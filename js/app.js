@@ -473,9 +473,11 @@ function onGesture(g) {
       gallery.hosts.forEach(h => { if (h.awake) { h.actor.nod(2); h.actor.hopOnce(0.03); } });
     }
   }
-  if (view === 'view-create' && composer && !$('#compose-wrap').hidden) {
-    if (g === 'swipeLeft') { composer.nextVariant(-1); syncVariant(); }
-    if (g === 'swipeRight') { composer.nextVariant(1); syncVariant(); }
+  if (view === 'view-create') {
+    const step = g === 'swipeLeft' ? -1 : g === 'swipeRight' ? 1 : 0;
+    if (!step) return;
+    if (!$('#compose-wrap').hidden) { composer?.nextVariant(step); syncVariant(); }
+    else { sculpt?.nextMaterial(step); syncMaterial(); }
   }
 }
 function onHands(hs) {
@@ -507,23 +509,7 @@ function onHands(hs) {
     if (h) { c.style.left = h.pinchX * innerWidth + 'px'; c.style.top = h.pinchY * innerHeight + 'px'; c.classList.toggle('pinch', h.pinch); }
   });
   if (!$('#compose-wrap').hidden) { composer?.handInput(hs); return; }
-  if (!sculpt) return;
-  // sculpt: right-hand pinch pulls, left-hand pinch presses; open hand turns; two open hands zoom
-  const pinch = hs.find(h => h.pinch);
-  if (pinch) {
-    sculpt.setMode(pinch.pinchX > 0.5 ? 'pull' : 'press');
-    sculpt.externalBrush({ x: pinch.pinchX * innerWidth, y: pinch.pinchY * innerHeight });
-  } else sculpt.externalBrush(null);
-  const open = hs.filter(h => h.open);
-  if (open.length === 2) {
-    const d = Math.hypot(open[0].x - open[1].x, open[0].y - open[1].y);
-    if (onHands.d0) sculpt.zoomBy(d / onHands.d0);
-    onHands.d0 = d; onHands.prev = null;
-  } else if (open.length === 1 && !pinch) {
-    const h = open[0];
-    if (onHands.prev) sculpt.rotateBy(h.x - onHands.prev[0], h.y - onHands.prev[1]);
-    onHands.prev = [h.x, h.y]; onHands.d0 = null;
-  } else { onHands.prev = null; onHands.d0 = null; }
+  sculpt?.handInput(hs);
 }
 
 // ---------------------------------------------------------------- 7 · create
@@ -536,42 +522,27 @@ async function enterCreate(mode = 'sculpt') {
 
 async function openSculpt() {
   $('#compose-wrap').hidden = true; $('#sculpt-canvas').hidden = false;
-  createStatus(t('sculptHint') + (tracker ? ' ' + t('sculptHands') : ''));
+  if ($('#collage-shelf')) $('#collage-shelf').hidden = true;
+  createStatus(t('monumentHint') + (tracker ? ' ' + t('monumentHands') : ''));
   $('#create-tools').innerHTML = `
-    <div class="segmented" role="group">
-      <button data-action="mode" data-mode="pull" aria-pressed="true">${esc(t('toolPull'))}</button>
-      <button data-action="mode" data-mode="press" aria-pressed="false">${esc(t('toolPress'))}</button>
-    </div>
-    <label>${esc(t('toolSize'))}<input type="range" id="tool-size" min="0.06" max="0.45" step="0.01" value="0.18"></label>
-    <label>${esc(t('toolStrength'))}<input type="range" id="tool-strength" min="0.1" max="1.5" step="0.05" value="0.5"></label>
-    <div class="segmented" role="group">
-      <button data-action="wire" data-wire="0" aria-pressed="true">${esc(t('viewSolid'))}</button>
-      <button data-action="wire" data-wire="1" aria-pressed="false">${esc(t('viewWire'))}</button>
-    </div>
-    <button class="btn small ghost" data-action="reset">${esc(t('resetModels'))}</button>
+    <div class="segmented" role="group" id="mat-group">${['marble', 'bronze', 'clay', 'painted'].map(m =>
+      `<button data-action="material" data-mat="${m}" aria-pressed="${m === 'marble'}">${esc(t(`materials.${m}`))}</button>`).join('')}</div>
     <button class="btn small" data-action="export-glb">${esc(t('exportGLB'))}</button>
     <button class="btn primary cta" data-action="card">${esc(t('makeCard'))}</button>`;
-  $('#tool-size').addEventListener('input', applyTools);
-  $('#tool-strength').addEventListener('input', applyTools);
   if (sculpt) return;
   const v = state.visitor;
-  let visitorModel;
-  if (v.kind === 'drawing') visitorModel = { glb: null, png: v.canvas.toDataURL('image/png') };
-  else visitorModel = { glb: state.look === 'photo' ? v.species.glb : v.species.glbStorybook, png: state.look === 'photo' ? v.species.cutout : v.species.storybook };
-  const { createSculpt } = await import('./sculpt.js');
-  sculpt = await createSculpt($('#sculpt-canvas'), {
-    models: [
-      { ...visitorModel, position: [-0.38, 0, 0.14], rotY: 0.3, scale: 0.95 },
-      { glb: state.host.glb, png: state.host.sprite, position: [0.38, 0, -0.12], rotY: -0.32, scale: 0.95 },
-    ],
-    onStatus: kind => { if (kind === 'fallback' && v.kind !== 'drawing') createStatus(t('modelFallback'), true); },
+  let visitorStatue;
+  if (v.kind === 'animal3d') { const a = animal3dById(v.id); visitorStatue = { kind: 'animal3d', glb: a.glb, height: a.height }; }
+  else visitorStatue = { kind: 'slab', src: v.kind === 'drawing' ? v.canvas : v.species.storybook, height: 0.55 };
+  const { createMonument } = await import('./monument.js');
+  sculpt = await createMonument($('#sculpt-canvas'), {
+    work: state.work, visitor: visitorStatue,
+    statues: state.hosts.map(h => ({ kind: 'slab', src: h.sprite, height: Math.min(0.75, Math.max(0.3, (hostMeta[h.id].box[3] - hostMeta[h.id].box[1]) / state.work.size[1] * 2.2)), flip: h.faces === 'left' })),
   });
-  applyTools();
   window.__aia.sculpt = sculpt;          // console/debug access only
 }
-function applyTools() {
-  if (!sculpt || !$('#tool-size')) return;
-  sculpt.setRadius(+$('#tool-size').value); sculpt.setStrength(+$('#tool-strength').value);
+function syncMaterial() {
+  document.querySelectorAll('#mat-group button').forEach(b => b.setAttribute('aria-pressed', b.dataset.mat === sculpt?.material));
 }
 function createStatus(text, append = false) {
   const el = $('#create-status');
@@ -579,48 +550,59 @@ function createStatus(text, append = false) {
   el.insertAdjacentHTML('beforeend', `<div>${esc(text)}</div>`);
 }
 
+let collage = null;
 async function openCompose() {
   $('#sculpt-canvas').hidden = true; $('#compose-wrap').hidden = false;
-  sculpt?.externalBrush(null);
   createStatus(t('composeHint') + (tracker ? ' ' + t('composeHands') : ''));
-  const { Composer, VARIANTS } = await import('./compose.js');
+  const { Composer, VARIANTS, SEASONS } = await import('./compose.js');
+  collage ??= await (await fetch('assets/collage/collage.json')).json();
   $('#create-tools').innerHTML = `
     <label>${esc(t('background'))}<select id="bg-select">${WORKS.map(w => `<option value="${w.id}" ${w.id === state.work.id ? 'selected' : ''}>${esc(W(w.id).title)}</option>`).join('')}</select></label>
+    <label>${esc(t('season'))}<select id="season-select">${SEASONS.map(v => `<option value="${v}">${esc(t(`seasons.${v}`))}</option>`).join('')}</select></label>
     <label>${esc(t('variant'))}<select id="variant-select">${VARIANTS.map(v => `<option value="${v}">${esc(t(`variants.${v}`))}</option>`).join('')}</select></label>
+    <button class="btn small ghost" data-action="remove-sel">${esc(t('removeSel'))}</button>
     <button class="btn primary cta" data-action="card">${esc(t('makeCard'))}</button>`;
+  // a shelf of every animal cut from the three paintings, plus your visitor
+  let shelf = $('#collage-shelf');
+  if (!shelf) { shelf = document.createElement('div'); shelf.id = 'collage-shelf'; shelf.className = 'collage-shelf glass'; $('#view-create').appendChild(shelf); }
+  shelf.hidden = false;
+  shelf.innerHTML = `<h3>${esc(t('addAnimals'))}</h3><div class="shelf-row">${Object.entries(collage).map(([id, c]) =>
+    `<button class="pick" data-action="add-collage" data-id="${id}"><img src="assets/collage/${id}.webp" alt=""><span>${esc(c.name)}</span></button>`).join('')}</div>`;
   if (!composer) {
-    const vimg = await visitorImage();
-    // the visitor is painted in the manner of the painting, as it was inside it
-    const painted = state.visitor.kind === 'drawing' ? vimg : await loadImage(await paintify(vimg.src, state.work.style, 520));
-    const host = await loadImage(state.host.sprite);
-    composer = new Composer($('#compose-canvas'), {
-      items: [
-        { img: painted, x: 0.38, y: 0.9, s: 0.26, r: 0, flip: false },
-        { img: host, x: 0.62, y: 0.9, s: 0.26, r: 0, flip: state.host.faces === 'right' },
-      ],
-    });
+    const v = state.visitor;
+    let vimg;
+    if (v.kind === 'animal3d') vimg = await loadImage(animal3dById(v.id).thumb);
+    else if (v.kind === 'drawing') vimg = v.canvas;
+    else vimg = await loadImage(v.species.storybook);
+    const items = [{ img: vimg, x: 0.36, y: 0.9, s: 0.24, r: 0, flip: false }];
+    for (const [k, h] of state.hosts.entries()) {
+      if (!collage[h.id]) continue;
+      items.push({ img: await loadImage(`assets/collage/${h.id}.webp`), x: 0.56 + k * 0.14, y: 0.9, s: 0.24, r: 0, flip: h.faces === 'right' });
+    }
+    composer = new Composer($('#compose-canvas'), { items });
     window.__aia.composer = composer;
     await setComposeBackground(state.work.id);
     addEventListener('resize', () => composer?.resize());
   }
   $('#bg-select').addEventListener('change', e => setComposeBackground(e.target.value));
   $('#variant-select').addEventListener('change', e => composer.setVariant(e.target.value));
+  $('#season-select').addEventListener('change', e => composer.setSeason(e.target.value));
+  composer.onChange = syncVariant;
   syncVariant();
 }
 async function setComposeBackground(id) {
   const w = workById(id);
   const own = id === state.work.id && !state.host.inPlace;   // the host left its place in its own painting
   await composer.setBackground(w, own ? { src: state.host.patch, box: hostMeta[state.host.id].box } : null);
-  if (composer.variant !== 'original') composer.setVariant(composer.variant);
 }
-function syncVariant() { if ($('#variant-select') && composer) $('#variant-select').value = composer.variant; }
+function syncVariant() { if ($('#variant-select') && composer) { $('#variant-select').value = composer.variant; $('#season-select').value = composer.season; } }
 
 function pressGroup(btn) { btn.parentElement.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b === btn)); }
 
 async function exportGLB() {
   const blob = await sculpt.exportGLB();
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = 'animals-in-the-archive-sculpture.glb';
+  a.href = URL.createObjectURL(blob); a.download = 'animals-in-the-archive-monument.glb';
   a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 
@@ -629,7 +611,7 @@ async function openCard() {
   const w = state.work, x = W(w.id), v = state.visitor;
   const composing = !$('#compose-wrap').hidden;
   const shot = composing ? composer.toDataURL() : sculpt.screenshot();
-  state.made = composing ? t('madePainting', { variant: t(`variants.${composer.variant}`) }) : t('madeSculpture');
+  state.made = composing ? t('madePainting', { variant: t(`variants.${composer.variant}`) }) : t('madeSculpture', { material: t(`materials.${sculpt.material}`) });
   const date = new Date();
   const blob = await makeCard({
     screenshot: shot, record: recordNumber(date), date: date.toISOString().slice(0, 10),
@@ -656,6 +638,7 @@ function teardown() {
   gallery?.dispose(); gallery = null;
   sculpt?.dispose(); sculpt = null;
   composer = null; clearBubbles(); status(''); controls('');
+  if ($('#collage-shelf')) $('#collage-shelf').hidden = true;
   $('#compose-canvas').getContext('2d').clearRect(0, 0, 9999, 9999);
 }
 function playAgain() {
@@ -731,9 +714,9 @@ document.addEventListener('click', e => {
     case 'create-mode':
       $('#create-modes').querySelectorAll('button').forEach(b => b.setAttribute('aria-selected', b === el));
       if (el.dataset.mode === 'sculpt') openSculpt(); else openCompose(); break;
-    case 'mode': pressGroup(el); sculpt?.setMode(el.dataset.mode); break;
-    case 'wire': pressGroup(el); sculpt?.setWireframe(el.dataset.wire === '1'); break;
-    case 'reset': sculpt?.reset(); break;
+    case 'material': pressGroup(el); sculpt?.setMaterial(el.dataset.mat); break;
+    case 'add-collage': loadImage(`assets/collage/${el.dataset.id}.webp`).then(img => composer?.addItem(img, 0.12 + Math.random() * 0.76, 0.7 + Math.random() * 0.25, 0.14 + Math.random() * 0.1)); break;
+    case 'remove-sel': composer?.removeSelected(); break;
     case 'export-glb': exportGLB(); break;
     case 'card': openCard(); break;
     case 'play-again': playAgain(); break;

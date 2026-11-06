@@ -410,3 +410,21 @@ body.in-stage .footer, body.in-sculpt .footer { display: none; }
   background: linear-gradient(to top, rgba(13,12,11,.95), rgba(13,12,11,0)); }
 .studio-cta .cta { min-width: min(420px, 80vw); }
 body.in-studio .footer { display: none; }
+
+/* collage shelf (create · new painting) */
+.collage-shelf { position: absolute; right: 16px; top: 76px; bottom: 110px; width: 148px; z-index: 6; padding: 12px 10px; border-radius: 16px; overflow: auto; }
+.collage-shelf h3 { font: 400 10.5px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); margin: 0 0 10px; }
+.collage-shelf .shelf-row { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: 1fr; overflow: visible; }
+.collage-shelf .pick img { height: 58px; }
+.collage-shelf .pick span { font-size: 13px; }
+@media (max-width: 760px) { .collage-shelf { top: auto; bottom: 120px; left: 12px; right: 12px; width: auto; height: 116px; }
+  .collage-shelf .shelf-row { grid-auto-flow: column; grid-auto-columns: 96px; grid-template-columns: none; overflow-x: auto; } }
+.compose-wrap { right: 176px; }
+@media (max-width: 760px) { .compose-wrap { right: 16px; bottom: 250px; } }
+
+/* create: tools sit in one slim row below the picture */
+#view-create .control-bar { flex-wrap: nowrap; gap: 8px; padding: 8px 10px; overflow-x: auto; }
+#view-create .control-bar .cta { min-height: 46px; padding: 0 22px; font-size: 14.5px; }
+#view-create .control-bar label { white-space: nowrap; }
+.compose-wrap { bottom: 96px; }
+@media (max-width: 760px) { #view-create .control-bar { flex-wrap: wrap; } }

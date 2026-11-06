@@ -421,7 +421,7 @@ export class Gallery {
   }
 
   // a believable "ground" inside the picture: further back is higher up
-  groundY(z) { return -this.ph / 2 + this.ph * 0.12 + (0.4 - z) * 0.22; }
+  groundY(z) { return -this.ph / 2 + this.ph * 0.22 + (0.4 - z) * 0.22; }
   randomGround() {
     const z = rand(-this.paintU.uDepth.value * 0.55, 0.4);
     return new THREE.Vector3(rand(-this.pw / 2 + 0.25, this.pw / 2 - 0.25), this.groundY(z), z);

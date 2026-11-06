@@ -10,7 +10,8 @@
 
 import { loadImage } from './paint.js';
 
-export const VARIANTS = ['original', 'night', 'autumn', 'engraving', 'prism', 'wash'];
+export const VARIANTS = ['original', 'night', 'engraving', 'prism', 'wash'];
+export const SEASONS = ['none', 'spring', 'summer', 'autumn', 'winter'];
 const MAXW = 1600;
 
 function toCanvas(img, maxW = MAXW) {
@@ -41,12 +42,6 @@ const FX = {
       d[i] = clamp((l * 0.55 + d[i] * 0.2) * k); d[i + 1] = clamp((l * 0.7 + d[i + 1] * 0.2) * k * 1.05); d[i + 2] = clamp((l + d[i + 2] * 0.3) * k * 1.25);
     }
   }),
-  autumn: s => pixels(s, d => {
-    for (let i = 0; i < d.length; i += 4) {
-      const r = d[i], g = d[i + 1], b = d[i + 2];
-      d[i] = clamp(r * 1.12 + g * 0.18); d[i + 1] = clamp(g * 0.82 + r * 0.12); d[i + 2] = clamp(b * 0.62);
-    }
-  }),
   engraving: s => pixels(s, (d, w, h) => {
     const sp = Math.max(3, w / 380);
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
@@ -75,12 +70,50 @@ const FX = {
   }),
 };
 
+// seasons recolour the greens and add weather, keeping the painting's own light
+function seasonFX(src, season) {
+  if (season === 'none') return src;
+  const c = pixels(src, (d, w, h) => {
+    for (let i = 0; i < d.length; i += 4) {
+      const r = d[i], g = d[i + 1], b = d[i + 2];
+      const green = Math.max(0, g - (r + b) / 2) / 255;          // how much this pixel is foliage
+      const l = r * 0.3 + g * 0.59 + b * 0.11;
+      if (season === 'autumn') { d[i] = clamp(r + green * 210); d[i + 1] = clamp(g - green * 40); d[i + 2] = clamp(b * (1 - green * 0.8)); }
+      else if (season === 'winter') { const k = 0.55; d[i] = clamp(l * k + r * (1 - k) * 0.6 + 60); d[i + 1] = clamp(l * k + g * (1 - k) * 0.6 + 64); d[i + 2] = clamp(l * k + b * (1 - k) * 0.6 + 82); }
+      else if (season === 'spring') { d[i] = clamp(r * 1.02 + green * 30); d[i + 1] = clamp(g * 1.08 + 8); d[i + 2] = clamp(b * 1.02); }
+      else if (season === 'summer') { d[i] = clamp(r * 1.1 + 12); d[i + 1] = clamp(g * 1.04 + 6); d[i + 2] = clamp(b * 0.88); }
+    }
+  });
+  const x = c.getContext('2d'), W = c.width, H = c.height;
+  const rnd = (k => () => (k = (k * 16807) % 2147483647) / 2147483647)(7);
+  if (season === 'winter') {                      // snow on the ground and falling
+    const g = x.createLinearGradient(0, H * 0.72, 0, H); g.addColorStop(0, 'rgba(245,248,255,0)'); g.addColorStop(1, 'rgba(245,248,255,.55)');
+    x.fillStyle = g; x.fillRect(0, 0, W, H);
+    x.fillStyle = 'rgba(255,255,255,.85)';
+    for (let i = 0; i < W * H / 2500; i++) { x.beginPath(); x.arc(rnd() * W, rnd() * H, 0.6 + rnd() * W / 600, 0, 7); x.fill(); }
+  } else if (season === 'spring') {               // blossom petals
+    for (let i = 0; i < W * H / 6000; i++) {
+      x.fillStyle = `rgba(${245 + rnd() * 10},${190 + rnd() * 40},${205 + rnd() * 30},.85)`;
+      x.beginPath(); x.ellipse(rnd() * W, rnd() * H * 0.8, W / 420, W / 700, rnd() * 3, 0, 7); x.fill();
+    }
+  } else if (season === 'autumn') {               // falling leaves
+    for (let i = 0; i < W * H / 9000; i++) {
+      x.fillStyle = ['#b5551d', '#d48a2a', '#8f3a14', '#c9a038'][Math.floor(rnd() * 4)];
+      x.beginPath(); x.ellipse(rnd() * W, rnd() * H, W / 300, W / 600, rnd() * 3, 0, 7); x.fill();
+    }
+  } else if (season === 'summer') {               // warm haze from the sky
+    const g = x.createLinearGradient(0, 0, 0, H * 0.6); g.addColorStop(0, 'rgba(255,214,140,.22)'); g.addColorStop(1, 'rgba(255,214,140,0)');
+    x.fillStyle = g; x.fillRect(0, 0, W, H);
+  }
+  return c;
+}
+
 export class Composer {
   constructor(canvas, { items, onChange } = {}) {
     this.cv = canvas; this.ctx = canvas.getContext('2d');
     this.items = items;                 // [{img, name, x, y, s, r, flip}] x,y in 0..1 of the picture (feet)
     this.onChange = onChange;
-    this.variant = 'original';
+    this.variant = 'original'; this.season = 'none';
     this.cache = {};
     this.sel = null;
     this.bindPointer();
@@ -95,15 +128,25 @@ export class Composer {
       const s = base.width / work.size[0], [x0, y0, x1, y1] = patch.box;
       base.getContext('2d').drawImage(p, x0 * s, y0 * s, (x1 - x0) * s, (y1 - y0) * s);
     }
-    this.work = work; this.base = base; this.cache = { original: base };
+    this.work = work; this.base = base; this.cache = {};
+    this.refresh();
     this.resize(); this.render();
   }
 
   setVariant(v) {
-    this.variant = v;
-    if (!this.cache[v]) this.cache[v] = FX[v](this.base);
-    this.render(); this.onChange?.(v);
+    this.variant = v; this.refresh(); this.onChange?.(v);
   }
+  setSeason(sn) { this.season = sn; this.refresh(); this.onChange?.(this.variant); }
+  refresh() {
+    const key = this.variant + '|' + this.season;
+    if (!this.cache[key]) this.cache[key] = FX[this.variant](seasonFX(this.base, this.season));
+    this.render();
+  }
+  addItem(img, x = 0.5, y = 0.85, s = 0.22) {
+    const it = { img, x, y, s, r: 0, flip: false };
+    this.items.push(it); this.sel = it; this.render(); return it;
+  }
+  removeSelected() { if (this.sel) { this.items.splice(this.items.indexOf(this.sel), 1); this.sel = null; this.render(); } }
   nextVariant(step = 1) {
     const i = (VARIANTS.indexOf(this.variant) + step + VARIANTS.length) % VARIANTS.length;
     this.setVariant(VARIANTS[i]);
@@ -130,7 +173,7 @@ export class Composer {
   render() {
     if (!this.base) return;
     const c = this.ctx, W = this.cv.width, H = this.cv.height;
-    c.drawImage(this.cache[this.variant] || this.base, 0, 0, W, H);
+    c.drawImage(this.cache[this.variant + '|' + this.season] || this.base, 0, 0, W, H);
     for (const it of this.items) {
       const r = this.rect(it);
       // soft ground shadow
