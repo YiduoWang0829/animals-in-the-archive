@@ -1,68 +1,77 @@
-// Collection data (non-text). Text for each work lives in js/strings.js → works.
-// Coordinates are fractions of the painting's width / height.
+// Collection data (non-text). Text lives in js/strings.js.
 
+// sizes are the HD images in assets/paintings/hd; `realWidth` is the hung width in
+// metres in the gallery (proportional to the real works, slightly enlarged)
 export const WORKS = [
   {
-    id: 'eden',
-    accession: 'AIA.1615.001',
+    id: 'eden', accession: 'AIA.1615.001', style: 'eden',
     image: 'assets/paintings/garden-of-eden.jpg',
-    size: [960, 620],
-    style: 'eden',                       // painterly treatment key (js/paint.js)
-    host: {
-      id: 'eden-lion',
-      sprite: 'assets/sprites/eden-lion.png',
-      plate: 'assets/sprites/eden-lion-plate.jpg',
-      glb: 'assets/sprites/glb/eden-lion.glb',
-      box: [687, 346, 785, 452],          // pixels in the painting (sprites.json)
-    },
-    // visitor walks in from `side` and stops with its feet at `end`
-    entry: { side: 'left', end: [0.6, 0.715], width: 0.1 },
+    hd: 'assets/paintings/hd/garden-of-eden.jpg',
+    depth: 'assets/paintings/depth/garden-of-eden.png',
+    size: [2400, 1550], realWidth: 2.3,
+    hosts: ['eden-lion', 'eden-horse', 'eden-deer', 'eden-rabbit', 'eden-dog', 'eden-peacock'],
+    wall: 0x2a2622,
   },
   {
-    id: 'durer',
-    accession: 'AIA.1513.002',
+    id: 'durer', accession: 'AIA.1513.002', style: 'durer',
     image: 'assets/paintings/knight-death-devil.jpg',
-    size: [960, 1247],
-    style: 'durer',
-    host: {
-      id: 'durer-dog',
-      sprite: 'assets/sprites/durer-dog.png',
-      plate: 'assets/sprites/durer-dog-plate.jpg',
-      glb: 'assets/sprites/glb/durer-dog.glb',
-      box: [431, 890, 654, 1044],
-    },
-    entry: { side: 'left', end: [0.27, 0.975], width: 0.24 },
+    hd: 'assets/paintings/hd/knight-death-devil.jpg',
+    depth: 'assets/paintings/depth/knight-death-devil.png',
+    size: [1847, 2400], realWidth: 1.45,
+    hosts: ['durer-horse', 'durer-dog'],
+    wall: 0x24231f,
   },
   {
-    id: 'marc',
-    accession: 'AIA.1913.003',
+    id: 'marc', accession: 'AIA.1913.003', style: 'marc',
     image: 'assets/paintings/fate-of-the-animals.jpg',
-    size: [960, 718],
-    style: 'marc',
-    host: {
-      id: 'marc-deer',
-      sprite: 'assets/sprites/marc-deer.png',
-      plate: 'assets/sprites/marc-deer-plate.jpg',
-      glb: 'assets/sprites/glb/marc-deer.glb',
-      box: [375, 272, 573, 693],
-    },
-    entry: { side: 'right', end: [0.77, 0.975], width: 0.21 },
+    hd: 'assets/paintings/hd/fate-of-the-animals.jpg',
+    depth: 'assets/paintings/depth/fate-of-the-animals.png',
+    size: [2385, 1783], realWidth: 2.4,
+    hosts: ['marc-deer', 'marc-boar'],
+    wall: 0x22252a,
   },
 ];
 
-// Visitor species. `faces` = direction the head points in the photograph.
-// `doodle` = DoodleNet (QuickDraw) classes that count as this species.
+// Painted animals that can come alive. box = sprite rect in HD pixels (hosts.json).
+// faces = where its head points; inPlace = too big / interlocked to walk away.
+export const HOSTS = {
+  'eden-lion':    { faces: 'left',  name: 'lion' },
+  'eden-horse':   { faces: 'left',  name: 'white horse' },
+  'eden-deer':    { faces: 'left',  name: 'stag' },
+  'eden-rabbit':  { faces: 'left',  name: 'rabbit' },
+  'eden-dog':     { faces: 'left',  name: 'little dog' },
+  'eden-peacock': { faces: 'right', name: 'peacock' },
+  'durer-horse':  { faces: 'left',  name: 'knight’s horse', inPlace: true },
+  'durer-dog':    { faces: 'left',  name: 'hound' },
+  'marc-deer':    { faces: 'left',  name: 'blue deer' },
+  'marc-boar':    { faces: 'right', name: 'red boar' },
+};
+for (const [id, h] of Object.entries(HOSTS)) {
+  h.id = id; h.sprite = `assets/hosts/${id}.png`; h.patch = `assets/hosts/${id}-patch.jpg`;
+}
+
+// Visitor species. faces = direction of the head in the photograph.
+// doodle = DoodleNet (QuickDraw) classes that count as this species.
+// gait = force 'hop' for animals that hop rather than walk.
 export const SPECIES = [
-  { id: 'brown_bear', file: 'brown_bear_24160860', faces: 'right', doodle: ['bear', 'teddy-bear', 'panda'] },
-  { id: 'grey_wolf',  file: 'grey_wolf_4909114',  faces: 'right', doodle: ['dog'] },
-  { id: 'lion',       file: 'lion_236419',        faces: 'left',  doodle: ['lion'] },
-  { id: 'red_deer',   file: 'red_deer_10941056',  faces: 'left',  doodle: ['horse', 'giraffe', 'camel', 'cow', 'kangaroo'] },
-  { id: 'red_fox',    file: 'red_fox_2262475',    faces: 'left',  doodle: ['raccoon', 'squirrel'] },
-  { id: 'tiger',      file: 'tiger_50541307',     faces: 'right', doodle: ['tiger', 'cat'] },
+  { id: 'domestic_cat', file: 'domestic_cat_236808539', faces: 'right', doodle: ['cat'] },
+  { id: 'domestic_dog', file: 'domestic_dog_251913625', faces: 'right', doodle: ['dog'] },
+  { id: 'rabbit',       file: 'rabbit_78502673',        faces: 'left',  doodle: ['rabbit'], gait: 'hop' },
+  { id: 'red_deer',     file: 'red_deer_10941056',      faces: 'left',  doodle: ['giraffe', 'camel', 'kangaroo'] },
+  { id: 'horse',        file: 'horse_121483510',        faces: 'left',  doodle: ['horse', 'cow', 'zebra'] },
+  { id: 'red_fox',      file: 'red_fox_2262475',        faces: 'left',  doodle: ['raccoon'] },
+  { id: 'red_squirrel', file: 'red_squirrel_171989381', faces: 'right', doodle: ['squirrel', 'mouse'] },
+  { id: 'hedgehog',     file: 'hedgehog_203070926',     faces: 'right', doodle: ['hedgehog'] },
+  { id: 'owl',          file: 'owl_324147361',          faces: 'right', doodle: ['owl', 'bird', 'parrot', 'duck'], gait: 'hop' },
+  { id: 'brown_bear',   file: 'brown_bear_24160860',    faces: 'right', doodle: ['bear', 'teddy-bear', 'panda'] },
+  { id: 'grey_wolf',    file: 'grey_wolf_4909114',      faces: 'right', doodle: [] },
+  { id: 'lion',         file: 'lion_236419',            faces: 'left',  doodle: ['lion'] },
+  { id: 'tiger',        file: 'tiger_50541307',         faces: 'right', doodle: ['tiger'] },
 ].map(s => ({
   ...s,
   original: `assets/animals/originals/${s.file}.png`,
   cutout: `assets/animals/cutouts/${s.file}.png`,
+  storybook: `assets/animals/storybook/${s.file}.png`,
   glb: `assets/animals/glb/${s.file}.glb`,
 }));
 

@@ -16,6 +16,6 @@ for n in ["garden-of-eden", "knight-death-devil", "fate-of-the-animals"]:
     d = np.array(pipe(small)["predicted_depth"].squeeze().cpu(), dtype=np.float32)
     d = (d - d.min()) / (d.max() - d.min() + 1e-6)          # relative inverse depth: 1 = near
     out = Image.fromarray((d * 255).astype(np.uint8)).resize(small.size, Image.BICUBIC)
-    out = out.filter(ImageFilter.GaussianBlur(1.2))
+    out = out.filter(ImageFilter.GaussianBlur(1.2)).filter(ImageFilter.GaussianBlur(3.5))   # soft steps = less tearing in 3D
     out.save(f"assets/paintings/depth/{n}.png")
     print(n, out.size)
