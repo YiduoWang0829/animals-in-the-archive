@@ -428,3 +428,4 @@ body.in-studio .footer { display: none; }
 #view-create .control-bar label { white-space: nowrap; }
 .compose-wrap { bottom: 96px; }
 @media (max-width: 760px) { #view-create .control-bar { flex-wrap: wrap; } }
+.tt-tools:empty { display: none; }

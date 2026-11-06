@@ -211,6 +211,7 @@ async function openStudio(notice = '') {
 // show a character on the stage and update the big button
 function choose(c) {
   state.choice = c;
+  if (!turntable) return;                 // the stage is still loading; openStudio shows the choice when ready
   document.querySelectorAll('.pick').forEach(p => p.setAttribute('aria-pressed',
     (c.kind === 'animal3d' && p.dataset.id === c.id) || (c.kind === 'species' && p.dataset.species === c.species.id)));
   const tools = $('#tt-tools'), img2d = $('#tt-2d'), name = $('#tt-name');
@@ -612,14 +613,15 @@ async function openCard() {
   const w = state.work, x = W(w.id), v = state.visitor;
   const composing = !$('#compose-wrap').hidden;
   const shot = composing ? composer.toDataURL() : sculpt.screenshot();
-  state.made = composing ? t('madePainting', { variant: t(`variants.${composer.variant}`) }) : t('madeSculpture', { material: t(`materials.${sculpt.material}`) });
+  state.made = composing ? t('madePainting', { variant: t(`variants.${composer.variant}`) }) : t('madeSculpture', { material: t(`materials.${sculpt.material}`).toLowerCase() });
   const date = new Date();
   const blob = await makeCard({
     screenshot: shot, record: recordNumber(date), date: date.toISOString().slice(0, 10),
     work: w, workText: x, roleName: t(`roles.${state.role}.name`),
-    speciesName: v.kind === 'drawing' ? t('yourDrawing') : `${t(`species.${v.species.id}`)} (${t(`speciesLatin.${v.species.id}`)})`,
-    hostName: hostName(), mood: t(`moods.${state.role}.${state.answer || 'yes'}`), made: state.made,
-    photoCredit: v.kind === 'drawing' ? t('cardDrawingCredit') : t('cardPhotoCredit', { file: v.species.file + '.png' }),
+    speciesName: v.kind === 'species' ? `${t(`species.${v.species.id}`)} (${t(`speciesLatin.${v.species.id}`)})` : visitorName(),
+    hostName: state.hosts.map(h => t(`hostNames.${h.id}`)).join(', '), mood: t(`moods.${state.role}.${state.answer || 'yes'}`), made: state.made,
+    photoCredit: v.kind === 'drawing' ? t('cardDrawingCredit') : v.kind === 'animal3d' ? t('card3dCredit', { name: t(`animals3d.${v.id}`) })
+      : t('cardPhotoCredit', { file: v.species.file + '.png' }),
     figure: composing,
   });
   if (cardUrl) URL.revokeObjectURL(cardUrl);
