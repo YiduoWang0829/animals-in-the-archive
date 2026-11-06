@@ -1,0 +1,56 @@
+{
+ "red_fox_2262475": {
+  "category": "red_fox",
+  "query_scientific_name": "Vulpes vulpes",
+  "observation_id": "1859843",
+  "photo_id": "2262475",
+  "record_url": "https://www.inaturalist.org/observations/1859843",
+  "licence": "cc-by",
+  "attribution": "(c) botanygirl, some rights reserved (CC BY)"
+ },
+ "tiger_50541307": {
+  "category": "tiger",
+  "query_scientific_name": "Panthera tigris",
+  "observation_id": "32235759",
+  "photo_id": "50541307",
+  "record_url": "https://www.inaturalist.org/observations/32235759",
+  "licence": "cc-by",
+  "attribution": "(c) wild_wind, some rights reserved (CC BY)"
+ },
+ "lion_236419": {
+  "category": "lion",
+  "query_scientific_name": "Panthera leo",
+  "observation_id": "163263",
+  "photo_id": "236419",
+  "record_url": "https://www.inaturalist.org/observations/163263",
+  "licence": "cc-by",
+  "attribution": "(c) 66dodge, some rights reserved (CC BY)"
+ },
+ "grey_wolf_4909114": {
+  "category": "grey_wolf",
+  "query_scientific_name": "Canis lupus",
+  "observation_id": "4126404",
+  "photo_id": "4909114",
+  "record_url": "https://www.inaturalist.org/observations/4126404",
+  "licence": "cc-by",
+  "attribution": "(c) Desiree L. Narango, some rights reserved (CC BY)"
+ },
+ "brown_bear_24160860": {
+  "category": "brown_bear",
+  "query_scientific_name": "Ursus arctos",
+  "observation_id": "16123410",
+  "photo_id": "24160860",
+  "record_url": "https://www.inaturalist.org/observations/16123410",
+  "licence": "cc0",
+  "attribution": "no rights reserved"
+ },
+ "red_deer_10941056": {
+  "category": "red_deer",
+  "query_scientific_name": "Cervus elaphus",
+  "observation_id": "8249012",
+  "photo_id": "10941056",
+  "record_url": "https://www.inaturalist.org/observations/8249012",
+  "licence": "cc-by",
+  "attribution": "(c) Michael Bakker Paiva, some rights reserved (CC BY)"
+ }
+}

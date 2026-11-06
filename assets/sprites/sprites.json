@@ -1,0 +1,47 @@
+{
+  "eden-lion": {
+    "painting": "assets/paintings/garden-of-eden.jpg",
+    "size": [
+      960,
+      620
+    ],
+    "box": [
+      687,
+      346,
+      785,
+      452
+    ],
+    "sprite": "assets/sprites/eden-lion.png",
+    "plate": "assets/sprites/eden-lion-plate.jpg"
+  },
+  "durer-dog": {
+    "painting": "assets/paintings/knight-death-devil.jpg",
+    "size": [
+      960,
+      1247
+    ],
+    "box": [
+      431,
+      890,
+      654,
+      1044
+    ],
+    "sprite": "assets/sprites/durer-dog.png",
+    "plate": "assets/sprites/durer-dog-plate.jpg"
+  },
+  "marc-deer": {
+    "painting": "assets/paintings/fate-of-the-animals.jpg",
+    "size": [
+      960,
+      718
+    ],
+    "box": [
+      375,
+      272,
+      573,
+      693
+    ],
+    "sprite": "assets/sprites/marc-deer.png",
+    "plate": "assets/sprites/marc-deer-plate.jpg"
+  }
+}

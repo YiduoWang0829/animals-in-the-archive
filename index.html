@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Animals in the Archive</title>
+  <meta name="description" content="An interactive digital collection: send an animal from a photographic archive into three paintings, meet the animal painted there, and sculpt them together.">
+  <meta name="author" content="Yiduo Wang">
+  <meta name="theme-color" content="#0d0c0b">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Three.js is vendored locally (see vendor/) and resolved through this import map -->
+  <script type="importmap">
+    { "imports": {
+        "three": "./vendor/three-0.170.0/build/three.module.js",
+        "three/addons/": "./vendor/three-0.170.0/examples/jsm/"
+    } }
+  </script>
+</head>
+<body>
+  <header class="masthead">
+    <a class="brand" href="#" data-action="home">
+      <span class="brand-mark" aria-hidden="true">AiA</span>
+      <span class="brand-name" data-i18n="siteTitle"></span>
+    </a>
+    <nav class="nav">
+      <a href="#" data-action="home" data-i18n="navCollection"></a>
+      <a href="#" data-action="credits" data-i18n="navCredits"></a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- 1 · Collection index -->
+    <section id="view-index" class="view is-active" aria-labelledby="index-title">
+      <div class="intro">
+        <p class="kicker" data-i18n="siteKicker"></p>
+        <h1 id="index-title" class="display" data-i18n="siteTitle"></h1>
+        <p class="lede" data-i18n="siteIntro"></p>
+      </div>
+      <div class="index-head">
+        <h2 class="caption-heading" data-i18n="indexHeading"></h2>
+        <span class="caption" id="index-count"></span>
+      </div>
+      <ol class="catalogue" id="catalogue"></ol>
+    </section>
+
+    <!-- 4–6 · The painting: entrance and reply -->
+    <section id="view-stage" class="view" aria-label="Painting">
+      <div class="stage-wrap" id="stage-wrap">
+        <div class="stage" id="stage">
+          <div class="moulding" aria-hidden="true"></div>
+          <div class="outside-layer" id="outside-layer"></div>
+          <div class="picture" id="picture">
+            <img class="picture-img" id="picture-img" alt="">
+          </div>
+          <div class="bubble-layer" id="bubble-layer"></div>
+        </div>
+      </div>
+      <div class="wall-label glass" id="wall-label"></div>
+      <div class="control-bar glass" id="stage-controls"></div>
+    </section>
+
+    <!-- 7 · Sculpture room -->
+    <section id="view-sculpt" class="view" aria-label="Sculpture room">
+      <div class="sculpt-canvas" id="sculpt-canvas"></div>
+      <div class="sculpt-status glass" id="sculpt-status"></div>
+      <div class="hand-preview glass" id="hand-preview" hidden>
+        <video id="hand-video" playsinline muted></video>
+      </div>
+      <div class="hand-cursor" id="hand-cursor" hidden></div>
+      <div class="control-bar glass sculpt-tools" id="sculpt-tools"></div>
+    </section>
+
+    <!-- Credits -->
+    <section id="view-credits" class="view" aria-labelledby="credits-title">
+      <div class="intro narrow">
+        <h1 id="credits-title" class="display small" data-i18n="creditsHeading"></h1>
+        <div id="credits-body" class="credits"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer caption" data-i18n="footer"></footer>
+
+  <!-- One reusable frosted-glass modal -->
+  <div class="modal" id="modal" role="dialog" aria-modal="true" hidden>
+    <div class="modal-scrim" data-action="close-modal"></div>
+    <div class="modal-panel glass" id="modal-panel"></div>
+  </div>
+
+  <!-- SVG filters: irregular brush edge for the painted visitor, one per painting -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <filter id="brush-eden" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="2" seed="3"/>
+      <feDisplacementMap in="SourceGraphic" scale="4" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="brush-durer" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.12" numOctaves="1" seed="8"/>
+      <feDisplacementMap in="SourceGraphic" scale="2.5" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="brush-marc" x="-8%" y="-8%" width="116%" height="116%">
+      <feTurbulence type="turbulence" baseFrequency="0.018 0.045" numOctaves="2" seed="11"/>
+      <feDisplacementMap in="SourceGraphic" scale="9" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </svg>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
