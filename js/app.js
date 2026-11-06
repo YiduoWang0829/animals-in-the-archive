@@ -285,27 +285,42 @@ async function enterStage(visitor) {
   closeModal(); show('stage');
   status(`<span class="loading"></span>${esc(t('loadingRoom'))}`); controls('');
   const w = state.work;
-  // a different painted animal may wake up each visit
-  state.host = HOSTS[w.hosts[Math.floor(Math.random() * w.hosts.length)]];
+  // a different set of painted animals wakes up each visit (the first one speaks for them)
+  const order = [...w.hosts].sort(() => Math.random() - 0.5);
+  const free = order.filter(id => !HOSTS[id].inPlace), fixed = order.filter(id => HOSTS[id].inPlace);
+  const pick = (fixed.length && Math.random() < 0.5 ? [fixed[0]] : []).concat(free).slice(0, Math.min(3, w.hosts.length));
+  state.hosts = pick.map(id => HOSTS[id]);
+  state.host = state.hosts[0];
   hostMeta ??= await (await fetch('assets/hosts/hosts.json')).json();
-  const img = await visitorImage();
+  const actor = await makeVisitorActor();
   gallery?.dispose();
   const { Gallery } = await import('./gallery.js');
   gallery = new Gallery($('#stage3d'), {
-    work: w, workText: W(w.id), visitorImage: img,
-    visitorHead: visitor.kind === 'drawing' ? visitor.facing : visitor.species.faces,
-    visitorLit: state.look === 'photo' && visitor.kind !== 'drawing',
-    visitorGait: visitor.kind === 'drawing' ? undefined : visitor.species.gait,
-    host: state.host, hostMeta: hostMeta[state.host.id],
+    work: w, workText: W(w.id), visitor: actor,
+    hosts: state.hosts.map(h => ({ host: h, meta: hostMeta[h.id] })),
     onFrame: g => { placeBubbles(g); stageFrame(g); },
+    onEvent: (kind, i) => { if (kind === 'run' && Math.random() < 0.5) sayHost(i, pickLine(t('runAway'))); },
   });
   await gallery.init();
   status('');
   runStory(gallery);
 }
 
+// the visitor as an actor: a 2D character (drawing / storybook / photo cut-out)
+async function makeVisitorActor() {
+  const v = state.visitor;
+  const { Character } = await import('./character.js');
+  if (v.kind === 'drawing') return new Character(v.canvas, { height: 0.55, headSide: v.facing });
+  const img = await visitorImage();
+  return new Character(img, { height: 0.55, headSide: v.species.faces, lit: state.look === 'photo', gait: v.species.gait });
+}
+
+const pickLine = arr => arr[Math.floor(Math.random() * arr.length)];
+const hostNameOf = i => cap(t(`hostNames.${state.hosts[i].id}`));
+function sayHost(i, text) { say(i, hostNameOf(i), text); }
+
 const visitorName = () => state.visitor.kind === 'drawing' ? t('yourDrawing') : t(`species.${state.visitor.species.id}`);
-const hostName = () => t(`hostNames.${state.host.id}`);
+const hostName = () => t(`hostNames.${state.host.id}`);   // the first painted animal
 
 async function runStory(g) {
   const x = W(state.work.id);
@@ -319,13 +334,24 @@ async function runStory(g) {
   if (g !== gallery) return;
   bubbles.get('visitor')?.classList.remove('show');
   await g.approach();
-  await g.wakeHost();
+  // the first painted animal wakes and speaks
+  await g.wakeHost(0, 0);
   if (g !== gallery) return;
   state.hostAwake = true;
-  say('host', cap(hostName()), `${t(`works.${state.work.id}.welcome`, { visitor: visitorName() })} ${x.greet[state.role]}`);
-  await sleep(3200);
+  sayHost(0, `${t(`works.${state.work.id}.welcome`, { visitor: visitorName() })} ${x.greet[state.role]}`);
+  await sleep(2600);
+  // the others wake up one by one, curious about the visitor
+  const chorus = [...x.chorus].sort(() => Math.random() - 0.5);
+  for (let i = 1; i < state.hosts.length; i++) {
+    if (g !== gallery) return;
+    g.wakeHost(i, i % 2 ? -1 : 1);
+    await sleep(1400);
+    sayHost(i, chorus[(i - 1) % chorus.length]);
+    await sleep(1900);
+  }
   if (g !== gallery) return;
-  say('host', cap(hostName()), t('hostAsk'));
+  for (let i = 1; i < state.hosts.length; i++) bubbles.get(i)?.classList.remove('show');
+  sayHost(0, t('hostAsk'));
   state.awaiting = true;
   controls(`${tracker ? `<span class="hint">${esc(t('answerHint'))}</span>` : ''}
     <button class="btn" data-action="answer" data-answer="no">${esc(t('no'))}</button>
@@ -339,10 +365,10 @@ async function answer(a) {
   controls('');
   say('visitor', cap(visitorName()), a === 'yes' ? t('visitorYes') : t('visitorNo'));
   await sleep(900);
-  say('host', cap(hostName()), x[a]);
+  sayHost(0, x[a]);
   if (a === 'yes') { await sleep(2600); await stepIn(g); }
   else {
-    await g.hostRefuses();
+    await g.hostsRefuse();
     controls(`<button class="btn" data-action="home">${esc(t('anotherPainting'))}</button>
       <button class="btn primary cta" data-action="step-in">${esc(t('stepInAnyway'))}</button>`);
   }
@@ -357,29 +383,59 @@ async function stepIn(g = gallery) {
   state.inside = true;
   status(esc(tracker ? t('insideHint') : t('insideHintMouse')));
   controls(`<button class="btn primary cta" data-action="to-create">${esc(t('create'))}</button>`);
+  // now and then one of them says something
+  const chorus = W(state.work.id).chorus;
+  (async () => {
+    while (gallery === g && g.inside) {
+      await sleep(7000 + Math.random() * 5000);
+      if (gallery !== g) break;
+      const i = Math.floor(Math.random() * state.hosts.length);
+      sayHost(i, pickLine(chorus));
+      setTimeout(() => bubbles.get(i)?.classList.remove('show'), 4200);
+    }
+  })();
 }
 
 // per frame: parallax from your head (or the mouse) and the host's role reaction
-let pointer = null;
+let pointer = null, drag = null;
 function stageFrame(g) {
   if (face) g.parallax.set((face.x - 0.5) * 2.2, -(face.y - 0.45) * 2.2);
-  else if (pointer) g.parallax.set(pointer[0], pointer[1]);
-  if (state.hostAwake && !g.host.target && !g.inside) {
-    // where are you? your face, your hand, or the mouse, in screen x
-    const you = face ? face.x * innerWidth : hands[0] ? hands[0].x * innerWidth : pointer ? (pointer[0] + 1) / 2 * innerWidth : null;
-    if (you !== null) {
-      const hx = g.project(g.anchor('host')).x;
-      const toward = Math.sign(you - hx) || 1;
-      g.host.setDir(state.role === 'guard' ? -toward : toward);   // the guard's host turns away
-    }
-  }
+  else if (pointer && !g.inside) g.parallax.set(pointer[0], pointer[1]);
+  if (!state.hostAwake || g.inside) return;
+  // where are you? your face, your hand, or the mouse, in screen x
+  const you = face ? face.x * innerWidth : hands[0] ? hands[0].x * innerWidth : pointer ? (pointer[0] + 1) / 2 * innerWidth : null;
+  if (you === null) return;
+  g.hosts.forEach((h, i) => {
+    if (!h.awake || h.actor.target) return;
+    const hx = g.project(g.anchor(i)).x;
+    const toward = Math.sign(you - hx) || 1;
+    h.actor.setDir(state.role === 'guard' ? -toward : toward);   // the guard's animals turn away
+  });
 }
-$('#stage3d').addEventListener('pointermove', e => {
+const stage3d = $('#stage3d');
+stage3d.addEventListener('pointermove', e => {
   pointer = [e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight * 2 - 1)];
+  if (drag && gallery?.inside) {
+    gallery.look(-(e.clientX - drag[0]) * 0.003, (e.clientY - drag[1]) * 0.002);
+    if (Math.hypot(e.clientX - drag[2], e.clientY - drag[3]) > 6) drag.moved = true;
+    drag[0] = e.clientX; drag[1] = e.clientY;
+  }
 });
-$('#stage3d').addEventListener('pointerdown', e => {
-  if (gallery?.inside) gallery.walkVisitorToScreen(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight * 2 - 1));
+stage3d.addEventListener('pointerdown', e => { drag = [e.clientX, e.clientY, e.clientX, e.clientY]; });
+stage3d.addEventListener('pointerup', e => {
+  const wasDrag = drag?.moved; drag = null;
+  if (!gallery?.inside || wasDrag) return;
+  const nx = e.clientX / innerWidth * 2 - 1, ny = -(e.clientY / innerHeight * 2 - 1);
+  tapInside(nx, ny);
 });
+stage3d.addEventListener('wheel', e => { if (gallery?.inside) { e.preventDefault(); gallery.zoomBy(-e.deltaY * 0.0015); } }, { passive: false });
+
+// a tap/pinch inside the picture: call the animal under it, or walk there
+function tapInside(nx, ny) {
+  const i = gallery.hostAt(nx, ny);
+  if (i >= 0) { gallery.callHost(i); sayHost(i, pickLine(t('called'))); setTimeout(() => bubbles.get(i)?.classList.remove('show'), 3600); }
+  else gallery.walkVisitorToScreen(nx, ny);
+}
 
 // ---------------------------------------------------------------- camera events
 let lastPinchWalk = 0;
@@ -390,8 +446,9 @@ function onGesture(g) {
     else if (g === 'shake' && state.awaiting) answer('no');
     else if (g === 'wave') {
       gallery.visitor.hopOnce(0.1); gallery.visitor.nod(2);
-      if (!gallery.inside) say('visitor', cap(visitorName()), t('waveReply'));
-      if (state.hostAwake) gallery.host.nod(2);
+      say('visitor', cap(visitorName()), t('waveReply'));
+      setTimeout(() => bubbles.get('visitor')?.classList.remove('show'), 2500);
+      gallery.hosts.forEach(h => { if (h.awake) { h.actor.nod(2); h.actor.hopOnce(0.03); } });
     }
   }
   if (view === 'view-create' && composer && !$('#compose-wrap').hidden) {
@@ -403,10 +460,21 @@ function onHands(hs) {
   const view = document.querySelector('.view.is-active')?.id;
   // inside the painting: pinch in the air to send the visitor there
   if (view === 'view-stage' && gallery?.inside) {
-    const p = hs.find(h => h.pinch);
-    if (p && performance.now() - lastPinchWalk > 350) {
+    const p = hs.find(h => h.pinch), open = hs.filter(h => h.open);
+    if (p && performance.now() - lastPinchWalk > 600) {
       lastPinchWalk = performance.now();
-      gallery.walkVisitorToScreen(p.pinchX * 2 - 1, -(p.pinchY * 2 - 1));
+      tapInside(p.pinchX * 2 - 1, -(p.pinchY * 2 - 1));
+    }
+    if (open.length === 2) {                         // two hands apart = zoom in, together = out
+      const d = Math.hypot(open[0].x - open[1].x, open[0].y - open[1].y);
+      if (onHands.zd) gallery.zoomBy((d - onHands.zd) * 2.2);
+      onHands.zd = d;
+    } else {
+      onHands.zd = null;
+      if (open.length === 1) {                       // one open hand = look around, like a joystick
+        const h = open[0];
+        gallery.look((h.x - 0.5) * 0.06, -(h.y - 0.5) * 0.04);
+      }
     }
   }
   if (view !== 'view-create') return;

@@ -1,12 +1,16 @@
 // The gallery and the painting space.
 //
-// A dark room: wall, floor, a spotlit gilded frame. The painting is a relief
-// built from its depth map, seen through a window cut in the wall, so even in
-// the gallery it has a little depth. The visitor animal walks in across the
-// floor, looks back at you, and stops below the picture. A painted animal comes
-// alive in the picture. On "yes" the visitor climbs into the frame, the camera
-// passes through it, the relief deepens, and the screen holds only the painting,
-// now a space you are standing in.
+// A dark room with a spotlit, gilded frame. The painting is a relief built from
+// its depth map, seen through a window cut in the wall. The visitor walks in
+// across the floor and looks back at you. Several painted animals wake up, step
+// out of their places (the ground behind them was repainted offline) and come
+// to the front of the picture. On "yes" the camera passes through the frame and
+// the picture becomes a space: you can look around and zoom (mouse, head or
+// hands), and the animals keep living there: they wander, run, follow you,
+// and come when you call them.
+//
+// The visitor is an "actor": either a 2D Character (drawing / storybook) or a
+// 3D animated animal. Both expose the same small interface (see character.js).
 
 import * as THREE from 'three';
 import { Character } from './character.js';
@@ -28,9 +32,8 @@ const PAINT_VERT = /* glsl */`
   }
 `;
 const PAINT_FRAG = /* glsl */`
-  uniform sampler2D uMap, uPatch;
-  uniform vec4 uPatchRect;                 // u0, v0, u1, v1
-  uniform float uAway, uTime, uWind, uBright;
+  uniform sampler2D uMap;
+  uniform float uTime, uWind, uBright;
   varying vec2 vUv;
   varying float vD;
   void main() {
@@ -40,28 +43,27 @@ const PAINT_FRAG = /* glsl */`
     st.x += sin(uTime * 1.1 + vUv.y * 18.0 + vUv.x * 9.0) * 0.0011 * far * smoothstep(0.3, 1.0, vUv.y) * uWind;
     st.y += cos(uTime * 0.9 + vUv.x * 14.0) * 0.0007 * far * smoothstep(0.4, 1.0, vUv.y) * uWind;
     vec3 c = texture2D(uMap, st).rgb;
-    if (uAway > 0.0 && st.x > uPatchRect.x && st.x < uPatchRect.z && st.y > uPatchRect.y && st.y < uPatchRect.w) {
-      vec2 q = (st - uPatchRect.xy) / (uPatchRect.zw - uPatchRect.xy);
-      c = mix(c, texture2D(uPatch, q).rgb, uAway);
-    }
     float v = 1.0 - length((vUv - 0.5) * vec2(0.9, 1.1)) * 0.35;  // soft spotlight falloff
     gl_FragColor = vec4(c * uBright * v, 1.0);
     #include <colorspace_fragment>
   }
 `;
 
-const loadTex = (loader, url) => new Promise((res, rej) => loader.load(url, res, undefined, rej));
 const loadImg = url => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
 const ease = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+const rand = (a, b) => a + Math.random() * (b - a);
 
 export class Gallery {
+  // opts: { work, workText, visitor (actor), hosts: [{host, meta}], onFrame }
   constructor(container, opts) {
     this.container = container;
-    this.o = opts;            // { work, workText, visitorImage, visitorHead, visitorLit, visitorGait, host, hostMeta, onFrame }
+    this.o = opts;
     this.clock = new THREE.Clock();
     this.tweens = [];
     this.parallax = new THREE.Vector2();      // from head tracking or the mouse, -1..1
+    this.view = { yaw: 0, pitch: 0, zoom: 0, ty: 0, tp: 0, tz: 0 };   // inside: look around + zoom
     this.inside = false;
+    this.hosts = [];
   }
 
   async init() {
@@ -70,7 +72,6 @@ export class Gallery {
     r.setPixelRatio(Math.min(devicePixelRatio, 2));
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.0;
-    r.shadowMap.enabled = false;
     Object.assign(r.domElement.style, { width: '100%', height: '100%', display: 'block' });
     this.container.appendChild(r.domElement);
 
@@ -82,29 +83,34 @@ export class Gallery {
     this.camLook = new THREE.Vector3(0, 1.18, 0);
     cam.position.copy(this.camBase);
 
-    // ---- painting geometry ------------------------------------------------
+    // ---- painting --------------------------------------------------------
     const [W, H] = work.size;
+    this.W = W; this.H = H;
     const pw = this.pw = work.realWidth, ph = this.ph = pw * H / W;
     const cy = this.cy = Math.max(1.5, ph / 2 + 0.62);
     this.bottom = cy - ph / 2;
-    const tl = new THREE.TextureLoader();
-    const [map, depth] = await Promise.all([loadTex(tl, work.hd), loadTex(tl, work.depth)]);
+    const [img, depthImg] = await Promise.all([loadImg(work.hd), loadImg(work.depth)]);
+    // the painting lives on a canvas so walked-away animals can be painted out
+    const plate = this.plate = document.createElement('canvas');
+    plate.width = img.width; plate.height = img.height;
+    this.plateCtx = plate.getContext('2d');
+    this.plateCtx.drawImage(img, 0, 0);
+    const map = this.map = new THREE.CanvasTexture(plate);
     map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 8;
-    this.depthImg = depth.image;
+    const depth = new THREE.Texture(depthImg); depth.needsUpdate = true;
+    this.depthImg = depthImg;
     this.paintU = {
-      uMap: { value: map }, uDepthTex: { value: depth }, uPatch: { value: null },
-      uPatchRect: { value: new THREE.Vector4(2, 2, 2, 2) }, uAway: { value: 0 },
+      uMap: { value: map }, uDepthTex: { value: depth },
       uDepth: { value: pw * 0.16 }, uEdge: { value: 1 }, uTime: { value: 0 }, uWind: { value: 1 }, uBright: { value: 1.0 },
     };
-    const segX = 220, segY = Math.round(220 * ph / pw);
     this.paintGroup = new THREE.Group();
     this.paintGroup.position.set(0, cy, 0);
+    const segX = 220, segY = Math.round(220 * ph / pw);
     const painting = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph, segX, segY),
       new THREE.ShaderMaterial({ uniforms: this.paintU, vertexShader: PAINT_VERT, fragmentShader: PAINT_FRAG }));
     painting.position.z = -0.03;
     this.paintGroup.add(painting);
     scene.add(this.paintGroup);
-    // black box behind the window so the relief's edges disappear into darkness
     const box = new THREE.Mesh(new THREE.BoxGeometry(pw * 3, ph * 3, 12),
       new THREE.MeshBasicMaterial({ color: 0x050404, side: THREE.BackSide }));
     box.position.z = -6.02;
@@ -128,7 +134,6 @@ export class Gallery {
       new THREE.MeshStandardMaterial({ color: 0x141210, roughness: 0.7 }));
     skirting.position.set(0, 0.06, 0.015); scene.add(skirting);
 
-    // gilded frame
     const gold = new THREE.MeshStandardMaterial({ color: 0x9a7740, metalness: 0.85, roughness: 0.32 });
     const liner = new THREE.MeshStandardMaterial({ color: 0x2b2116, metalness: 0.3, roughness: 0.6 });
     const fw = 0.1, fd = 0.07;
@@ -160,48 +165,44 @@ export class Gallery {
     const label = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.196), new THREE.MeshStandardMaterial({ map: labelTex, roughness: 0.8 }));
     label.position.set(pw / 2 + 0.42, 1.25, 0.012); scene.add(label);
 
-    // lights
-    scene.add(new THREE.HemisphereLight(0xfff1df, 0x16120e, 0.35));
+    // lights (also light the 3D animals)
+    scene.add(new THREE.HemisphereLight(0xfff1df, 0x16120e, 0.55));
     const spot = new THREE.SpotLight(0xffe6c4, 70, 12, 0.5, 0.65, 1.6);
     spot.position.set(0, 4.6, 3.0); spot.target.position.set(0, cy, 0);
     scene.add(spot, spot.target);
-    const floorSpot = new THREE.SpotLight(0xfff0dc, 26, 10, 0.55, 0.8, 1.5);
+    const floorSpot = new THREE.SpotLight(0xfff0dc, 30, 10, 0.6, 0.8, 1.5);
     floorSpot.position.set(-1.0, 4.8, 3.2); floorSpot.target.position.set(-0.8, 0, 1.6);
     scene.add(floorSpot, floorSpot.target);
+    this.keyLight = new THREE.DirectionalLight(0xfff2e0, 0.0);  // used inside the painting
+    this.keyLight.position.set(1, 3, 4); scene.add(this.keyLight);
 
-    // ---- characters --------------------------------------------------------
-    const v = this.visitor = new Character(this.o.visitorImage, {
-      height: 0.55, headSide: this.o.visitorHead, lit: this.o.visitorLit, gait: this.o.visitorGait,
-    }).addTo(scene);
-    v.setPaint(work.style, this.frameRect, 0.0);
-    v.uniforms.uSpot.value.set(-0.8, 0, 1.6);
+    // ---- visitor ------------------------------------------------------------
+    const v = this.visitor = this.o.visitor;
+    v.addTo(scene);
+    v.setPaint?.(work.style, this.frameRect, 0.0);
+    v.setSpot?.(new THREE.Vector3(-0.8, 0, 1.6));
     v.position.set(-4.6, 0, 1.8);
     v.setDir(1, true);
 
-    const hm = this.o.hostMeta, host = this.o.host;
-    const sprite = await loadImg(host.sprite);
-    const [bx0, by0, bx1, by1] = hm.box;
-    const hh = (by1 - by0) / H * ph;
-    const h = this.host = new Character(sprite, { height: hh, headSide: host.faces });
-    h.uniforms.uLight.value = 1.0;
-    h.uniforms.uSpot.value.set(0, 0, 0);
-    h.shadow.visible = false;
-    this.paintGroup.add(h.group);                      // painting-local coordinates from here on
-    this.hostHome = this.paintPoint((bx0 + bx1) / 2 / W, 1 - by1 / H, 0.004);
-    h.position.copy(this.hostHome);
-    h.setDir(host.faces === 'right' ? 1 : -1, true);
-    if (!host.inPlace) {
-      const patch = await loadTex(tl, host.patch); patch.colorSpace = THREE.SRGBColorSpace;
-      this.paintU.uPatch.value = patch;
-      this.paintU.uPatchRect.value.set(bx0 / W, 1 - by1 / H, bx1 / W, 1 - by0 / H);
+    // ---- painted animals ------------------------------------------------------
+    for (const { host, meta } of this.o.hosts) {
+      const sprite = await loadImg(host.sprite);
+      const [bx0, by0, bx1, by1] = meta.box;
+      const hh = (by1 - by0) / H * ph;
+      const a = new Character(sprite, { height: hh, headSide: host.faces });
+      a.shadow.visible = false;
+      this.paintGroup.add(a.group);
+      const home = this.paintPoint((bx0 + bx1) / 2 / W, 1 - by1 / H, 0.004);
+      a.position.copy(home);
+      a.setDir(host.faces === 'right' ? 1 : -1, true);
+      a.mesh.renderOrder = 3;
+      this.hosts.push({ actor: a, host, meta, home, awake: false, away: false, next: rand(2, 5), patch: null });
     }
-    h.mesh.renderOrder = 3;
 
     // ---- loop --------------------------------------------------------------
     this.onResize = () => {
       const w = this.container.clientWidth, hgt = this.container.clientHeight;
       r.setSize(w, hgt, false); cam.aspect = w / hgt; cam.updateProjectionMatrix();
-      // keep the whole picture in view on narrow screens
       const need = (pw + 1.6) / 2 / Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) / cam.aspect;
       if (!this.inside) this.camBase.z = Math.max(5.4, Math.min(need + 0.5, 9));
     };
@@ -209,13 +210,13 @@ export class Gallery {
     r.setAnimationLoop(() => this.tick());
   }
 
-  // painting-local point (group space) for uv (u right, v up) at the relief surface
+  // painting-local point for uv (u right, v up), on the relief surface
   paintPoint(u, v, lift = 0) {
     const img = this.depthImg;
-    if (!this._dctx) {
+    if (!this._ddata) {
       const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
-      this._dctx = c.getContext('2d', { willReadFrequently: true }); this._dctx.drawImage(img, 0, 0);
-      this._ddata = this._dctx.getImageData(0, 0, img.width, img.height).data;
+      const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0);
+      this._ddata = x.getImageData(0, 0, img.width, img.height).data;
     }
     const x = Math.min(img.width - 1, Math.max(0, Math.round(u * img.width)));
     const y = Math.min(img.height - 1, Math.max(0, Math.round((1 - v) * img.height)));
@@ -223,9 +224,23 @@ export class Gallery {
     return new THREE.Vector3((u - 0.5) * this.pw, (v - 0.5) * this.ph, -0.03 - (1 - d) * this.paintU.uDepth.value + lift);
   }
 
-  tween(dur, fn) {
-    return new Promise(res => this.tweens.push({ t: 0, dur, fn, res }));
+  // paint the ground back where an animal stood (fades in over ~1 s)
+  async revealGround(h) {
+    if (h.host.inPlace || h.away) return;
+    h.away = true;
+    const patch = await loadImg(h.host.patch);
+    const [x0, y0, x1, y1] = h.meta.box, s = this.plate.width / this.W;
+    for (let i = 1; i <= 10; i++) {
+      await this.tween(0.1, () => {});
+      this.plateCtx.globalAlpha = 0.35;
+      this.plateCtx.drawImage(patch, x0 * s, y0 * s, (x1 - x0) * s, (y1 - y0) * s);
+      this.plateCtx.globalAlpha = 1;
+      this.map.needsUpdate = true;
+    }
   }
+
+  tween(dur, fn) { return new Promise(res => this.tweens.push({ t: 0, dur, fn, res })); }
+  wait(sec) { return this.tween(sec, () => {}); }
 
   tick() {
     const dt = Math.min(0.05, this.clock.getDelta());
@@ -234,9 +249,7 @@ export class Gallery {
     this.renderer.render(this.scene, this.camera);
     this.o.onFrame?.(this);
   }
-
-  // advance the simulation by fixed steps without waiting for animation frames
-  // (used for testing; real visitors are driven by tick())
+  // advance without animation frames (testing only)
   advance(seconds, fps = 60) {
     for (let i = 0; i < seconds * fps; i++) { this.simT = (this.simT || 0) + 1 / fps; this.step(1 / fps, this.simT); }
     this.renderer.render(this.scene, this.camera);
@@ -249,145 +262,220 @@ export class Gallery {
       tw.t = Math.min(1, tw.t + dt / tw.dur); tw.fn(ease(tw.t), tw.t);
       if (tw.t >= 1) { this.tweens.splice(this.tweens.indexOf(tw), 1); tw.res(); }
     }
-    if (this.inside) {      // inside the picture: lit like the painting, not by the gallery spot
-      for (const c of [this.visitor, this.host]) c.mesh.getWorldPosition(c.uniforms.uSpot.value);
+    if (this.inside) {
+      // lit like the painting, not by the gallery spot
+      const p = new THREE.Vector3();
+      for (const a of [this.visitor, ...this.hosts.map(h => h.actor)]) { a.group.getWorldPosition(p); a.setSpot?.(p); }
+      this.liveInside(dt);
     }
     this.visitor.update(dt, t);
-    this.host.update(dt, t);
-    // head-coupled parallax: move your head (or the mouse) and the room shifts
-    const cam = this.camera, px = this.parallax;
-    const k = this.inside ? 0.12 : 0.55;
-    cam.position.x += (this.camBase.x + px.x * k - cam.position.x) * 0.08;
-    cam.position.y += (this.camBase.y + px.y * k * 0.5 - cam.position.y) * 0.08;
-    cam.position.z += (this.camBase.z - cam.position.z) * 0.08;
-    cam.lookAt(this.camLook);
+    for (const h of this.hosts) h.actor.update(dt, t);
+    this.updateCamera();
+  }
+
+  updateCamera() {
+    const cam = this.camera, px = this.parallax, v = this.view;
+    if (!this.inside) {
+      const k = 0.55;
+      cam.position.x += (this.camBase.x + px.x * k - cam.position.x) * 0.08;
+      cam.position.y += (this.camBase.y + px.y * k * 0.5 - cam.position.y) * 0.08;
+      cam.position.z += (this.camBase.z - cam.position.z) * 0.08;
+      cam.lookAt(this.camLook);
+      return;
+    }
+    // inside: zoom moves you into the picture; looking around pans across it.
+    // The pan is limited so the edge of the painting never comes into view.
+    v.zoom += (v.tz - v.zoom) * 0.08;
+    const D = Math.max(0.2, this.viewDist - v.zoom);          // distance to the picture plane
+    const halfH = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * D, halfW = halfH * cam.aspect;
+    const maxX = Math.max(0, this.pw / 2 * 0.97 - halfW), maxY = Math.max(0, this.ph / 2 * 0.97 - halfH);
+    v.ty = THREE.MathUtils.clamp(v.ty, -maxX, maxX); v.tp = THREE.MathUtils.clamp(v.tp, -maxY, maxY);
+    v.yaw += (v.ty - v.yaw) * 0.08; v.pitch += (v.tp - v.pitch) * 0.08;
+    const pos = this.camBase.clone();
+    pos.x += v.yaw + px.x * 0.1 * (maxX > 0.05 ? 1 : 0.4);
+    pos.y += v.pitch + px.y * 0.05;
+    pos.z -= v.zoom;
+    cam.position.lerp(pos, 0.15);
+    // a slight turn toward where you are looking gives the depth its parallax
+    const look = new THREE.Vector3(pos.x + v.yaw * 0.25, pos.y + v.pitch * 0.25, pos.z - 1);
+    cam.lookAt(look);
+  }
+
+  // ---- VR-style controls inside the painting (mouse drag, wheel, head, hands)
+  look(dx, dy) {                       // pan across the picture (metres-ish units)
+    if (!this.inside) return;
+    this.view.ty += dx * 1.6; this.view.tp += dy * 1.6;
+  }
+  zoomBy(d) {
+    if (!this.inside) return;
+    this.view.tz = THREE.MathUtils.clamp(this.view.tz + d, -0.25, this.maxZoom || 1);
   }
 
   // screen position (CSS px) of a world point, for speech bubbles
   project(p) {
     const v = p.clone().project(this.camera);
     const rc = this.renderer.domElement.getBoundingClientRect();
-    return { x: rc.left + (v.x + 1) / 2 * rc.width, y: rc.top + (1 - v.y) / 2 * rc.height, behind: v.z > 1 };
+    return { x: rc.left + (v.x + 1) / 2 * rc.width, y: rc.top + (1 - v.y) / 2 * rc.height, behind: v.z > 1 || v.z < -1 };
   }
-  anchor(who) {
-    const c = who === 'host' ? this.host : this.visitor;
-    const p = new THREE.Vector3(); c.mesh.getWorldPosition(p);
-    const s = new THREE.Vector3(); c.mesh.getWorldScale(s);
-    return p.add(new THREE.Vector3(0, Math.abs(s.y) * 1.02, 0));
+  anchor(who) { return (who === 'visitor' ? this.visitor : this.hosts[who].actor).topWorld(); }
+
+  // which painted animal is under a screen point (normalised -1..1)?
+  hostAt(nx, ny) {
+    const ray = new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2(nx, ny), this.camera);
+    const hits = ray.intersectObjects(this.hosts.filter(h => h.awake).map(h => h.actor.mesh), false);
+    return hits.length ? this.hosts.findIndex(h => h.actor.mesh === hits[0].object) : -1;
   }
 
-  // ---- choreography --------------------------------------------------------
-  async walkIn() {
-    const v = this.visitor;
-    await v.walkTo(new THREE.Vector3(-1.35, 0, 1.25), 0.75);
-  }
-  // turn toward the viewer: a 3/4 turn of the body, a nod and a little hop
+  // ---- choreography (gallery) ---------------------------------------------
+  async walkIn() { await this.visitor.walkTo(new THREE.Vector3(-1.35, 0, 1.25), 0.75); }
+  // turn toward the viewer, nod and a little hop
   async lookBack(side = 1) {
     const v = this.visitor;
     v.setDir(side);
-    await this.tween(0.5, e => { v.mesh.rotation.y = e * 0.55 * -side; });
+    await this.tween(0.5, e => v.lookTurn(e * 0.55 * -side));
     v.nod(2); v.hopOnce(0.06);
-    await this.tween(1.1, () => {});
+    await this.wait(1.1);
   }
   async faceAway() {
-    const v = this.visitor;
-    await this.tween(0.4, e => { v.mesh.rotation.y = (1 - e) * v.mesh.rotation.y; });
-    v.mesh.rotation.y = 0;
+    const v = this.visitor, a0 = v.lookAngle;
+    await this.tween(0.4, e => v.lookTurn((1 - e) * a0));
   }
   async approach() {
     await this.faceAway();
     await this.visitor.walkTo(new THREE.Vector3(-0.35, 0, 0.55), 0.7);
     this.visitor.setDir(1);
   }
-  // the painted animal comes alive: shakes itself, turns, steps to the front of the picture
-  async wakeHost() {
-    const h = this.host, hostOpts = this.o.host;
-    h.hopOnce(0.04 * h.height / 0.3);
-    await this.tween(0.5, () => {});
-    h.nod(2);
-    if (hostOpts.inPlace) {
-      // too big to leave its place: it lifts its head and stamps
-      h.uniforms.uWalk.value = 0.25;
-      await this.tween(1.0, (e) => { h.uniforms.uPhase.value = e * Math.PI * 2; });
-      h.uniforms.uWalk.value = 0;
+
+  // a painted animal comes alive and steps to the front of the picture (slot -1..1 spreads them)
+  async wakeHost(i, slot = 0) {
+    const h = this.hosts[i], a = h.actor;
+    h.awake = true;
+    a.hopOnce(0.04 * a.height / 0.3);
+    await this.wait(0.45);
+    a.nod(2);
+    if (h.host.inPlace) {                       // too big to leave: it lifts its head and stamps
+      a.uniforms.uWalk.value = 0.25;
+      await this.tween(1.0, e => { a.uniforms.uPhase.value = e * Math.PI * 2; });
+      a.uniforms.uWalk.value = 0;
       return;
     }
-    // reveal the ground it was painted on, and walk to the front edge of the picture
-    this.tween(1.2, e => { this.paintU.uAway.value = e; });
-    const front = this.paintPoint(0.5 + (this.hostHome.x / this.pw) * 0.6, 0.06, 0);
-    front.z = 0.02;                                   // at the picture plane, facing the visitor
-    front.x = THREE.MathUtils.clamp(this.hostHome.x * 0.5 + 0.25, -this.pw / 2 + h.height, this.pw / 2 - h.height);
-    await h.walkTo(front, 0.45);
-    h.setDir(-1);
+    this.revealGround(h);
+    const front = this.paintPoint(0.5, 0.06, 0);
+    front.z = 0.02;
+    front.x = THREE.MathUtils.clamp(0.15 + slot * this.pw * 0.22, -this.pw / 2 + a.height, this.pw / 2 - a.height);
+    await a.walkTo(front, 0.45, { run: Math.random() < 0.4 });
+    a.setDir(-1);
   }
-  async hostRefuses() {
-    const h = this.host;
-    h.setDir(h.dir * -1);
-    await this.tween(1.2, e => { h.uniforms.uLight.value = 1 - e * 0.25; });
+  async hostsRefuse() {
+    for (const h of this.hosts.filter(h => h.awake)) { h.actor.setDir(h.actor.dir * -1); h.actor.setLight(0.8); }
     this.visitor.setDir(-1);
     await this.lookBack(-1);
   }
 
-  // climb into the picture and pass through the frame
+  // ---- step into the picture ------------------------------------------------
   async enter() {
-    const v = this.visitor, h = this.host;
+    const v = this.visitor;
     await this.faceAway();
     v.setDir(1);
-    // hop up onto the frame's lower edge
     const from = v.position.clone(), to = new THREE.Vector3(-0.2, this.bottom + 0.005, 0.03);
     v.shadow.visible = false;
     await this.tween(0.75, (e, raw) => {
       v.position.lerpVectors(from, to, raw);
       v.position.y += Math.sin(raw * Math.PI) * 0.35;
     });
-    // step in: the relief opens up and the camera follows through the frame
     this.paintGroup.attach(v.group);
     this.inside = true;
     const depth0 = this.paintU.uDepth.value, depth1 = this.pw * 0.38;
     const camFrom = this.camBase.clone(), lookFrom = this.camLook.clone();
-    // fill the screen with the picture: fit whichever side is tighter
     const vf = THREE.MathUtils.degToRad(this.camera.fov / 2);
-    // overscan: the picture slightly overfills the screen, so moving your head never shows its edges
+    // overscan: the picture slightly overfills the screen
     const dist = Math.min(this.ph / 2 / Math.tan(vf), this.pw / 2 / (Math.tan(vf) * this.camera.aspect)) * 0.76;
-    const recede = dist + 0.3;                           // the picture moves back so the camera passes the frame
+    this.maxZoom = dist * 0.72; this.viewDist = dist;
+    const recede = dist + 0.3;
     const camTo = new THREE.Vector3(0, this.cy, dist - recede - 0.03), lookTo = new THREE.Vector3(0, this.cy, -recede);
     const inside = this.paintPoint(0.42, 0.1, 0); inside.z += 0.3;
-    const h0 = v.height, h1 = Math.max(0.1, Math.min(this.host.height * 0.8, this.ph * 0.17));
+    const h0 = v.height, ref = this.hosts.find(h => !h.host.inPlace)?.actor.height ?? this.ph * 0.15;
+    const h1 = Math.max(0.1, Math.min(ref * 0.85, this.ph * 0.17));
     v.walkTo(inside, 0.5);
+    this.keyLight.intensity = 0;
     await this.tween(3.4, e => {
       this.paintU.uDepth.value = depth0 + (depth1 - depth0) * e;
       this.paintU.uEdge.value = 1 - e * 0.6;
       this.camBase.lerpVectors(camFrom, camTo, e);
       this.camLook.lerpVectors(lookFrom, lookTo, e);
       this.paintGroup.position.z = -e * recede;
-      v.setHeight(h0 + (h1 - h0) * e);                   // takes the scale of the painted animals
+      v.setHeight(h0 + (h1 - h0) * e);
+      this.keyLight.intensity = e * 1.6;
     });
-    v.uniforms.uPaintAll.value = 1;
-    // both animals come forward and meet
-    if (!this.o.host.inPlace) {
-      const meet = new THREE.Vector3(0.16, -this.ph / 2 + this.ph * 0.24, 0.32);
-      v.walkTo(new THREE.Vector3(-0.2, meet.y, 0.36), 0.45);
-      await h.walkTo(meet, 0.4);
-      h.setDir(-1); v.setDir(1);
-    } else {
-      await v.walkTo(new THREE.Vector3(-this.pw * 0.18, -this.ph / 2 + this.ph * 0.24, 0.36), 0.45);
+    v.setPaintAll?.(1);
+    this.camera.position.copy(this.camBase);
+    // everyone awake gathers near the visitor
+    const meetY = this.groundY(0.32);
+    v.walkTo(new THREE.Vector3(-0.2, meetY, 0.36), 0.45);
+    for (const [k, h] of this.hosts.entries()) {
+      if (!h.awake || h.host.inPlace) continue;
+      h.actor.walkTo(new THREE.Vector3(0.12 + k * 0.22, this.groundY(0.3 - k * 0.12), 0.3 - k * 0.12), 0.45);
+      h.next = rand(3, 6);
+    }
+    await this.wait(2.5);
+  }
+
+  // a believable "ground" inside the picture: further back is higher up
+  groundY(z) { return -this.ph / 2 + this.ph * 0.12 + (0.4 - z) * 0.22; }
+  randomGround() {
+    const z = rand(-this.paintU.uDepth.value * 0.55, 0.4);
+    return new THREE.Vector3(rand(-this.pw / 2 + 0.25, this.pw / 2 - 0.25), this.groundY(z), z);
+  }
+
+  // inside: the animals keep living. They wander, run, follow the visitor or rest.
+  liveInside(dt) {
+    for (const h of this.hosts) {
+      if (!h.awake || h.host.inPlace || h.called) continue;
+      h.next -= dt;
+      if (h.next > 0 || h.actor.target) continue;
+      const roll = Math.random();
+      if (roll < 0.35) {                              // follow the visitor
+        const p = this.visitor.position.clone(); p.x += rand(-0.35, 0.35); p.z = THREE.MathUtils.clamp(p.z + rand(-0.15, 0.1), -0.5, 0.45);
+        p.y = this.groundY(p.z);
+        h.actor.walkTo(p, 0.4);
+      } else if (roll < 0.75) {                       // wander, sometimes at a run
+        const run = Math.random() < 0.35;
+        h.actor.walkTo(this.randomGround(), run ? 0.9 : 0.35, { run });
+        if (run) this.o.onEvent?.('run', this.hosts.indexOf(h));
+      } else {                                         // rest: look around, nod
+        h.actor.setDir(Math.random() < 0.5 ? -1 : 1); h.actor.nod(1);
+      }
+      h.next = rand(3.5, 8);
     }
   }
 
-  // inside the painting: walk the visitor to a point on screen (mouse or finger)
+  // walk the visitor to a screen point (mouse click or pinch in the air)
   walkVisitorToScreen(nx, ny) {
     if (!this.inside) return;
     const ray = new THREE.Raycaster();
     ray.setFromCamera(new THREE.Vector2(nx, ny), this.camera);
-    // a ground plane inside the picture, just above its lower edge
-    const gy = this.paintGroup.position.y - this.ph / 2 + this.ph * 0.08;
+    const gy = this.paintGroup.position.y + this.groundY(0.2);
     const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -gy);
     const hit = new THREE.Vector3();
     if (!ray.ray.intersectPlane(plane, hit)) return;
     const local = this.paintGroup.worldToLocal(hit.clone());
     local.x = THREE.MathUtils.clamp(local.x, -this.pw / 2 + 0.2, this.pw / 2 - 0.2);
-    local.z = THREE.MathUtils.clamp(local.z, -this.paintU.uDepth.value * 0.7, 0.45);
-    this.visitor.walkTo(local, 0.55);
+    local.z = THREE.MathUtils.clamp(local.z, -this.paintU.uDepth.value * 0.6, 0.45);
+    local.y = this.groundY(local.z);
+    this.visitor.walkTo(local, 0.55, { run: local.distanceTo(this.visitor.position) > 0.8 });
+  }
+  // call a painted animal: it comes to the visitor
+  async callHost(i) {
+    const h = this.hosts[i];
+    if (!h || h.host.inPlace) { h?.actor.nod(2); return; }
+    h.called = true;
+    const p = this.visitor.position.clone();
+    p.x += p.x > 0 ? -0.3 : 0.3; p.y = this.groundY(p.z);
+    await h.actor.walkTo(p, 0.8, { run: true });
+    h.actor.setDir(Math.sign(this.visitor.position.x - p.x) || 1);
+    h.actor.nod(2);
+    this.visitor.setDir(Math.sign(p.x - this.visitor.position.x) || 1);
+    h.called = false; h.next = rand(4, 7);
   }
 
   screenshot() { this.renderer.render(this.scene, this.camera); return this.renderer.domElement.toDataURL('image/png'); }
@@ -395,7 +483,7 @@ export class Gallery {
   dispose() {
     this.renderer.setAnimationLoop(null);
     this.ro?.disconnect();
-    this.visitor?.dispose(); this.host?.dispose();
+    this.visitor?.dispose(); this.hosts.forEach(h => h.actor.dispose());
     this.scene.traverse(o => { o.geometry?.dispose?.(); if (o.material) [].concat(o.material).forEach(m => { m.map?.dispose?.(); m.dispose?.(); }); });
     this.renderer.dispose(); this.renderer.domElement.remove();
   }

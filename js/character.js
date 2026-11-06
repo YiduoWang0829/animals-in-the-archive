@@ -223,8 +223,9 @@ export class Character {
     return p.add(new THREE.Vector3(u * (this.headSide === 'right' ? 1 : -1), this.height * 0.95, 0));
   }
 
-  walkTo(target, speed = 0.8) {
-    this.target = target.clone(); this.speed = speed;
+  // run = longer, faster strides with bigger leg swing
+  walkTo(target, speed = 0.8, { run = false } = {}) {
+    this.target = target.clone(); this.speed = speed; this.running = run;
     const dx = target.x - this.group.position.x;
     if (Math.abs(dx) > 0.02) this.setDir(Math.sign(dx));
     return new Promise(res => { this._arrive = res; });
@@ -242,10 +243,10 @@ export class Character {
       if (dist <= step) { p.copy(this.target); this.target = null; this._arrive?.(); this._arrive = null; }
       else { p.addScaledVector(d.normalize(), step); walking = true; }
       // stride length ~ 0.55 × height: legs cycle in step with the distance covered
-      if (walking) u.uPhase.value += (step / (this.height * 0.55)) * Math.PI;
+      if (walking) u.uPhase.value += (step / (this.height * (this.running ? 0.9 : 0.55))) * Math.PI;
     }
     if (this.rig.type === 'hop' && walking && this.hopT < 0) this.hopOnce(0.08 * this.height / 0.6);
-    u.uWalk.value += ((walking ? 1 : 0) - u.uWalk.value) * Math.min(1, dt * 8);
+    u.uWalk.value += ((walking ? (this.running ? 1.45 : 1) : 0) - u.uWalk.value) * Math.min(1, dt * 8);
     if (!walking) u.uPhase.value += dt * 0.6 * (1 - u.uWalk.value) * 0;   // idle: legs still
 
     // hop arc
@@ -275,6 +276,19 @@ export class Character {
     this.shadow.position.set(this.group.position.x, gy + 0.004, this.group.position.z + 0.02);
     this.shadow.material.opacity = 1 - Math.min(0.7, this.hop * 3);
   }
+
+  // --- actor interface used by the gallery (shared with the 3D animals) ---
+  setSpot(v) { this.uniforms.uSpot.value.copy(v); }
+  setPaintAll(v) { this.uniforms.uPaintAll.value = v; }
+  setLight(v) { this.uniforms.uLight.value = v; }
+  // world position just above the head, for speech bubbles
+  topWorld() {
+    const p = new THREE.Vector3(); this.mesh.getWorldPosition(p);
+    const s = new THREE.Vector3(); this.mesh.getWorldScale(s);
+    return p.add(new THREE.Vector3(0, Math.abs(s.y) * 1.02, 0));
+  }
+  lookTurn(a) { this.mesh.rotation.y = a; }
+  get lookAngle() { return this.mesh.rotation.y; }
 
   dispose() {
     this.group.removeFromParent(); this.shadow.removeFromParent();
