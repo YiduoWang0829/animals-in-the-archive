@@ -236,7 +236,7 @@ function answer(a) {
   const x = W(state.work.id);
   stage.say('visitor', cap(t(`species.${state.species.id}`)), a === 'yes' ? t('visitorYes') : t('visitorNo'));
   stage.setAnswer(a);
-  setTimeout(() => stage.say('host', cap(x.host), x[a]), 900);
+  setTimeout(() => stage?.say('host', cap(x.host), x[a]), 900);
   $('#stage-controls').innerHTML = `<span class="hint">${esc(t('cardMood'))}: ${esc(mood())}</span>
     <button class="btn primary" data-action="to-sculpt">${esc(t('toSculpt'))}</button>`;
 }

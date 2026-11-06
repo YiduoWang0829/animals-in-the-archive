@@ -344,3 +344,9 @@ body.in-stage .footer, body.in-sculpt .footer { display: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* phones: keep the masthead to one line */
+@media (max-width: 520px) {
+  .brand-name { display: none; }
+  .nav { gap: 16px; }
+}
