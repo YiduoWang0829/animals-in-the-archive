@@ -1,0 +1,142 @@
+{
+ "eden-lion": {
+  "work": "eden",
+  "box": [
+   1718,
+   868,
+   1956,
+   1127
+  ],
+  "size": [
+   2400,
+   1550
+  ],
+  "in_place": false
+ },
+ "eden-horse": {
+  "work": "eden",
+  "box": [
+   1283,
+   773,
+   1445,
+   980
+  ],
+  "size": [
+   2400,
+   1550
+  ],
+  "in_place": false
+ },
+ "eden-deer": {
+  "work": "eden",
+  "box": [
+   1353,
+   731,
+   1565,
+   1038
+  ],
+  "size": [
+   2400,
+   1550
+  ],
+  "in_place": false
+ },
+ "eden-rabbit": {
+  "work": "eden",
+  "box": [
+   581,
+   1296,
+   756,
+   1472
+  ],
+  "size": [
+   2400,
+   1550
+  ],
+  "in_place": false
+ },
+ "eden-dog": {
+  "work": "eden",
+  "box": [
+   680,
+   1199,
+   868,
+   1410
+  ],
+  "size": [
+   2400,
+   1550
+  ],
+  "in_place": false
+ },
+ "eden-peacock": {
+  "work": "eden",
+  "box": [
+   762,
+   1026,
+   1186,
+   1550
+  ],
+  "size": [
+   2400,
+   1550
+  ],
+  "in_place": false
+ },
+ "durer-horse": {
+  "work": "durer",
+  "box": [
+   21,
+   324,
+   1847,
+   2400
+  ],
+  "size": [
+   1847,
+   2400
+  ],
+  "in_place": true
+ },
+ "durer-dog": {
+  "work": "durer",
+  "box": [
+   822,
+   1716,
+   1643,
+   2254
+  ],
+  "size": [
+   1847,
+   2400
+  ],
+  "in_place": false
+ },
+ "marc-deer": {
+  "work": "marc",
+  "box": [
+   928,
+   830,
+   1459,
+   1783
+  ],
+  "size": [
+   2385,
+   1783
+  ],
+  "in_place": false
+ },
+ "marc-boar": {
+  "work": "marc",
+  "box": [
+   71,
+   1083,
+   825,
+   1774
+  ],
+  "size": [
+   2385,
+   1783
+  ],
+  "in_place": false
+ }
+}
