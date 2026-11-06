@@ -666,6 +666,10 @@ function renderCredits() {
       <tr><th>${L('file')}</th><th>${L('species')}</th><th>${L('photographer')}</th><th>${L('record')}</th><th>${L('recorded')}</th><th>${L('via')}</th></tr>
       ${c.photos.map(p => `<tr><td>${esc(p.file)}</td><td>${esc(p.species)}</td><td class="tbv">${L('tbc')}</td><td>${link(p.record)}</td><td>${esc(p.recorded)} · <span class="tbv">${L('tbc')}</span></td><td>${esc(p.via)}</td></tr>`).join('')}
     </table></div>
+    <h2>${L('models3d')}</h2><p class="note">${L('modelsNote')}</p><div class="scroll"><table>
+      <tr><th>${L('file')}</th><th>${L('model')}</th><th>${L('source')}</th><th>${L('licence')}</th></tr>
+      ${c.models3d.map(m => `<tr><td>${esc(m.file)}</td><td>${esc(m.name)} · Quaternius</td><td>${link(m.source)}</td><td>CC0 1.0</td></tr>`).join('')}
+    </table></div>
     <h2>${L('software')}</h2><div class="scroll"><table>
       <tr><th>${L('item')}</th><th>${L('version')}</th><th>${L('use')}</th><th>${L('licence')}</th></tr>
       ${c.software.map(s => `<tr><td>${esc(s.item)}</td><td>${esc(s.version)}</td><td>${esc(s.use)}</td><td>${tbv(s.licence)}</td></tr>`).join('')}

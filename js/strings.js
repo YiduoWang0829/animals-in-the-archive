@@ -243,7 +243,7 @@ export const STRINGS = {
 
     creditsHeading: 'Credits',
     credits: {
-      paintings: 'Paintings', photos: 'Animal photographs', hosts: 'Painted animals', software: 'Software, models and fonts',
+      paintings: 'Paintings', photos: 'Animal photographs', models3d: '3D animals', modelsNote: 'Rigged and animated low-poly animals by Quaternius, released under CC0 1.0 (public domain) on poly.pizza; licence checked on each model page on 2026-11-06. Shading, outline and painterly treatment are this project’s own.', model: 'Model', hosts: 'Painted animals', software: 'Software, models and fonts',
       work: 'Work', author: 'Artist', date: 'Date', collection: 'Collection', source: 'Image source', licence: 'Licence status',
       file: 'Source file', species: 'Species', record: 'Source record', photographer: 'Photographer',
       recorded: 'Licence as recorded', via: 'Obtained from', item: 'Item', version: 'Version', use: 'Used for',
@@ -359,6 +359,7 @@ export const STRINGS = {
                       "via": "your animal archive dataset"
               }
       ],
+      models3d: [{"file": "fox.glb", "name": "Fox", "source": "https://poly.pizza/m/Bc97C66HKi"}, {"file": "shiba_inu.glb", "name": "Shiba Inu", "source": "https://poly.pizza/m/y4wdQpg767"}, {"file": "husky.glb", "name": "Husky", "source": "https://poly.pizza/m/wcWiuEqwzq"}, {"file": "deer.glb", "name": "Deer", "source": "https://poly.pizza/m/T6Cs7tmMHJ"}, {"file": "stag.glb", "name": "Stag", "source": "https://poly.pizza/m/tQdzbZ1Cmw"}, {"file": "alpaca.glb", "name": "Alpaca", "source": "https://poly.pizza/m/bCVFD48i2l"}, {"file": "donkey.glb", "name": "Donkey", "source": "https://poly.pizza/m/qmX6nhnvp7"}, {"file": "white_horse.glb", "name": "White Horse", "source": "https://poly.pizza/m/bEdE4rmZy9"}, {"file": "zebra.glb", "name": "Zebra", "source": "https://poly.pizza/m/iclPBR6SBZ"}, {"file": "cow.glb", "name": "Cow", "source": "https://poly.pizza/m/26zM1outCr"}, {"file": "bull.glb", "name": "Bull", "source": "https://poly.pizza/m/a8PIIYwF7r"}],
       software: [
         { item: 'three.js (+ GLTFLoader, GLTFExporter, OrbitControls)', version: '0.170.0', use: 'Gallery, painting space, sculpture', licence: 'MIT' },
         { item: 'MediaPipe Tasks Vision', version: '0.10.14', use: 'Optional face and hand tracking', licence: 'Apache-2.0' },

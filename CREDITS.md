@@ -1,56 +1,89 @@
 # Credits
 
-Items marked **to be verified** or **to be confirmed** were not checked against a
-primary source. They are left open on purpose and must be checked before publication.
+Items marked **to be verified** or **to be confirmed** were not checked against a primary
+source. They are left open on purpose and must be checked before publication.
 
 ## Paintings
 
-Image files come from Wikimedia Commons; the metadata below was checked on each Commons
-file page on 2026-11-06.
+The images come from Wikimedia Commons (web size and 2400 px "hd" versions). Metadata was
+checked on each Commons file page on 2026-11-06.
 
 | Work | Artist | Date | Collection | Source | Licence status |
 |---|---|---|---|---|---|
-| *The Garden of Eden with the Fall of Man* (Het aards paradijs met de zondeval van Adam en Eva) | Jan Brueghel the Elder and Peter Paul Rubens (figures by Rubens, landscape and animals by Brueghel, per Commons) | 1615 per Commons; the site shows "c. 1615" | Mauritshuis, The Hague, inv. 253 | [Commons file](https://commons.wikimedia.org/wiki/File:Jan_Brueghel_de_Oude_en_Peter_Paul_Rubens_-_Het_aards_paradijs_met_de_zondeval_van_Adam_en_Eva.jpg) (source given as Geheugen van Nederland / Mauritshuis) | Public domain; reproduction marked CC Public Domain Mark 1.0 |
-| *Knight, Death and the Devil* (Der Reiter) | Albrecht Dürer | 1513, engraving | Commons cites the National Gallery of Art, Washington (accessions 1943.3.3519 and 1941.1.20). **Which impression this file shows: to be verified** | [Commons file](https://commons.wikimedia.org/wiki/File:Albrecht_D%C3%BCrer_-_Knight,_Death_and_the_Devil.jpg) | Public domain; CC Public Domain Mark 1.0 |
-| *Fate of the Animals* (Tierschicksale) | Franz Marc | 1913, oil on canvas. **Not stated on the Commons file page; to be verified** (Wikipedia gives 1913) | Kunstmuseum Basel per Wikipedia. **Inventory number and dimensions to be verified** (sources disagree) | [Commons file](https://commons.wikimedia.org/wiki/File:Marc_tierschicksale.jpg) (source given as "reproduction from art book") | Public domain; CC Public Domain Mark 1.0 |
+| *The Garden of Eden with the Fall of Man* | Jan Brueghel the Elder and Peter Paul Rubens | 1615 per Commons; the site shows "c. 1615" | Mauritshuis, The Hague, inv. 253 | [Commons](https://commons.wikimedia.org/wiki/File:Jan_Brueghel_de_Oude_en_Peter_Paul_Rubens_-_Het_aards_paradijs_met_de_zondeval_van_Adam_en_Eva.jpg) | Public domain; CC Public Domain Mark 1.0 |
+| *Knight, Death and the Devil* | Albrecht Dürer | 1513, engraving | Commons cites the National Gallery of Art, Washington (1943.3.3519 / 1941.1.20). **Impression to be verified** | [Commons](https://commons.wikimedia.org/wiki/File:Albrecht_D%C3%BCrer_-_Knight,_Death_and_the_Devil.jpg) | Public domain; CC Public Domain Mark 1.0 |
+| *Fate of the Animals* (Tierschicksale) | Franz Marc | 1913, oil on canvas. **Not stated on Commons; to be verified** | Kunstmuseum Basel per Wikipedia. **Inventory number and dimensions to be verified** | [Commons](https://commons.wikimedia.org/wiki/File:Marc_tierschicksale.jpg) | Public domain; CC Public Domain Mark 1.0 |
 
-Painted animals cropped as sprites (`tools/crop_sprites.py`, polygons traced by hand):
-the lion (Eden), the dog (Dürer, head and shoulders above the horse's leg) and the blue
-deer (Marc).
+### Derived from the paintings (this project's own processing)
 
-## Animal photographs
+- **Depth maps** (`assets/paintings/depth/`): estimated with Depth Anything V2 Small
+  (`depth-anything/Depth-Anything-V2-Small-hf`, Apache-2.0), then smoothed.
+- **Painted animals that come alive** (`assets/hosts/`): Eden lion, white horse, stag,
+  white rabbit, little dog and peacock; Dürer's hound and the knight's horse; Marc's blue
+  deer and red boars. Cut out with Segment Anything (`facebook/sam-vit-base`,
+  Apache-2.0), using hand-placed boxes, points and two hand-traced outlines. Hidden parts
+  and the ground behind each animal were repainted with LaMa (big-lama via
+  simple-lama-inpainting; **model licence to be verified**). The repainted areas are
+  machine-generated, not part of the original works.
+- **Collage pieces** (`assets/collage/`): 22 animals cut from the three paintings with SAM.
 
-Source folder: `Desktop/ucl coding/WS2 Tracking/animal_archive_data/photographs/images`
-(the author's animal archive dataset, 6 species × 50 photos). One photograph per species
-was chosen: full body, side or three-quarter view. Each original is kept in
-`assets/animals/originals/`, and the rembg cut-out (isnet-general-use) is in
-`assets/animals/cutouts/`.
+## 3D animals
 
-**Photographer: to be confirmed for all photos.** The dataset's own metadata
-(`metadata/photographs.csv`) links each file to an iNaturalist observation and records a
-licence and attribution string. These are copied below *as recorded*, not as verified
-claims. Check each record page before publishing. Several are recorded as CC BY, which
-requires attribution.
+Rigged and animated low-poly animals by **Quaternius**, released as **CC0 1.0** (public
+domain) on poly.pizza. The licence was checked on each model page on 2026-11-06. Credit is
+not required but is given here. The shading, outline and painterly look are this
+project's own.
 
-| File | Species | Photographer | Source record (per dataset metadata) | Licence / attribution as recorded |
+| File | Model | Author | Source page | Licence |
 |---|---|---|---|---|
-| brown_bear_24160860.png | Brown bear (*Ursus arctos*) | to be confirmed | https://www.inaturalist.org/observations/16123410 | cc0, "no rights reserved" (to be confirmed) |
-| grey_wolf_4909114.png | Grey wolf (*Canis lupus*) | to be confirmed | https://www.inaturalist.org/observations/4126404 | cc-by, "(c) Desiree L. Narango, some rights reserved (CC BY)" (to be confirmed) |
-| lion_236419.png | Lion (*Panthera leo*) | to be confirmed | https://www.inaturalist.org/observations/163263 | cc-by, "(c) 66dodge, some rights reserved (CC BY)" (to be confirmed) |
-| red_deer_10941056.png | Red deer (*Cervus elaphus*) | to be confirmed | https://www.inaturalist.org/observations/8249012 | cc-by, "(c) Michael Bakker Paiva, some rights reserved (CC BY)" (to be confirmed) |
-| red_fox_2262475.png | Red fox (*Vulpes vulpes*) | to be confirmed | https://www.inaturalist.org/observations/1859843 | cc-by, "(c) botanygirl, some rights reserved (CC BY)" (to be confirmed) |
-| tiger_50541307.png | Tiger (*Panthera tigris*) | to be confirmed | https://www.inaturalist.org/observations/32235759 | cc-by, "(c) wild_wind, some rights reserved (CC BY)" (to be confirmed) |
+| fox.glb | Fox | Quaternius | https://poly.pizza/m/Bc97C66HKi | CC0 1.0 |
+| shiba_inu.glb | Shiba Inu | Quaternius | https://poly.pizza/m/y4wdQpg767 | CC0 1.0 |
+| husky.glb | Husky | Quaternius | https://poly.pizza/m/wcWiuEqwzq | CC0 1.0 |
+| deer.glb | Deer | Quaternius | https://poly.pizza/m/T6Cs7tmMHJ | CC0 1.0 |
+| stag.glb | Stag | Quaternius | https://poly.pizza/m/tQdzbZ1Cmw | CC0 1.0 |
+| alpaca.glb | Alpaca | Quaternius | https://poly.pizza/m/bCVFD48i2l | CC0 1.0 |
+| donkey.glb | Donkey | Quaternius | https://poly.pizza/m/qmX6nhnvp7 | CC0 1.0 |
+| white_horse.glb | White Horse | Quaternius | https://poly.pizza/m/bEdE4rmZy9 | CC0 1.0 |
+| zebra.glb | Zebra | Quaternius | https://poly.pizza/m/iclPBR6SBZ | CC0 1.0 |
+| cow.glb | Cow | Quaternius | https://poly.pizza/m/26zM1outCr | CC0 1.0 |
+| bull.glb | Bull | Quaternius | https://poly.pizza/m/a8PIIYwF7r | CC0 1.0 |
+
+## Animal photographs (storybook illustrations)
+
+Six photos come from the author's own animal archive dataset (`WS2 Tracking`). Seven
+(cat, dog, rabbit, horse, barn owl, red squirrel, hedgehog) were downloaded on
+2026-11-06 from iNaturalist with a CC0 filter. The licence and attribution are copied as
+recorded in the metadata, not as verified claims. **Photographer: to be confirmed for
+all.** The storybook illustrations in `assets/animals/storybook/` are generated from
+these photos by `tools/storybook.py`.
+
+| File | Species | Photographer | Source record | Licence / attribution as recorded | Obtained from |
+|---|---|---|---|---|---|
+| brown_bear_24160860.png | brown bear | to be confirmed | https://www.inaturalist.org/observations/16123410 | cc0, "no rights reserved" (to be confirmed) | author’s dataset |
+| domestic_cat_236808539.png | domestic cat | to be confirmed | https://www.inaturalist.org/observations/138537499 | cc0, "no rights reserved" (to be confirmed) | iNaturalist CC0 search, 2026-11-06 |
+| domestic_dog_251913625.png | domestic dog | to be confirmed | https://www.inaturalist.org/observations/146515389 | cc0, "no rights reserved" (to be confirmed) | iNaturalist CC0 search, 2026-11-06 |
+| grey_wolf_4909114.png | grey wolf | to be confirmed | https://www.inaturalist.org/observations/4126404 | cc-by, "(c) Desiree L. Narango, some rights reserved (CC BY)" (to be confirmed) | author’s dataset |
+| hedgehog_203070926.png | hedgehog | to be confirmed | https://www.inaturalist.org/observations/120086772 | cc0, "no rights reserved" (to be confirmed) | iNaturalist CC0 search, 2026-11-06 |
+| horse_121483510.png | horse | to be confirmed | https://www.inaturalist.org/observations/74337960 | cc0, "no rights reserved" (to be confirmed) | iNaturalist CC0 search, 2026-11-06 |
+| lion_236419.png | lion | to be confirmed | https://www.inaturalist.org/observations/163263 | cc-by, "(c) 66dodge, some rights reserved (CC BY)" (to be confirmed) | author’s dataset |
+| owl_324147361.png | owl | to be confirmed | https://www.inaturalist.org/observations/185588647 | cc0, "no rights reserved" (to be confirmed) | iNaturalist CC0 search, 2026-11-06 |
+| rabbit_78502673.png | rabbit | to be confirmed | https://www.inaturalist.org/observations/49453023 | cc0, "no rights reserved" (to be confirmed) | iNaturalist CC0 search, 2026-11-06 |
+| red_deer_10941056.png | red deer | to be confirmed | https://www.inaturalist.org/observations/8249012 | cc-by, "(c) Michael Bakker Paiva, some rights reserved (CC BY)" (to be confirmed) | author’s dataset |
+| red_fox_2262475.png | red fox | to be confirmed | https://www.inaturalist.org/observations/1859843 | cc-by, "(c) botanygirl, some rights reserved (CC BY)" (to be confirmed) | author’s dataset |
+| red_squirrel_171989381.png | red squirrel | to be confirmed | https://www.inaturalist.org/observations/102837347 | cc0, "no rights reserved" (to be confirmed) | iNaturalist CC0 search, 2026-11-06 |
+| tiger_50541307.png | tiger | to be confirmed | https://www.inaturalist.org/observations/32235759 | cc-by, "(c) wild_wind, some rights reserved (CC BY)" (to be confirmed) | author’s dataset |
 
 ## Software, models and fonts (vendored in `vendor/`)
 
 | Item | Version | Use | Licence |
 |---|---|---|---|
-| three.js (core, GLTFLoader, OrbitControls, BufferGeometryUtils) | 0.170.0 (npm) | Sculpture room | MIT (`vendor/three-0.170.0/LICENSE`) |
-| @mediapipe/tasks-vision | 0.10.14 (npm) | Optional hand tracking | Apache-2.0 |
-| hand_landmarker.task (float16, v1) | from storage.googleapis.com/mediapipe-models | Hand landmark model | Apache-2.0 per MediaPipe documentation (to be verified) |
-| @tensorflow/tfjs | 4.22.0 (npm) | Runs the sketch classifier | Apache-2.0 |
-| DoodleNet model | `ml5js/ml5-data-and-models@master/models/doodlenet` (fetched 2026-11-06) | Sketch recognition, 345 QuickDraw classes | Model licence to be verified. Class list and preprocessing follow ml5@0.12.2 (MIT, `vendor/doodlenet/ml5-LICENSE.md`) |
-| Cormorant Garamond, Inter, IBM Plex Mono | Fontsource 5.1.0 | Typography | SIL OFL 1.1 (licence files in `vendor/fonts/`) |
+| three.js (+ GLTFLoader, GLTFExporter, OrbitControls, BufferGeometryUtils) | 0.170.0 | All 3D | MIT |
+| @mediapipe/tasks-vision | 0.10.14 | Optional face and hand tracking | Apache-2.0 |
+| hand_landmarker.task, blaze_face_short_range.tflite | float16 v1 | Hand and face models | Apache-2.0 per MediaPipe documentation (to be verified) |
+| @tensorflow/tfjs | 4.22.0 | Runs the sketch classifier | Apache-2.0 |
+| DoodleNet (ml5.js data and models) | labels from ml5@0.12.2 | Sketch recognition | ml5.js MIT; **model licence to be verified** |
+| Cormorant Garamond, Inter, IBM Plex Mono | Fontsource 5.1.0 | Typography | SIL OFL 1.1 |
 
-Tools used to make the assets (not shipped): Blender 5.2.3 LTS (`blender/make_relief.py`),
-rembg 2.0.87 with isnet-general-use, Pillow, NumPy, SciPy.
+Tools used offline (not shipped): Blender 5.2.3 LTS, rembg 2.0.87 (isnet-general-use),
+PyTorch, Hugging Face transformers, Depth Anything V2, Segment Anything, LaMa, OpenCV,
+Pillow, NumPy, SciPy.
