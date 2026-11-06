@@ -6,7 +6,8 @@
   "photo_id": "2262475",
   "record_url": "https://www.inaturalist.org/observations/1859843",
   "licence": "cc-by",
-  "attribution": "(c) botanygirl, some rights reserved (CC BY)"
+  "attribution": "(c) botanygirl, some rights reserved (CC BY)",
+  "source": "author's animal archive dataset (iNaturalist); large version downloaded 2026-11-06"
  },
  "tiger_50541307": {
   "category": "tiger",
@@ -15,7 +16,8 @@
   "photo_id": "50541307",
   "record_url": "https://www.inaturalist.org/observations/32235759",
   "licence": "cc-by",
-  "attribution": "(c) wild_wind, some rights reserved (CC BY)"
+  "attribution": "(c) wild_wind, some rights reserved (CC BY)",
+  "source": "author's animal archive dataset (iNaturalist); large version downloaded 2026-11-06"
  },
  "lion_236419": {
   "category": "lion",
@@ -24,7 +26,8 @@
   "photo_id": "236419",
   "record_url": "https://www.inaturalist.org/observations/163263",
   "licence": "cc-by",
-  "attribution": "(c) 66dodge, some rights reserved (CC BY)"
+  "attribution": "(c) 66dodge, some rights reserved (CC BY)",
+  "source": "author's animal archive dataset (iNaturalist); large version downloaded 2026-11-06"
  },
  "grey_wolf_4909114": {
   "category": "grey_wolf",
@@ -33,7 +36,8 @@
   "photo_id": "4909114",
   "record_url": "https://www.inaturalist.org/observations/4126404",
   "licence": "cc-by",
-  "attribution": "(c) Desiree L. Narango, some rights reserved (CC BY)"
+  "attribution": "(c) Desiree L. Narango, some rights reserved (CC BY)",
+  "source": "author's animal archive dataset (iNaturalist); large version downloaded 2026-11-06"
  },
  "brown_bear_24160860": {
   "category": "brown_bear",
@@ -42,7 +46,8 @@
   "photo_id": "24160860",
   "record_url": "https://www.inaturalist.org/observations/16123410",
   "licence": "cc0",
-  "attribution": "no rights reserved"
+  "attribution": "no rights reserved",
+  "source": "author's animal archive dataset (iNaturalist); large version downloaded 2026-11-06"
  },
  "red_deer_10941056": {
   "category": "red_deer",
@@ -51,6 +56,70 @@
   "photo_id": "10941056",
   "record_url": "https://www.inaturalist.org/observations/8249012",
   "licence": "cc-by",
-  "attribution": "(c) Michael Bakker Paiva, some rights reserved (CC BY)"
+  "attribution": "(c) Michael Bakker Paiva, some rights reserved (CC BY)",
+  "source": "author's animal archive dataset (iNaturalist); large version downloaded 2026-11-06"
+ },
+ "domestic_cat_236808539": {
+  "category": "domestic_cat",
+  "query_scientific_name": "Felis catus",
+  "photo_id": "236808539",
+  "record_url": "https://www.inaturalist.org/observations/138537499",
+  "licence": "cc0",
+  "attribution": "no rights reserved",
+  "source": "iNaturalist (downloaded 2026-11-06, CC0 filter)"
+ },
+ "domestic_dog_251913625": {
+  "category": "domestic_dog",
+  "query_scientific_name": "Canis familiaris",
+  "photo_id": "251913625",
+  "record_url": "https://www.inaturalist.org/observations/146515389",
+  "licence": "cc0",
+  "attribution": "no rights reserved",
+  "source": "iNaturalist (downloaded 2026-11-06, CC0 filter)"
+ },
+ "rabbit_78502673": {
+  "category": "rabbit",
+  "query_scientific_name": "Oryctolagus cuniculus",
+  "photo_id": "78502673",
+  "record_url": "https://www.inaturalist.org/observations/49453023",
+  "licence": "cc0",
+  "attribution": "no rights reserved",
+  "source": "iNaturalist (downloaded 2026-11-06, CC0 filter)"
+ },
+ "horse_121483510": {
+  "category": "horse",
+  "query_scientific_name": "Equus asinus \u00d7 caballus",
+  "photo_id": "121483510",
+  "record_url": "https://www.inaturalist.org/observations/74337960",
+  "licence": "cc0",
+  "attribution": "no rights reserved",
+  "source": "iNaturalist (downloaded 2026-11-06, CC0 filter)"
+ },
+ "owl_324147361": {
+  "category": "owl",
+  "query_scientific_name": "Tyto alba",
+  "photo_id": "324147361",
+  "record_url": "https://www.inaturalist.org/observations/185588647",
+  "licence": "cc0",
+  "attribution": "no rights reserved",
+  "source": "iNaturalist (downloaded 2026-11-06, CC0 filter)"
+ },
+ "red_squirrel_171989381": {
+  "category": "red_squirrel",
+  "query_scientific_name": "Sciurus vulgaris",
+  "photo_id": "171989381",
+  "record_url": "https://www.inaturalist.org/observations/102837347",
+  "licence": "cc0",
+  "attribution": "no rights reserved",
+  "source": "iNaturalist (downloaded 2026-11-06, CC0 filter)"
+ },
+ "hedgehog_203070926": {
+  "category": "hedgehog",
+  "query_scientific_name": "Erinaceus europaeus occidentalis",
+  "photo_id": "203070926",
+  "record_url": "https://www.inaturalist.org/observations/120086772",
+  "licence": "cc0",
+  "attribution": "no rights reserved",
+  "source": "iNaturalist (downloaded 2026-11-06, CC0 filter)"
  }
 }
