@@ -35,19 +35,19 @@ export const WORKS = [
 // Painted animals that can come alive. box = sprite rect in HD pixels (hosts.json).
 // faces = where its head points; inPlace = too big / interlocked to walk away.
 export const HOSTS = {
-  'eden-lion':    { faces: 'left',  name: 'lion' },
-  'eden-horse':   { faces: 'left',  name: 'white horse' },
-  'eden-deer':    { faces: 'left',  name: 'stag' },
-  'eden-rabbit':  { faces: 'left',  name: 'rabbit' },
-  'eden-dog':     { faces: 'left',  name: 'little dog' },
-  'eden-peacock': { faces: 'right', name: 'peacock' },
-  'durer-horse':  { faces: 'left',  name: 'knight’s horse', inPlace: true },
-  'durer-dog':    { faces: 'left',  name: 'hound' },
-  'marc-deer':    { faces: 'left',  name: 'blue deer' },
-  'marc-boar':    { faces: 'right', name: 'red boar' },
+  'eden-lion':    { faces: 'left' },
+  'eden-horse':   { faces: 'left' },
+  'eden-deer':    { faces: 'left' },
+  'eden-rabbit':  { faces: 'left' },
+  'eden-dog':     { faces: 'left' },
+  'eden-peacock': { faces: 'right' },
+  'durer-horse':  { faces: 'left', inPlace: true },
+  'durer-dog':    { faces: 'left' },
+  'marc-deer':    { faces: 'left' },
+  'marc-boar':    { faces: 'right' },
 };
 for (const [id, h] of Object.entries(HOSTS)) {
-  h.id = id; h.sprite = `assets/hosts/${id}.png`; h.patch = `assets/hosts/${id}-patch.jpg`;
+  h.id = id; h.sprite = `assets/hosts/${id}.webp`; h.patch = `assets/hosts/${id}-patch.jpg`; h.glb = `assets/hosts/glb/${id}.glb`;
 }
 
 // Visitor species. faces = direction of the head in the photograph.
@@ -73,6 +73,7 @@ export const SPECIES = [
   cutout: `assets/animals/cutouts/${s.file}.png`,
   storybook: `assets/animals/storybook/${s.file}.png`,
   glb: `assets/animals/glb/${s.file}.glb`,
+  glbStorybook: `assets/animals/glb-storybook/${s.file}.glb`,
 }));
 
 export const workById = id => WORKS.find(w => w.id === id);

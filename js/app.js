@@ -1,20 +1,27 @@
-// Animals in the Archive: main flow controller.
-// index → record → role → visitor (archive or sketch) → stage → sculpt → card.
+// Animals in the Archive: flow controller.
+// index → record → role → camera (optional) → visitor (draw or archive)
+//   → gallery: walk in, look back, the painted animal wakes and asks
+//   → step into the painting → create (sculpt 3D / new painting 2D) → card.
 // No data is stored or sent anywhere; state lives in memory only.
 
 import { t, STRINGS, LANG } from './strings.js';
-import { WORKS, SPECIES, workById, speciesById } from './data.js';
-import { paintify } from './paint.js';
-import { Stage } from './stage.js';
-import { loadClassifier, createPad, classify, matchSpecies } from './sketch.js';
+import { WORKS, SPECIES, HOSTS, workById, speciesById } from './data.js';
+import { loadClassifier, createPad, classify, matchSpecies, drawingToCharacter } from './sketch.js';
 import { makeCard, recordNumber } from './card.js';
+import { paintify, loadImage } from './paint.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const W = id => t(`works.${id}`);
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-const state = { work: null, role: null, species: null, answer: null, viaSketch: false };
-let stage = null, sculpt = null, hands = null, cardUrl = null;
+const state = {
+  work: null, role: null, look: 'storybook', visitor: null, host: null, answer: null,
+  facing: 'right', colour: '#c98a4b', made: null,
+};
+let gallery = null, sculpt = null, composer = null, tracker = null, cardUrl = null, hostMeta = null;
+let face = null, hands = [];
 
 // ---------------------------------------------------------------- i18n
 document.documentElement.lang = LANG;
@@ -24,7 +31,8 @@ document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.d
 function show(view) {
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('is-active', v.id === `view-${view}`));
   document.body.classList.toggle('in-stage', view === 'stage');
-  document.body.classList.toggle('in-sculpt', view === 'sculpt');
+  document.body.classList.toggle('in-sculpt', view === 'create');
+  if (view !== 'stage') clearBubbles();
   window.scrollTo(0, 0);
 }
 
@@ -35,14 +43,10 @@ function openModal(html, { wide = false } = {}) {
   lastFocus = document.activeElement;
   panel.className = 'modal-panel glass' + (wide ? ' wide' : '');
   panel.innerHTML = `<button class="modal-close" data-action="close-modal" aria-label="${esc(t('close'))}"></button>` + html;
-  modal.hidden = false;
-  panel.scrollTop = 0;
+  modal.hidden = false; panel.scrollTop = 0;
   (panel.querySelector('[autofocus]') || panel.querySelector('button:not(.modal-close)') || panel).focus?.();
 }
-function closeModal() {
-  modal.hidden = true; panel.innerHTML = '';
-  lastFocus?.focus?.();
-}
+function closeModal() { modal.hidden = true; panel.innerHTML = ''; lastFocus?.focus?.(); }
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.hidden) closeModal(); });
 
 // ---------------------------------------------------------------- 1 · index
@@ -60,7 +64,7 @@ function renderIndex() {
         <dt>${esc(t('fieldStyle'))}</dt><dd>${esc(x.style)}</dd>
         <dt>${esc(t('fieldAnimals'))}</dt><dd>${esc(x.animals)}</dd>
       </dl>
-      <span class="link view-link arrow">${esc(t('viewRecord'))}</span>
+      <span class="btn cta primary enter-pill">${esc(t('enterWork'))}</span>
     </li>`;
   }).join('');
 }
@@ -88,7 +92,7 @@ function openRecord(id) {
     </div>
     <div class="modal-actions">
       <button class="btn ghost" data-action="close-modal">${esc(t('close'))}</button>
-      <button class="btn primary" data-action="to-role" autofocus>${esc(t('enterWork'))}</button>
+      <button class="btn primary cta" data-action="to-role" autofocus>${esc(t('enterWork'))}</button>
     </div>`, { wide: true });
 }
 
@@ -108,293 +112,483 @@ function openRole() {
     </div>
     <div class="modal-actions">
       <button class="btn ghost" data-action="back-record">${esc(t('back'))}</button>
-      <button class="btn primary" data-action="to-visitor" ${state.role ? '' : 'disabled'}>${esc(t('continue'))}</button>
+      <button class="btn primary cta" data-action="to-camera" ${state.role ? '' : 'disabled'}>${esc(t('continue'))}</button>
     </div>`);
 }
 
-// ---------------------------------------------------------------- 4 · visitor
-function openVisitor(tab = 'archive') {
+// ---------------------------------------------------------------- 4 · camera consent
+function openCamera() {
+  if (tracker) { openVisitor(); return; }           // already on in this session
   openModal(`
-    <p class="kicker">${esc(t('stepOf', { n: 3 }))} · ${esc(t(`roles.${state.role}.name`))}</p>
+    <p class="kicker">${esc(t('stepOf', { n: 3 }))}</p>
+    <h2>${esc(t('camHeading'))}</h2>
+    <p class="sub">${esc(t('camBody'))}</p>
+    <label class="consent-check"><input type="checkbox" id="consent-box"><span>${esc(t('consentCheck'))}</span></label>
+    <div class="modal-actions">
+      <button class="btn ghost" data-action="cam-skip">${esc(t('camSkip'))}</button>
+      <button class="btn primary cta" data-action="cam-start" id="cam-start" disabled>${esc(t('camStart'))}</button>
+    </div>`);
+  $('#consent-box').addEventListener('change', e => { $('#cam-start').disabled = !e.target.checked; });
+}
+
+async function startCamera() {
+  if (!$('#consent-box')?.checked) return;          // consent is required
+  $('#cam-start').disabled = true;
+  $('#cam-start').innerHTML = `<span class="loading"></span>${esc(t('camLoading'))}`;
+  try {
+    if (!navigator.mediaDevices?.getUserMedia) throw Object.assign(new Error('no camera API'), { name: 'NotFoundError' });
+    const { Tracker } = await import('./tracking.js');
+    tracker = await new Tracker($('#cam-video'), {
+      onFace: f => { face = f.present ? f : null; },
+      onHands: h => { hands = h; onHands(h); },
+      onGesture: g => onGesture(g),
+    }).start();
+    $('#cam-chip').hidden = false;
+    openVisitor();
+  } catch (err) {
+    console.warn('[camera]', err.name, err.message);
+    const denied = ['NotAllowedError', 'NotFoundError', 'NotReadableError', 'SecurityError', 'OverconstrainedError'].includes(err.name);
+    tracker = null;
+    openVisitor(denied ? t('camDenied') : t('camFailed'));
+  }
+}
+function stopCamera() {
+  tracker?.stop(); tracker = null; face = null; hands = [];
+  $('#cam-chip').hidden = true;
+  $('#hand-cursor').hidden = true; $('#hand-cursor-2').hidden = true;
+  sculpt?.externalBrush(null);
+}
+
+// ---------------------------------------------------------------- 5 · visitor
+const SWATCHES = ['#c98a4b', '#9a7b5c', '#e2c48a', '#7f8f9c', '#5d6b4f', '#b8524a', '#3f5a9e', '#efe9dc'];
+function openVisitor(notice = '') {
+  openModal(`
+    <p class="kicker">${esc(t('stepOf', { n: 4 }))} · ${esc(t(`roles.${state.role}.name`))}${tracker ? ' · ' + esc(t('camOn')) : ''}</p>
     <h2>${esc(t('visitorHeading'))}</h2>
     <p class="sub">${esc(t('visitorIntro'))}</p>
-    <div class="tabs" role="tablist">
-      <button role="tab" data-action="tab" data-tab="archive" aria-selected="${tab === 'archive'}">${esc(t('tabArchive'))}</button>
-      <button role="tab" data-action="tab" data-tab="draw" aria-selected="${tab === 'draw'}">${esc(t('tabDraw'))}</button>
-    </div>
-    <div id="tab-body"></div>
-    <div class="modal-actions">
-      <button class="btn ghost" data-action="back-role">${esc(t('back'))}</button>
-    </div>`, { wide: true });
-  tab === 'archive' ? renderArchiveTab() : renderDrawTab();
-}
-
-function renderArchiveTab() {
-  $('#tab-body').innerHTML = `<div class="species-grid">${SPECIES.map(s => `
-    <button class="species" data-action="pick-species" data-species="${s.id}">
-      <div class="thumb"><img src="${s.cutout}" alt="" loading="lazy"></div>
-      <h3>${esc(t(`species.${s.id}`))}</h3>
-      <span class="latin">${esc(t(`speciesLatin.${s.id}`))}</span>
-      <span class="caption">${esc(t('archiveRecord', { file: s.file + '.png' }))}</span>
-    </button>`).join('')}</div>`;
-}
-
-function renderDrawTab() {
-  $('#tab-body').innerHTML = `
-    <div class="draw">
-      <div>
+    ${notice ? `<p class="status">${esc(notice)}</p>` : ''}
+    <div class="visitor">
+      <div class="draw-side">
         <div class="draw-pad" id="draw-pad"><canvas id="draw-canvas" aria-label="${esc(t('drawHint'))}"></canvas>
           <div class="match-photo"><img id="match-img" alt=""></div></div>
         <div class="draw-tools">
           <button class="btn small" data-action="draw-clear">${esc(t('drawClear'))}</button>
-          <button class="btn small primary" data-action="draw-go" id="draw-go" disabled>${esc(t('drawRecognise'))}</button>
+          <button class="btn small primary" data-action="draw-go" id="draw-go">${esc(t('drawRecognise'))}</button>
         </div>
-      </div>
-      <div>
+        <div class="draw-opts">
+          <span class="lbl">${esc(t('facing'))}</span>
+          <div class="segmented" role="group">
+            <button data-action="facing" data-facing="left" aria-pressed="${state.facing === 'left'}">${esc(t('facingLeft'))}</button>
+            <button data-action="facing" data-facing="right" aria-pressed="${state.facing === 'right'}">${esc(t('facingRight'))}</button>
+          </div>
+          <span class="lbl">${esc(t('wash'))}</span>
+          <div class="swatches">${SWATCHES.map(c => `<button data-action="swatch" data-colour="${c}" style="background:${c}" aria-label="${c}" aria-pressed="${state.colour === c}"></button>`).join('')}</div>
+        </div>
         <p class="status" id="draw-status"><span class="loading"></span>${esc(t('drawLoading'))}</p>
-        <p class="sub" style="margin:0 0 8px">${esc(t('drawHint'))}</p>
+        <p class="note" style="margin-top:0">${esc(t('drawHint'))}</p>
         <div id="draw-result"></div>
-        <p class="note">${esc(t('drawNote'))}</p>
+        <div class="result-actions"><button class="btn primary cta" data-action="use-drawing">${esc(t('useDrawing'))}</button></div>
       </div>
-    </div>`;
+      <div class="archive-side">
+        <div class="archive-head">
+          <h3>${esc(t('archiveHeading'))}</h3>
+          <div class="segmented" role="group" aria-label="${esc(t('lookLabel'))}">
+            <button data-action="look" data-look="storybook" aria-pressed="${state.look === 'storybook'}">${esc(t('lookStorybook'))}</button>
+            <button data-action="look" data-look="photo" aria-pressed="${state.look === 'photo'}">${esc(t('lookPhoto'))}</button>
+          </div>
+        </div>
+        <div class="species-grid" id="species-grid"></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" data-action="back-role">${esc(t('back'))}</button>
+    </div>`, { wide: true });
+  renderSpecies();
   const pad = createPad($('#draw-canvas'));
-  renderDrawTab.pad = pad;
+  openVisitor.pad = pad;
+  $('#draw-go').disabled = true;
   loadClassifier().then(() => {
     if (!$('#draw-status')) return;
-    $('#draw-status').textContent = t('drawReady');
-    $('#draw-go').disabled = false;
+    $('#draw-status').textContent = t('drawReady'); $('#draw-go').disabled = false;
   }).catch(err => {
     console.warn('[sketch] classifier unavailable:', err);
-    if (!$('#draw-status')) return;
-    $('#draw-status').textContent = t('drawUnavailable');
-    $('#draw-go').disabled = true;
+    if ($('#draw-status')) $('#draw-status').textContent = t('drawUnavailable');
   });
+}
+function renderSpecies() {
+  $('#species-grid').innerHTML = SPECIES.map(s => `
+    <button class="species" data-action="pick-species" data-species="${s.id}">
+      <div class="thumb"><img src="${state.look === 'photo' ? s.cutout : s.storybook}" alt="" loading="lazy"></div>
+      <h3>${esc(cap(t(`species.${s.id}`)))}</h3>
+      <span class="latin">${esc(t(`speciesLatin.${s.id}`))}</span>
+      <span class="caption">${esc(t('archiveRecord', { file: s.file }))}</span>
+    </button>`).join('');
 }
 
 async function recogniseSketch() {
-  const pad = renderDrawTab.pad, out = $('#draw-result');
+  const pad = openVisitor.pad, out = $('#draw-result');
   if (pad.isEmpty()) { out.innerHTML = `<p class="status">${esc(t('drawEmpty'))}</p>`; return; }
   const ranked = await classify(pad.canvas);
-  const matches = matchSpecies(ranked, SPECIES);
-  const best = matches[0];
+  const best = matchSpecies(ranked.slice(), SPECIES.filter(s => s.doodle.length))[0];
   const pct = p => (p * 100).toFixed(1);
-  const top = ranked.slice(0, 5).map(r => `<li><span>${esc(r.label)}</span><span class="bar"><i style="width:${(r.p * 100).toFixed(1)}%"></i></span><span class="pct">${pct(r.p)}%</span></li>`).join('');
-  const MIN = 0.05;   // below this the match is not shown as a recognition
+  const top = ranked.slice(0, 4).map(r => `<li><span>${esc(r.label)}</span><span class="bar"><i style="width:${(r.p * 100).toFixed(1)}%"></i></span><span class="pct">${pct(r.p)}%</span></li>`).join('');
   let html = `<div class="result"><h4>${esc(t('drawTop'))}</h4><ul class="bars">${top}</ul>`;
-  if (best.score >= MIN) {
+  if (best.score >= 0.05) {
     html += `<h4>${esc(t('drawMatch'))}</h4>
       <p class="match">${esc(t(`species.${best.species.id}`))}</p>
       <p class="caption" style="text-transform:none;letter-spacing:.04em">${esc(t('drawScore', { p: pct(best.score) }))} · ${esc(t('drawVia', { c: best.via }))}</p>
-      <div style="margin-top:14px"><button class="btn primary" data-action="pick-species" data-species="${best.species.id}" data-sketch="1">${esc(t('useMatch', { species: t(`species.${best.species.id}`) }))}</button></div>`;
-    // cross-fade the sketch into the matched photograph
-    $('#match-img').src = best.species.cutout;
+      <div class="result-actions"><button class="btn" data-action="pick-species" data-species="${best.species.id}">${esc(t('useMatch', { species: t(`species.${best.species.id}`) }))}</button></div>`;
+    $('#match-img').src = state.look === 'photo' ? best.species.cutout : best.species.storybook;
     $('#draw-pad').classList.add('revealed');
+    setTimeout(() => $('#draw-pad')?.classList.remove('revealed'), 3200);     // fade back to the drawing
   } else {
-    html += `<p class="status" style="margin-top:14px">${esc(t('drawNoMatch', { p: pct(best.score) }))}</p>
-      <button class="btn small" data-action="tab" data-tab="archive">${esc(t('tabArchive'))}</button>`;
+    html += `<p class="status" style="margin-top:14px">${esc(t('drawNoMatch', { p: pct(best.score) }))}</p>`;
   }
   out.innerHTML = html + '</div>';
+  out.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
-// ---------------------------------------------------------------- 5–6 · stage
-async function enterStage(speciesId) {
-  state.species = speciesById(speciesId);
-  state.answer = null;
-  closeModal();
-  show('stage');
-  const w = state.work, x = W(w.id), sp = state.species;
-  $('#wall-label').innerHTML = `<div class="caption">${esc(w.accession)}</div>
-    <div class="t">${esc(x.title)}</div><div class="a">${esc(x.artist)}, ${esc(x.date)}</div>`;
-  const bar = $('#stage-controls');
-  bar.innerHTML = `<span class="hint"><span class="loading"></span>${esc(t('entering', { species: cap(t(`species.${sp.id}`)) }))}</span>`;
+// ---------------------------------------------------------------- 6 · gallery
+const bubbles = new Map();
+function say(who, name, text) {
+  let b = bubbles.get(who);
+  if (!b) { b = document.createElement('div'); b.className = 'bubble'; $('#bubble-layer').appendChild(b); bubbles.set(who, b); }
+  b.classList.remove('show');
+  b.innerHTML = `<span class="who"></span><span class="txt"></span>`;
+  b.querySelector('.who').textContent = name; b.querySelector('.txt').textContent = text;
+  requestAnimationFrame(() => b.classList.add('show'));
+}
+function clearBubbles() { bubbles.forEach(b => b.remove()); bubbles.clear(); }
+function placeBubbles(g) {
+  const items = [...bubbles.entries()].map(([who, el]) => ({ who, el, p: g.project(g.anchor(who)) }));
+  // keep two bubbles from overlapping: lift the left one if they collide
+  if (items.length === 2) {
+    const [a, b] = items;
+    if (Math.abs(a.p.x - b.p.x) < 300 && Math.abs(a.p.y - b.p.y) < 120) (a.p.x < b.p.x ? a : b).p.y -= 110;
+  }
+  for (const { el, p } of items) {
+    const x = Math.max(170, Math.min(innerWidth - 170, p.x)), y = Math.max(150, p.y);
+    el.style.left = x + 'px'; el.style.top = y + 'px';
+  }
+}
+function controls(html) { $('#stage-controls').innerHTML = html; }
+function status(html) { $('#stage-status').innerHTML = html ? `<div class="glass">${html}</div>` : ''; }
 
-  stage?.destroy();
-  stage = new Stage({
-    wrap: $('#stage-wrap'), stage: $('#stage'), outside: $('#outside-layer'),
-    picture: $('#picture'), img: $('#picture-img'), bubbles: $('#bubble-layer'),
+async function visitorImage() {
+  const v = state.visitor;
+  if (v.kind === 'drawing') return v.canvas;
+  return loadImage(state.look === 'photo' ? v.species.cutout : v.species.storybook);
+}
+
+async function enterStage(visitor) {
+  state.visitor = visitor; state.answer = null; state.inside = false; state.hostAwake = false;
+  closeModal(); show('stage');
+  status(`<span class="loading"></span>${esc(t('loadingRoom'))}`); controls('');
+  const w = state.work;
+  // a different painted animal may wake up each visit
+  state.host = HOSTS[w.hosts[Math.floor(Math.random() * w.hosts.length)]];
+  hostMeta ??= await (await fetch('assets/hosts/hosts.json')).json();
+  const img = await visitorImage();
+  gallery?.dispose();
+  const { Gallery } = await import('./gallery.js');
+  gallery = new Gallery($('#stage3d'), {
+    work: w, workText: W(w.id), visitorImage: img,
+    visitorHead: visitor.kind === 'drawing' ? visitor.facing : visitor.species.faces,
+    visitorLit: state.look === 'photo' && visitor.kind !== 'drawing',
+    visitorGait: visitor.kind === 'drawing' ? undefined : visitor.species.gait,
+    host: state.host, hostMeta: hostMeta[state.host.id],
+    onFrame: g => { placeBubbles(g); stageFrame(g); },
   });
-  const painted = await paintify(sp.cutout, w.style);
-  await stage.setup({ work: w, species: sp, role: state.role, paintedSrc: painted });
-  await stage.walkIn();
-
-  // the painted host replies
-  const hostName = cap(x.host);
-  stage.say('host', hostName, `${t(`works.${w.id}.welcome`, { visitor: t(`species.${sp.id}`) })} ${x.greet[state.role]}`);
-  bar.innerHTML = `<span class="hint">${esc(t(`pointerHint.${state.role}`, { animal: x.host }))}</span>
-    <button class="btn primary" data-action="ask">${esc(t('askQuestion'))}</button>`;
+  await gallery.init();
+  status('');
+  runStory(gallery);
 }
 
-function ask() {
-  stage.say('visitor', cap(t(`species.${state.species.id}`)), t('questionLine'));
-  const bar = $('#stage-controls');
-  bar.innerHTML = `<button class="btn" data-action="answer" data-answer="no">${esc(t('no'))}</button>
-    <button class="btn primary" data-action="answer" data-answer="yes">${esc(t('yes'))}</button>`;
-}
+const visitorName = () => state.visitor.kind === 'drawing' ? t('yourDrawing') : t(`species.${state.visitor.species.id}`);
+const hostName = () => t(`hostNames.${state.host.id}`);
 
-function answer(a) {
-  state.answer = a;
+async function runStory(g) {
   const x = W(state.work.id);
-  stage.say('visitor', cap(t(`species.${state.species.id}`)), a === 'yes' ? t('visitorYes') : t('visitorNo'));
-  stage.setAnswer(a);
-  setTimeout(() => stage?.say('host', cap(x.host), x[a]), 900);
-  $('#stage-controls').innerHTML = `<span class="hint">${esc(t('cardMood'))}: ${esc(mood())}</span>
-    <button class="btn primary" data-action="to-sculpt">${esc(t('toSculpt'))}</button>`;
+  await g.walkIn();
+  if (g !== gallery) return;
+  // the visitor stops and looks back at you (towards your face if the camera sees you)
+  const side = face ? (face.x < 0.45 ? -1 : 1) : 1;
+  say('visitor', cap(visitorName()), t(`visitorGreet.${state.role}`));
+  await g.lookBack(side);
+  await sleep(1600);
+  if (g !== gallery) return;
+  bubbles.get('visitor')?.classList.remove('show');
+  await g.approach();
+  await g.wakeHost();
+  if (g !== gallery) return;
+  state.hostAwake = true;
+  say('host', cap(hostName()), `${t(`works.${state.work.id}.welcome`, { visitor: visitorName() })} ${x.greet[state.role]}`);
+  await sleep(3200);
+  if (g !== gallery) return;
+  say('host', cap(hostName()), t('hostAsk'));
+  state.awaiting = true;
+  controls(`${tracker ? `<span class="hint">${esc(t('answerHint'))}</span>` : ''}
+    <button class="btn" data-action="answer" data-answer="no">${esc(t('no'))}</button>
+    <button class="btn primary cta" data-action="answer" data-answer="yes">${esc(t('yes'))}</button>`);
 }
 
-const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
-const mood = () => t(`moods.${state.role}.${state.answer || 'yes'}`);
+async function answer(a) {
+  if (!state.awaiting || !gallery) return;
+  state.awaiting = false; state.answer = a;
+  const g = gallery, x = W(state.work.id);
+  controls('');
+  say('visitor', cap(visitorName()), a === 'yes' ? t('visitorYes') : t('visitorNo'));
+  await sleep(900);
+  say('host', cap(hostName()), x[a]);
+  if (a === 'yes') { await sleep(2600); await stepIn(g); }
+  else {
+    await g.hostRefuses();
+    controls(`<button class="btn" data-action="home">${esc(t('anotherPainting'))}</button>
+      <button class="btn primary cta" data-action="step-in">${esc(t('stepInAnyway'))}</button>`);
+  }
+}
 
-// ---------------------------------------------------------------- 7 · sculpt
-async function enterSculpt() {
-  stage?.destroy(); stage = null;
-  show('sculpt');
-  const w = state.work, sp = state.species;
-  const status = $('#sculpt-status');
-  status.innerHTML = `<strong>${esc(t('sculptHeading'))}</strong>${esc(t('sculptHint'))}`;
-  renderTools();
-  const { createSculpt } = await import('./sculpt.js');
-  sculpt?.dispose();
-  sculpt = await createSculpt($('#sculpt-canvas'), {
-    models: [
-      { glb: sp.glb, png: sp.cutout, position: [-0.38, 0, 0.14], rotY: 0.3, scale: 0.95 },
-      { glb: w.host.glb, png: w.host.sprite, position: [0.38, 0, -0.12], rotY: -0.32, scale: 0.95 },
-    ],
-    onStatus: kind => { if (kind === 'fallback') status.insertAdjacentHTML('beforeend', `<br><em>${esc(t('modelFallback'))}</em>`); },
+async function stepIn(g = gallery) {
+  if (!g || g.inside) return;
+  controls(''); clearBubbles();
+  state.hostAwake = false;
+  await g.enter();
+  if (g !== gallery) return;
+  state.inside = true;
+  status(esc(tracker ? t('insideHint') : t('insideHintMouse')));
+  controls(`<button class="btn primary cta" data-action="to-create">${esc(t('create'))}</button>`);
+}
+
+// per frame: parallax from your head (or the mouse) and the host's role reaction
+let pointer = null;
+function stageFrame(g) {
+  if (face) g.parallax.set((face.x - 0.5) * 2.2, -(face.y - 0.45) * 2.2);
+  else if (pointer) g.parallax.set(pointer[0], pointer[1]);
+  if (state.hostAwake && !g.host.target && !g.inside) {
+    // where are you? your face, your hand, or the mouse, in screen x
+    const you = face ? face.x * innerWidth : hands[0] ? hands[0].x * innerWidth : pointer ? (pointer[0] + 1) / 2 * innerWidth : null;
+    if (you !== null) {
+      const hx = g.project(g.anchor('host')).x;
+      const toward = Math.sign(you - hx) || 1;
+      g.host.setDir(state.role === 'guard' ? -toward : toward);   // the guard's host turns away
+    }
+  }
+}
+$('#stage3d').addEventListener('pointermove', e => {
+  pointer = [e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight * 2 - 1)];
+});
+$('#stage3d').addEventListener('pointerdown', e => {
+  if (gallery?.inside) gallery.walkVisitorToScreen(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight * 2 - 1));
+});
+
+// ---------------------------------------------------------------- camera events
+let lastPinchWalk = 0;
+function onGesture(g) {
+  const view = document.querySelector('.view.is-active')?.id;
+  if (view === 'view-stage' && gallery) {
+    if (g === 'nod' && state.awaiting) answer('yes');
+    else if (g === 'shake' && state.awaiting) answer('no');
+    else if (g === 'wave') {
+      gallery.visitor.hopOnce(0.1); gallery.visitor.nod(2);
+      if (!gallery.inside) say('visitor', cap(visitorName()), t('waveReply'));
+      if (state.hostAwake) gallery.host.nod(2);
+    }
+  }
+  if (view === 'view-create' && composer && !$('#compose-wrap').hidden) {
+    if (g === 'swipeLeft') { composer.nextVariant(-1); syncVariant(); }
+    if (g === 'swipeRight') { composer.nextVariant(1); syncVariant(); }
+  }
+}
+function onHands(hs) {
+  const view = document.querySelector('.view.is-active')?.id;
+  // inside the painting: pinch in the air to send the visitor there
+  if (view === 'view-stage' && gallery?.inside) {
+    const p = hs.find(h => h.pinch);
+    if (p && performance.now() - lastPinchWalk > 350) {
+      lastPinchWalk = performance.now();
+      gallery.walkVisitorToScreen(p.pinchX * 2 - 1, -(p.pinchY * 2 - 1));
+    }
+  }
+  if (view !== 'view-create') return;
+  const c1 = $('#hand-cursor'), c2 = $('#hand-cursor-2');
+  [c1, c2].forEach((c, i) => {
+    const h = hs[i];
+    c.hidden = !h;
+    if (h) { c.style.left = h.pinchX * innerWidth + 'px'; c.style.top = h.pinchY * innerHeight + 'px'; c.classList.toggle('pinch', h.pinch); }
   });
-  applyTools();
-  window.__aia.sculpt = sculpt;   // console/debug access only
+  if (!$('#compose-wrap').hidden) { composer?.handInput(hs); return; }
+  if (!sculpt) return;
+  // sculpt: right-hand pinch pulls, left-hand pinch presses; open hand turns; two open hands zoom
+  const pinch = hs.find(h => h.pinch);
+  if (pinch) {
+    sculpt.setMode(pinch.pinchX > 0.5 ? 'pull' : 'press');
+    sculpt.externalBrush({ x: pinch.pinchX * innerWidth, y: pinch.pinchY * innerHeight });
+  } else sculpt.externalBrush(null);
+  const open = hs.filter(h => h.open);
+  if (open.length === 2) {
+    const d = Math.hypot(open[0].x - open[1].x, open[0].y - open[1].y);
+    if (onHands.d0) sculpt.zoomBy(d / onHands.d0);
+    onHands.d0 = d; onHands.prev = null;
+  } else if (open.length === 1 && !pinch) {
+    const h = open[0];
+    if (onHands.prev) sculpt.rotateBy(h.x - onHands.prev[0], h.y - onHands.prev[1]);
+    onHands.prev = [h.x, h.y]; onHands.d0 = null;
+  } else { onHands.prev = null; onHands.d0 = null; }
 }
 
-function renderTools() {
-  $('#sculpt-tools').innerHTML = `
-    <div class="segmented" role="group" aria-label="Brush">
+// ---------------------------------------------------------------- 7 · create
+async function enterCreate(mode = 'sculpt') {
+  show('create');
+  $('#create-modes').innerHTML = ['sculpt', 'compose'].map(m =>
+    `<button role="tab" data-action="create-mode" data-mode="${m}" aria-selected="${m === mode}">${esc(t(m === 'sculpt' ? 'modeSculpt' : 'modeCompose'))}</button>`).join('');
+  if (mode === 'sculpt') await openSculpt(); else await openCompose();
+}
+
+async function openSculpt() {
+  $('#compose-wrap').hidden = true; $('#sculpt-canvas').hidden = false;
+  createStatus(t('sculptHint') + (tracker ? ' ' + t('sculptHands') : ''));
+  $('#create-tools').innerHTML = `
+    <div class="segmented" role="group">
       <button data-action="mode" data-mode="pull" aria-pressed="true">${esc(t('toolPull'))}</button>
       <button data-action="mode" data-mode="press" aria-pressed="false">${esc(t('toolPress'))}</button>
     </div>
     <label>${esc(t('toolSize'))}<input type="range" id="tool-size" min="0.06" max="0.45" step="0.01" value="0.18"></label>
     <label>${esc(t('toolStrength'))}<input type="range" id="tool-strength" min="0.1" max="1.5" step="0.05" value="0.5"></label>
-    <span class="sep"></span>
-    <div class="segmented" role="group" aria-label="View">
+    <div class="segmented" role="group">
       <button data-action="wire" data-wire="0" aria-pressed="true">${esc(t('viewSolid'))}</button>
       <button data-action="wire" data-wire="1" aria-pressed="false">${esc(t('viewWire'))}</button>
     </div>
     <button class="btn small ghost" data-action="reset">${esc(t('resetModels'))}</button>
-    <button class="btn small" data-action="hands" id="hands-btn">${esc(t('handTracking'))}</button>
-    <button class="btn small primary" data-action="card">${esc(t('makeCard'))}</button>`;
+    <button class="btn small" data-action="export-glb">${esc(t('exportGLB'))}</button>
+    <button class="btn primary cta" data-action="card">${esc(t('makeCard'))}</button>`;
   $('#tool-size').addEventListener('input', applyTools);
   $('#tool-strength').addEventListener('input', applyTools);
+  if (sculpt) return;
+  const v = state.visitor;
+  let visitorModel;
+  if (v.kind === 'drawing') visitorModel = { glb: null, png: v.canvas.toDataURL('image/png') };
+  else visitorModel = { glb: state.look === 'photo' ? v.species.glb : v.species.glbStorybook, png: state.look === 'photo' ? v.species.cutout : v.species.storybook };
+  const { createSculpt } = await import('./sculpt.js');
+  sculpt = await createSculpt($('#sculpt-canvas'), {
+    models: [
+      { ...visitorModel, position: [-0.38, 0, 0.14], rotY: 0.3, scale: 0.95 },
+      { glb: state.host.glb, png: state.host.sprite, position: [0.38, 0, -0.12], rotY: -0.32, scale: 0.95 },
+    ],
+    onStatus: kind => { if (kind === 'fallback' && v.kind !== 'drawing') createStatus(t('modelFallback'), true); },
+  });
+  applyTools();
+  window.__aia.sculpt = sculpt;          // console/debug access only
 }
 function applyTools() {
-  if (!sculpt) return;
-  sculpt.setRadius(+$('#tool-size').value);
-  sculpt.setStrength(+$('#tool-strength').value);
+  if (!sculpt || !$('#tool-size')) return;
+  sculpt.setRadius(+$('#tool-size').value); sculpt.setStrength(+$('#tool-strength').value);
 }
-function pressGroup(btn) {
-  btn.parentElement.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b === btn));
-}
-
-// ---- camera consent + hand tracking (optional) ----
-function openConsent() {
-  openModal(`
-    <p class="kicker">${esc(t('handTracking'))}</p>
-    <h2>${esc(t('consentHeading'))}</h2>
-    <p class="sub">${esc(t('consentBody'))}</p>
-    <label class="consent-check"><input type="checkbox" id="consent-box"><span>${esc(t('consentCheck'))}</span></label>
-    <div class="modal-actions">
-      <button class="btn ghost" data-action="close-modal">${esc(t('consentCancel'))}</button>
-      <button class="btn primary" data-action="consent-start" id="consent-start" disabled>${esc(t('consentStart'))}</button>
-    </div>`);
-  $('#consent-box').addEventListener('change', e => { $('#consent-start').disabled = !e.target.checked; });
+function createStatus(text, append = false) {
+  const el = $('#create-status');
+  if (!append) el.innerHTML = `<strong>${esc(t('createHeading'))}</strong>`;
+  el.insertAdjacentHTML('beforeend', `<div>${esc(text)}</div>`);
 }
 
-async function startHandTracking() {
-  if (!$('#consent-box')?.checked) return;           // consent is required, every time
-  closeModal();
-  const line = setHandStatus(t('handStatusLoading'));
-  const cursor = $('#hand-cursor'), video = $('#hand-video');
-  try {
-    if (!navigator.mediaDevices?.getUserMedia) throw Object.assign(new Error('no camera API'), { name: 'NotFoundError' });
-    const { startHands } = await import('./hands.js');
-    hands = await startHands(video, f => {
-      if (!sculpt) return;
-      if (!f.present) { cursor.hidden = true; sculpt.externalBrush(null); setHandStatus(t('handStatusNoHand')); return; }
-      const r = $('#sculpt-canvas').getBoundingClientRect();
-      const x = r.left + f.x * r.width, y = r.top + f.y * r.height;
-      cursor.hidden = false; cursor.style.left = x + 'px'; cursor.style.top = y + 'px';
-      cursor.classList.toggle('pinch', f.pinch);
-      sculpt.externalBrush(f.pinch ? { x, y } : null);
-      setHandStatus(f.pinch ? t('handStatusPinch') : t('handStatusOn'));
-    });
-    $('#hand-preview').hidden = false;
-    const b = $('#hands-btn'); b.textContent = t('handStop'); b.dataset.action = 'hands-stop';
-  } catch (err) {
-    console.warn('[hands]', err.name, err.message);
-    const denied = ['NotAllowedError', 'NotFoundError', 'NotReadableError', 'SecurityError', 'OverconstrainedError'].includes(err.name);
-    line.textContent = denied ? t('handDenied') : t('handFailed');
-    stopHandTracking(false);
-  }
-}
-function setHandStatus(msg) {
-  let line = $('#hand-line');
-  if (!line) { $('#sculpt-status').insertAdjacentHTML('beforeend', '<div id="hand-line" class="caption" style="margin-top:8px;text-transform:none;letter-spacing:.02em"></div>'); line = $('#hand-line'); }
-  if (line.textContent !== msg) line.textContent = msg;
-  return line;
-}
-function stopHandTracking(resetText = true) {
-  hands?.stop(); hands = null;
+async function openCompose() {
+  $('#sculpt-canvas').hidden = true; $('#compose-wrap').hidden = false;
   sculpt?.externalBrush(null);
-  $('#hand-preview').hidden = true; $('#hand-cursor').hidden = true;
-  const b = $('#hands-btn'); if (b) { b.textContent = t('handTracking'); b.dataset.action = 'hands'; }
-  if (resetText && $('#hand-line')) $('#hand-line').textContent = t('handStatusOff');
+  createStatus(t('composeHint') + (tracker ? ' ' + t('composeHands') : ''));
+  const { Composer, VARIANTS } = await import('./compose.js');
+  $('#create-tools').innerHTML = `
+    <label>${esc(t('background'))}<select id="bg-select">${WORKS.map(w => `<option value="${w.id}" ${w.id === state.work.id ? 'selected' : ''}>${esc(W(w.id).title)}</option>`).join('')}</select></label>
+    <label>${esc(t('variant'))}<select id="variant-select">${VARIANTS.map(v => `<option value="${v}">${esc(t(`variants.${v}`))}</option>`).join('')}</select></label>
+    <button class="btn primary cta" data-action="card">${esc(t('makeCard'))}</button>`;
+  if (!composer) {
+    const vimg = await visitorImage();
+    // the visitor is painted in the manner of the painting, as it was inside it
+    const painted = state.visitor.kind === 'drawing' ? vimg : await loadImage(await paintify(vimg.src, state.work.style, 520));
+    const host = await loadImage(state.host.sprite);
+    composer = new Composer($('#compose-canvas'), {
+      items: [
+        { img: painted, x: 0.38, y: 0.9, s: 0.26, r: 0, flip: false },
+        { img: host, x: 0.62, y: 0.9, s: 0.26, r: 0, flip: state.host.faces === 'right' },
+      ],
+    });
+    window.__aia.composer = composer;
+    await setComposeBackground(state.work.id);
+    addEventListener('resize', () => composer?.resize());
+  }
+  $('#bg-select').addEventListener('change', e => setComposeBackground(e.target.value));
+  $('#variant-select').addEventListener('change', e => composer.setVariant(e.target.value));
+  syncVariant();
+}
+async function setComposeBackground(id) {
+  const w = workById(id);
+  const own = id === state.work.id && !state.host.inPlace;   // the host left its place in its own painting
+  await composer.setBackground(w, own ? { src: state.host.patch, box: hostMeta[state.host.id].box } : null);
+  if (composer.variant !== 'original') composer.setVariant(composer.variant);
+}
+function syncVariant() { if ($('#variant-select') && composer) $('#variant-select').value = composer.variant; }
+
+function pressGroup(btn) { btn.parentElement.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b === btn)); }
+
+async function exportGLB() {
+  const blob = await sculpt.exportGLB();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'animals-in-the-archive-sculpture.glb';
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 
 // ---------------------------------------------------------------- 8 · card
 async function openCard() {
-  const w = state.work, x = W(w.id), sp = state.species;
-  const shot = sculpt.screenshot();
+  const w = state.work, x = W(w.id), v = state.visitor;
+  const composing = !$('#compose-wrap').hidden;
+  const shot = composing ? composer.toDataURL() : sculpt.screenshot();
+  state.made = composing ? t('madePainting', { variant: t(`variants.${composer.variant}`) }) : t('madeSculpture');
   const date = new Date();
   const blob = await makeCard({
     screenshot: shot, record: recordNumber(date), date: date.toISOString().slice(0, 10),
     work: w, workText: x, roleName: t(`roles.${state.role}.name`),
-    speciesName: `${t(`species.${sp.id}`)} (${t(`speciesLatin.${sp.id}`)})`,
-    hostName: `${x.host}`, mood: mood(), photoFile: sp.file + '.png',
+    speciesName: v.kind === 'drawing' ? t('yourDrawing') : `${t(`species.${v.species.id}`)} (${t(`speciesLatin.${v.species.id}`)})`,
+    hostName: hostName(), mood: t(`moods.${state.role}.${state.answer || 'yes'}`), made: state.made,
+    photoCredit: v.kind === 'drawing' ? t('cardDrawingCredit') : t('cardPhotoCredit', { file: v.species.file + '.png' }),
+    figure: composing,
   });
   if (cardUrl) URL.revokeObjectURL(cardUrl);
   cardUrl = URL.createObjectURL(blob);
   openModal(`
-    <p class="kicker">${esc(t('stepOf', { n: 5 }))}</p>
+    <p class="kicker">${esc(t('stepOf', { n: 6 }))}</p>
     <h2>${esc(t('cardHeading'))}</h2>
     <p class="sub">${esc(t('cardIntro'))}</p>
     <div class="card-preview"><img src="${cardUrl}" alt="${esc(t('cardHeading'))}"></div>
     <div class="modal-actions">
       <button class="btn ghost" data-action="play-again">${esc(t('playAgain'))}</button>
-      <a class="btn primary" href="${cardUrl}" download="animals-in-the-archive-card.png">${esc(t('cardDownload'))}</a>
+      <a class="btn primary cta" href="${cardUrl}" download="animals-in-the-archive-card.png">${esc(t('cardDownload'))}</a>
     </div>`, { wide: true });
 }
 
-function playAgain() {
-  stopHandTracking(false);
+function teardown() {
+  gallery?.dispose(); gallery = null;
   sculpt?.dispose(); sculpt = null;
-  stage?.destroy(); stage = null;
+  composer = null; clearBubbles(); status(''); controls('');
+  $('#compose-canvas').getContext('2d').clearRect(0, 0, 9999, 9999);
+}
+function playAgain() {
+  teardown();
   if (cardUrl) { URL.revokeObjectURL(cardUrl); cardUrl = null; }
-  Object.assign(state, { work: null, role: null, species: null, answer: null });
-  closeModal();
-  show('index');
+  Object.assign(state, { work: null, role: null, visitor: null, host: null, answer: null, made: null });
+  closeModal(); show('index');
 }
 
 // ---------------------------------------------------------------- credits
 function renderCredits() {
   const c = t('creditsData'), L = k => esc(t(`credits.${k}`));
   const tbv = s => esc(s).replace(/(to be verified|to be confirmed)/g, '<span class="tbv">$1</span>');
-  const link = u => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u.replace(/^https?:\/\//, '').slice(0, 48))}…</a>`;
+  const link = u => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u.replace(/^https?:\/\//, '').slice(0, 46))}…</a>`;
   $('#credits-body').innerHTML = `
     <h2>${L('paintings')}</h2><div class="scroll"><table>
       <tr><th>${L('work')}</th><th>${L('author')}</th><th>${L('date')}</th><th>${L('collection')}</th><th>${L('source')}</th><th>${L('licence')}</th></tr>
       ${c.paintings.map(p => `<tr><td><em>${esc(p.work)}</em></td><td>${esc(p.author)}</td><td>${tbv(p.date)}</td><td>${tbv(p.collection)}</td><td>${link(p.source)}</td><td>${tbv(p.licence)}</td></tr>`).join('')}
     </table></div>
+    <h2>${L('hosts')}</h2><p class="note">${L('hostNote')}</p>
     <h2>${L('photos')}</h2><p class="note">${L('photoNote')}</p><div class="scroll"><table>
-      <tr><th>${L('file')}</th><th>${L('species')}</th><th>${L('photographer')}</th><th>${L('record')}</th><th>${L('recorded')}</th></tr>
-      ${c.photos.map(p => `<tr><td>${esc(p.file)}</td><td>${esc(p.species)}</td><td class="tbv">${L('tbc')}</td><td>${link(p.record)}</td><td>${esc(p.recorded)} · <span class="tbv">${L('tbc')}</span></td></tr>`).join('')}
+      <tr><th>${L('file')}</th><th>${L('species')}</th><th>${L('photographer')}</th><th>${L('record')}</th><th>${L('recorded')}</th><th>${L('via')}</th></tr>
+      ${c.photos.map(p => `<tr><td>${esc(p.file)}</td><td>${esc(p.species)}</td><td class="tbv">${L('tbc')}</td><td>${link(p.record)}</td><td>${esc(p.recorded)} · <span class="tbv">${L('tbc')}</span></td><td>${esc(p.via)}</td></tr>`).join('')}
     </table></div>
     <h2>${L('software')}</h2><div class="scroll"><table>
       <tr><th>${L('item')}</th><th>${L('version')}</th><th>${L('use')}</th><th>${L('licence')}</th></tr>
@@ -411,30 +605,43 @@ document.addEventListener('click', e => {
   if (a !== 'open-work') e.preventDefault();
   switch (a) {
     case 'open-work': openRecord(el.dataset.work); break;
-    case 'home': if (hands) stopHandTracking(); sculpt?.dispose(); sculpt = null; stage?.destroy(); stage = null; closeModal(); show('index'); break;
-    case 'credits': if (hands) stopHandTracking(); renderCredits(); closeModal(); show('credits'); break;
+    case 'home': teardown(); closeModal(); show('index'); break;
+    case 'credits': teardown(); renderCredits(); closeModal(); show('credits'); break;
     case 'close-modal': closeModal(); break;
     case 'to-role': openRole(); break;
     case 'back-record': openRecord(state.work.id); break;
     case 'pick-role':
       state.role = el.dataset.role;
       panel.querySelectorAll('.choice').forEach(c => c.setAttribute('aria-pressed', c === el));
-      panel.querySelector('[data-action="to-visitor"]').disabled = false; break;
-    case 'to-visitor': openVisitor(); break;
+      panel.querySelector('[data-action="to-camera"]').disabled = false; break;
+    case 'to-camera': openCamera(); break;
+    case 'cam-start': startCamera(); break;
+    case 'cam-skip': openVisitor(); break;
+    case 'cam-stop': stopCamera(); break;
     case 'back-role': openRole(); break;
-    case 'tab': openVisitor(el.dataset.tab); break;
-    case 'draw-clear': renderDrawTab.pad.clear(); $('#draw-pad').classList.remove('revealed'); $('#draw-result').innerHTML = ''; break;
+    case 'look': state.look = el.dataset.look; pressGroup(el); renderSpecies(); break;
+    case 'facing': state.facing = el.dataset.facing; pressGroup(el); break;
+    case 'swatch': state.colour = el.dataset.colour; pressGroup(el); break;
+    case 'draw-clear': openVisitor.pad.clear(); $('#draw-pad').classList.remove('revealed'); $('#draw-result').innerHTML = ''; break;
     case 'draw-go': recogniseSketch(); break;
-    case 'pick-species': state.viaSketch = !!el.dataset.sketch; enterStage(el.dataset.species); break;
-    case 'ask': ask(); break;
+    case 'use-drawing': {
+      const pad = openVisitor.pad;
+      if (pad.isEmpty()) { $('#draw-result').innerHTML = `<p class="status">${esc(t('drawEmpty'))}</p>`; break; }
+      const canvas = drawingToCharacter(pad.canvas, state.colour);
+      if (canvas) enterStage({ kind: 'drawing', canvas, facing: state.facing });
+      break;
+    }
+    case 'pick-species': enterStage({ kind: 'species', species: speciesById(el.dataset.species) }); break;
     case 'answer': answer(el.dataset.answer); break;
-    case 'to-sculpt': enterSculpt(); break;
+    case 'step-in': stepIn(); break;
+    case 'to-create': gallery?.dispose(); gallery = null; clearBubbles(); enterCreate('sculpt'); break;
+    case 'create-mode':
+      $('#create-modes').querySelectorAll('button').forEach(b => b.setAttribute('aria-selected', b === el));
+      if (el.dataset.mode === 'sculpt') openSculpt(); else openCompose(); break;
     case 'mode': pressGroup(el); sculpt?.setMode(el.dataset.mode); break;
     case 'wire': pressGroup(el); sculpt?.setWireframe(el.dataset.wire === '1'); break;
     case 'reset': sculpt?.reset(); break;
-    case 'hands': openConsent(); break;
-    case 'hands-stop': stopHandTracking(); break;
-    case 'consent-start': startHandTracking(); break;
+    case 'export-glb': exportGLB(); break;
     case 'card': openCard(); break;
     case 'play-again': playAgain(); break;
   }
@@ -442,9 +649,7 @@ document.addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   if ((e.key === 'Enter' || e.key === ' ') && e.target.classList?.contains('entry')) { e.preventDefault(); openRecord(e.target.dataset.work); }
 });
-// stop the camera if the tab is hidden or closed
-document.addEventListener('visibilitychange', () => { if (document.hidden && hands) stopHandTracking(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && tracker) stopCamera(); });
 
 renderIndex();
-// expose a tiny hook for debugging in the console only
-window.__aia = { state, STRINGS };
+window.__aia = { state, STRINGS, get gallery() { return gallery; } };   // console/debug access only

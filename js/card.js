@@ -22,9 +22,9 @@ function wrap(ctx, text, x, y, maxW, lh) {
   return y + lh;
 }
 
-export async function makeCard({ screenshot, record, date, work, workText, roleName, speciesName, hostName, mood, photoFile }) {
+export async function makeCard({ screenshot, record, date, work, workText, roleName, speciesName, hostName, mood, made, photoCredit, figure }) {
   await document.fonts.ready;
-  const W = 1200, H = 1680, M = 84;
+  const W = 1200, H = 1720, M = 84;
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
   const c = cv.getContext('2d');
   const paper = '#eee8db', ink = '#1d1a16', muted = '#7b7266', rule = 'rgba(29,26,22,.22)';
@@ -55,7 +55,7 @@ export async function makeCard({ screenshot, record, date, work, workText, roleN
   c.save(); c.beginPath(); c.rect(M, boxY, boxW, boxH); c.clip();
   c.drawImage(img, M + (boxW - iw) / 2, boxY + (boxH - ih) / 2, iw, ih); c.restore();
   c.fillStyle = muted; c.font = `400 17px ${mono}`;
-  c.fillText(`FIG. 1  ${speciesName.toUpperCase()} × ${hostName.toUpperCase()}, RELIEF, SCULPTED BY THE VISITOR`, M, boxY + boxH + 34);
+  c.fillText(`FIG. 1  ${speciesName.toUpperCase()} × ${hostName.toUpperCase()}, ${made.toUpperCase()}, BY THE VISITOR`.slice(0, 96), M, boxY + boxH + 34);
 
   // fields
   const rows = [
@@ -64,6 +64,7 @@ export async function makeCard({ screenshot, record, date, work, workText, roleN
     [t('cardSpecies'), speciesName],
     [t('cardHost'), hostName],
     [t('cardMood'), mood],
+    [t('cardMade'), made],
     [t('cardDate'), date],
   ];
   let y = boxY + boxH + 92;
@@ -79,7 +80,7 @@ export async function makeCard({ screenshot, record, date, work, workText, roleN
   c.fillStyle = muted; c.font = `400 15px ${mono}`; c.fillText(t('cardCredits').toUpperCase(), M, y);
   c.font = `400 17px ${sans}`;
   y = wrap(c, `${workText.title} (${workText.artist}, ${workText.date}), ${workText.collection}. ` +
-    t('cardPhotoCredit', { file: photoFile }) + '.', M + 260, y, W - 2 * M - 260, 25);
+    photoCredit + '.', M + 260, y, W - 2 * M - 260, 25);
 
   c.fillStyle = muted; c.font = `400 15px ${mono}`;
   c.fillText(t('cardFooter').toUpperCase(), M, H - M + 10);

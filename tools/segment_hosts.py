@@ -8,7 +8,7 @@
    so the page can reveal the empty ground when the animal walks away.
 
 Usage:  python tools/segment_hosts.py [host ids...]
-Writes: assets/hosts/<id>.png         sprite (RGBA, feathered edge)
+Writes: assets/hosts/<id>.png         sprite (RGBA, feathered edge; the site loads a .webp copy)
         assets/hosts/<id>-patch.jpg   painting with the animal removed (bbox crop)
         assets/hosts/hosts.json       boxes in painting pixels (HD), patch rects
 """
@@ -164,6 +164,7 @@ for hid in (sys.argv[1:] or HOSTS):
     a = cv2.GaussianBlur(closed[ry0:ry1, rx0:rx1].astype(np.float32), (0, 0), 1.6)
     sprite = np.dstack([body, a.clip(0, 255).astype(np.uint8)])
     Image.fromarray(sprite).save(f"assets/hosts/{hid}.png")
+    Image.fromarray(sprite).save(f"assets/hosts/{hid}.webp", "WEBP", quality=88, method=6)   # what the site loads
 
     # painting with the animal removed (only needed when it walks away)
     entry = {"work": h["work"], "box": [int(rx0), int(ry0), int(rx1), int(ry1)], "size": [img.width, img.height],

@@ -6,6 +6,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+import { boxBlurAlpha } from './util.js';
 
 export async function createSculpt(container, { models, onStatus }) {
   const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
@@ -33,6 +35,8 @@ export async function createSculpt(container, { models, onStatus }) {
   // ---- models -----------------------------------------------------------
   const loader = new GLTFLoader();
   const meshes = [];
+  const sculpture = new THREE.Group();          // turned as one piece by hand gestures
+  scene.add(sculpture);
   const usedFallback = [];
   for (const m of models) {
     let mesh;
@@ -51,7 +55,7 @@ export async function createSculpt(container, { models, onStatus }) {
     mesh.rotation.y = m.rotY;
     mesh.scale.setScalar(m.scale);
     mesh.userData.orig = mesh.geometry.attributes.position.array.slice();
-    scene.add(mesh); meshes.push(mesh);
+    sculpture.add(mesh); meshes.push(mesh);
   }
   if (usedFallback.length) onStatus?.('fallback', usedFallback);
 
@@ -166,6 +170,21 @@ export async function createSculpt(container, { models, onStatus }) {
     },
     // hand tracking feeds a screen point; pass null to stop sculpting
     externalBrush(pt) { external = pt; },
+    // open-hand gestures: turn and zoom the sculpture
+    rotateBy(dx, dy) {
+      sculpture.rotation.y += dx * 3.2;
+      sculpture.rotation.x = THREE.MathUtils.clamp(sculpture.rotation.x + dy * 2.0, -0.9, 0.9);
+    },
+    zoomBy(f) {
+      const dir = camera.position.clone().sub(controls.target);
+      const len = THREE.MathUtils.clamp(dir.length() / f, controls.minDistance, controls.maxDistance);
+      camera.position.copy(controls.target).add(dir.setLength(len));
+    },
+    // the sculpted meshes as a .glb file (opens in Blender: File > Import > glTF 2.0)
+    exportGLB() {
+      return new Promise((res, rej) => new GLTFExporter().parse(sculpture,
+        buf => res(new Blob([buf], { type: 'model/gltf-binary' })), rej, { binary: true }));
+    },
     // total vertex displacement from the original models (used for testing)
     displacement() {
       let d = 0;
@@ -193,10 +212,10 @@ async function reliefFromPng(url) {
   const gw = aspect >= 1 ? long : Math.round(long * aspect);
   const gh = aspect >= 1 ? Math.round(long / aspect) : long;
   const cv = document.createElement('canvas'); cv.width = gw + 1; cv.height = gh + 1;
-  const ctx = cv.getContext('2d');
-  ctx.filter = 'blur(3px)';                                 // blurred alpha → rounded volume
+  const ctx = cv.getContext('2d', { willReadFrequently: true });
   ctx.drawImage(img, 0, 0, gw + 1, gh + 1);
-  const alpha = ctx.getImageData(0, 0, gw + 1, gh + 1).data;
+  const raw = ctx.getImageData(0, 0, gw + 1, gh + 1).data;
+  const alpha = boxBlurAlpha(raw, gw + 1, gh + 1, 3);      // blurred alpha → rounded volume
   const w = aspect >= 1 ? 2 : 2 * aspect, h = aspect >= 1 ? 2 / aspect : 2;
   const geo = new THREE.PlaneGeometry(w, h, gw, gh);
   const pos = geo.attributes.position;
@@ -209,3 +228,4 @@ async function reliefFromPng(url) {
   const mat = new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.5, side: THREE.DoubleSide });
   return new THREE.Mesh(geo, mat);
 }
+

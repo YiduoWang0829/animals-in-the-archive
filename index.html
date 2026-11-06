@@ -44,31 +44,22 @@
       <ol class="catalogue" id="catalogue"></ol>
     </section>
 
-    <!-- 4–6 · The painting: entrance and reply -->
-    <section id="view-stage" class="view" aria-label="Painting">
-      <div class="stage-wrap" id="stage-wrap">
-        <div class="stage" id="stage">
-          <div class="moulding" aria-hidden="true"></div>
-          <div class="outside-layer" id="outside-layer"></div>
-          <div class="picture" id="picture">
-            <img class="picture-img" id="picture-img" alt="">
-          </div>
-          <div class="bubble-layer" id="bubble-layer"></div>
-        </div>
-      </div>
-      <div class="wall-label glass" id="wall-label"></div>
+    <!-- 5 · Gallery and the painting space (three.js) -->
+    <section id="view-stage" class="view" aria-label="Gallery">
+      <div class="stage3d" id="stage3d"></div>
+      <div class="stage-status" id="stage-status" aria-live="polite"></div>
       <div class="control-bar glass" id="stage-controls"></div>
     </section>
 
-    <!-- 7 · Sculpture room -->
-    <section id="view-sculpt" class="view" aria-label="Sculpture room">
+    <!-- 6 · Create: sculpt (3D) or a new painting (2D) -->
+    <section id="view-create" class="view" aria-label="Create">
+      <div class="create-modes glass" role="tablist" id="create-modes"></div>
       <div class="sculpt-canvas" id="sculpt-canvas"></div>
-      <div class="sculpt-status glass" id="sculpt-status"></div>
-      <div class="hand-preview glass" id="hand-preview" hidden>
-        <video id="hand-video" playsinline muted></video>
-      </div>
+      <div class="compose-wrap" id="compose-wrap" hidden><canvas id="compose-canvas"></canvas></div>
+      <div class="sculpt-status glass" id="create-status"></div>
       <div class="hand-cursor" id="hand-cursor" hidden></div>
-      <div class="control-bar glass sculpt-tools" id="sculpt-tools"></div>
+      <div class="hand-cursor second" id="hand-cursor-2" hidden></div>
+      <div class="control-bar glass sculpt-tools" id="create-tools"></div>
     </section>
 
     <!-- Credits -->
@@ -82,27 +73,21 @@
 
   <footer class="footer caption" data-i18n="footer"></footer>
 
+  <!-- speech bubbles float above the 3D scene -->
+  <div class="bubble-layer" id="bubble-layer" aria-live="polite"></div>
+
+  <!-- camera chip: shows when the camera is on; the video never leaves this tab -->
+  <div class="cam-chip glass" id="cam-chip" hidden>
+    <video id="cam-video" playsinline muted></video>
+    <button class="btn small ghost" data-action="cam-stop" data-i18n="camStop"></button>
+  </div>
+
   <!-- One reusable frosted-glass modal -->
   <div class="modal" id="modal" role="dialog" aria-modal="true" hidden>
     <div class="modal-scrim" data-action="close-modal"></div>
     <div class="modal-panel glass" id="modal-panel"></div>
   </div>
 
-  <!-- SVG filters: irregular brush edge for the painted visitor, one per painting -->
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-    <filter id="brush-eden" x="-5%" y="-5%" width="110%" height="110%">
-      <feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="2" seed="3"/>
-      <feDisplacementMap in="SourceGraphic" scale="4" xChannelSelector="R" yChannelSelector="G"/>
-    </filter>
-    <filter id="brush-durer" x="-5%" y="-5%" width="110%" height="110%">
-      <feTurbulence type="fractalNoise" baseFrequency="0.12" numOctaves="1" seed="8"/>
-      <feDisplacementMap in="SourceGraphic" scale="2.5" xChannelSelector="R" yChannelSelector="G"/>
-    </filter>
-    <filter id="brush-marc" x="-8%" y="-8%" width="116%" height="116%">
-      <feTurbulence type="turbulence" baseFrequency="0.018 0.045" numOctaves="2" seed="11"/>
-      <feDisplacementMap in="SourceGraphic" scale="9" xChannelSelector="R" yChannelSelector="G"/>
-    </filter>
-  </svg>
 
   <!-- Opened by double-click (file://)? Browsers block ES modules there, so js/app.js
        never runs. This plain script still runs and explains what to do. (Its text

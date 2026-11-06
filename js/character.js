@@ -7,6 +7,7 @@
 
 import * as THREE from 'three';
 import { autoRig } from './rig.js';
+import { boxBlurAlpha } from './util.js';
 
 const VERT = /* glsl */`
   uniform float uPhase, uWalk, uPivot, uHeadU, uNod;
@@ -123,9 +124,8 @@ function pillowNormals(img, size = 256) {
   const w = Math.round(img.width * s), h = Math.round(img.height * s);
   const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
   const ctx = cv.getContext('2d', { willReadFrequently: true });
-  ctx.filter = `blur(${Math.max(2, size / 40)}px)`;
   ctx.drawImage(img, 0, 0, w, h);
-  const a = ctx.getImageData(0, 0, w, h).data;
+  const a = boxBlurAlpha(ctx.getImageData(0, 0, w, h).data, w, h, Math.max(2, Math.round(size / 40)));
   // luminance adds fur/muscle detail on top of the volume
   const c2 = document.createElement('canvas'); c2.width = w; c2.height = h;
   const x2 = c2.getContext('2d', { willReadFrequently: true }); x2.drawImage(img, 0, 0, w, h);

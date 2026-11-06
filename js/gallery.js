@@ -256,7 +256,7 @@ export class Gallery {
     this.host.update(dt, t);
     // head-coupled parallax: move your head (or the mouse) and the room shifts
     const cam = this.camera, px = this.parallax;
-    const k = this.inside ? 0.16 : 0.55;
+    const k = this.inside ? 0.12 : 0.55;
     cam.position.x += (this.camBase.x + px.x * k - cam.position.x) * 0.08;
     cam.position.y += (this.camBase.y + px.y * k * 0.5 - cam.position.y) * 0.08;
     cam.position.z += (this.camBase.z - cam.position.z) * 0.08;
@@ -348,11 +348,11 @@ export class Gallery {
     // fill the screen with the picture: fit whichever side is tighter
     const vf = THREE.MathUtils.degToRad(this.camera.fov / 2);
     // overscan: the picture slightly overfills the screen, so moving your head never shows its edges
-    const dist = Math.min(this.ph / 2 / Math.tan(vf), this.pw / 2 / (Math.tan(vf) * this.camera.aspect)) * 0.8;
+    const dist = Math.min(this.ph / 2 / Math.tan(vf), this.pw / 2 / (Math.tan(vf) * this.camera.aspect)) * 0.76;
     const recede = dist + 0.3;                           // the picture moves back so the camera passes the frame
     const camTo = new THREE.Vector3(0, this.cy, dist - recede - 0.03), lookTo = new THREE.Vector3(0, this.cy, -recede);
     const inside = this.paintPoint(0.42, 0.1, 0); inside.z += 0.3;
-    const h0 = v.height, h1 = Math.max(0.12, Math.min(this.host.height * 1.1, this.ph * 0.28));
+    const h0 = v.height, h1 = Math.max(0.1, Math.min(this.host.height * 0.8, this.ph * 0.17));
     v.walkTo(inside, 0.5);
     await this.tween(3.4, e => {
       this.paintU.uDepth.value = depth0 + (depth1 - depth0) * e;
@@ -365,12 +365,12 @@ export class Gallery {
     v.uniforms.uPaintAll.value = 1;
     // both animals come forward and meet
     if (!this.o.host.inPlace) {
-      const meet = new THREE.Vector3(0.16, -this.ph / 2 + this.ph * 0.24, 0.55);
-      v.walkTo(new THREE.Vector3(-0.2, meet.y, 0.6), 0.45);
+      const meet = new THREE.Vector3(0.16, -this.ph / 2 + this.ph * 0.24, 0.32);
+      v.walkTo(new THREE.Vector3(-0.2, meet.y, 0.36), 0.45);
       await h.walkTo(meet, 0.4);
       h.setDir(-1); v.setDir(1);
     } else {
-      await v.walkTo(new THREE.Vector3(-this.pw * 0.18, -this.ph / 2 + this.ph * 0.24, 0.6), 0.45);
+      await v.walkTo(new THREE.Vector3(-this.pw * 0.18, -this.ph / 2 + this.ph * 0.24, 0.36), 0.45);
     }
   }
 
@@ -386,7 +386,7 @@ export class Gallery {
     if (!ray.ray.intersectPlane(plane, hit)) return;
     const local = this.paintGroup.worldToLocal(hit.clone());
     local.x = THREE.MathUtils.clamp(local.x, -this.pw / 2 + 0.2, this.pw / 2 - 0.2);
-    local.z = THREE.MathUtils.clamp(local.z, -this.paintU.uDepth.value * 0.7, 0.8);
+    local.z = THREE.MathUtils.clamp(local.z, -this.paintU.uDepth.value * 0.7, 0.45);
     this.visitor.walkTo(local, 0.55);
   }
 
