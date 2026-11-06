@@ -44,6 +44,34 @@
       <ol class="catalogue" id="catalogue"></ol>
     </section>
 
+    <!-- 4 · Character studio: draw your own, or choose a living 3D animal -->
+    <section id="view-character" class="view" aria-labelledby="studio-title">
+      <div class="studio">
+        <header class="studio-head">
+          <p class="kicker" id="studio-kicker"></p>
+          <h1 id="studio-title" class="display small" data-i18n="visitorHeading"></h1>
+          <p class="lede" data-i18n="studioIntro"></p>
+        </header>
+        <div class="studio-grid">
+          <div class="studio-draw glass" id="studio-draw"></div>
+          <div class="studio-stage">
+            <div class="tt-wrap">
+              <div class="tt" id="turntable"></div>
+              <img class="tt-2d" id="tt-2d" alt="" hidden>
+              <div class="tt-name" id="tt-name"></div>
+              <div class="tt-tools" id="tt-tools"></div>
+            </div>
+            <div class="shelf"><h3 data-i18n="studio3d"></h3><div class="shelf-row" id="shelf-3d"></div></div>
+            <div class="shelf"><h3 data-i18n="studio2d"></h3><div class="shelf-row" id="shelf-2d"></div></div>
+          </div>
+        </div>
+        <div class="studio-cta">
+          <button class="btn ghost" data-action="back-role" data-i18n="back"></button>
+          <button class="btn primary cta" data-action="walk-in" id="walk-in"></button>
+        </div>
+      </div>
+    </section>
+
     <!-- 5 · Gallery and the painting space (three.js) -->
     <section id="view-stage" class="view" aria-label="Gallery">
       <div class="stage3d" id="stage3d"></div>

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3D animals test</title>
+<style>body { margin: 0; background: #111; } canvas { display: block; } #i { position: fixed; left: 8px; top: 8px; color: #ddd; font: 12px monospace; }</style>
+<script type="importmap">
+  { "imports": { "three": "../vendor/three-0.170.0/build/three.module.js", "three/addons/": "../vendor/three-0.170.0/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="i"></div>
+<script type="module">
+// Development page: every 3D animal walks back and forth (?look=storybook to test the ink look).
+import * as THREE from 'three';
+import { loadAnimal3D } from '../js/animal3d.js';
+const names = ['fox', 'deer', 'stag', 'white_horse', 'donkey', 'husky', 'shiba_inu', 'alpaca', 'bull', 'cow', 'zebra'];
+const look = new URLSearchParams(location.search).get('look') || 'real';
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(innerWidth, innerHeight); r.outputColorSpace = THREE.SRGBColorSpace;
+r.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(r.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x2a2622);
+scene.add(new THREE.HemisphereLight(0xfff1df, 0x16120e, 1.1));
+const sun = new THREE.DirectionalLight(0xfff0dc, 2.2); sun.position.set(2, 4, 5); scene.add(sun);
+const cam = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.1, 50); cam.position.set(0, 2.2, 8.5); cam.lookAt(0, 0.6, 0);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 10), new THREE.MeshStandardMaterial({ color: 0x3a342c })); floor.rotation.x = -Math.PI / 2; scene.add(floor);
+const as = window.as = [];
+for (const [i, n] of names.entries()) {
+  const a = await loadAnimal3D(`../assets/animals/3d/${n}.glb`, { height: 0.75, look });
+  a.addTo(scene); a.position.set(-4 + (i % 6) * 1.6, 0, -0.8 + Math.floor(i / 6) * 1.8); a.home = a.position.clone(); a.k = i; as.push(a);
+}
+document.getElementById('i').textContent = as.map(a => Object.keys(a.actions).join('/')).join('  |  ');
+const clock = new THREE.Clock(); let T = 0;
+window.step = (sec) => { for (let i = 0; i < sec * 60; i++) { T += 1 / 60; for (const a of as) { if (!a.target) a.walkTo(a.home.clone().add(new THREE.Vector3((a.k++ % 2) ? 0 : 1.1, 0, 0)), 0.5, { run: a.k % 5 === 0 }); a.update(1 / 60, T); } } r.render(scene, cam); };
+r.setAnimationLoop(() => { const dt = Math.min(0.05, clock.getDelta()); T += dt; for (const a of as) { if (!a.target) a.walkTo(a.home.clone().add(new THREE.Vector3((a.k++ % 2) ? 0 : 1.1, 0, 0)), 0.5, { run: a.k % 5 === 0 }); a.update(dt, T); } r.render(scene, cam); });
+</script>
+</body>
+</html>

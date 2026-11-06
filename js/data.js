@@ -76,5 +76,22 @@ export const SPECIES = [
   glbStorybook: `assets/animals/glb-storybook/${s.file}.glb`,
 }));
 
+// Rigged, animated 3D animals (Quaternius, CC0). height = metres in the gallery
+// (kept relative to each other; slightly smaller than life to suit the room).
+export const ANIMALS3D = [
+  { id: 'fox',         height: 0.3,  doodle: ['raccoon', 'squirrel'] },
+  { id: 'shiba_inu',   height: 0.34, doodle: ['dog'] },
+  { id: 'husky',       height: 0.44, doodle: [] },
+  { id: 'deer',        height: 0.56, doodle: ['kangaroo'] },
+  { id: 'stag',        height: 0.66, doodle: [] },
+  { id: 'alpaca',      height: 0.64, doodle: ['camel', 'giraffe'] },
+  { id: 'donkey',      height: 0.6,  doodle: [] },
+  { id: 'white_horse', height: 0.8,  doodle: ['horse'] },
+  { id: 'zebra',       height: 0.74, doodle: ['zebra'] },
+  { id: 'cow',         height: 0.7,  doodle: ['cow'] },
+  { id: 'bull',        height: 0.76, doodle: [] },
+].map(a => ({ ...a, glb: `assets/animals/3d/${a.id}.glb`, thumb: `assets/animals/3d/thumbs/${a.id}.webp` }));
+
 export const workById = id => WORKS.find(w => w.id === id);
+export const animal3dById = id => ANIMALS3D.find(a => a.id === id);
 export const speciesById = id => SPECIES.find(s => s.id === id);

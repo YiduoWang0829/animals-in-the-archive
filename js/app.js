@@ -5,7 +5,7 @@
 // No data is stored or sent anywhere; state lives in memory only.
 
 import { t, STRINGS, LANG } from './strings.js';
-import { WORKS, SPECIES, HOSTS, workById, speciesById } from './data.js';
+import { WORKS, SPECIES, HOSTS, ANIMALS3D, workById, speciesById, animal3dById } from './data.js';
 import { loadClassifier, createPad, classify, matchSpecies, drawingToCharacter } from './sketch.js';
 import { makeCard, recordNumber } from './card.js';
 import { paintify, loadImage } from './paint.js';
@@ -19,8 +19,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const state = {
   work: null, role: null, look: 'storybook', visitor: null, host: null, answer: null,
   facing: 'right', colour: '#c98a4b', made: null,
+  choice: { kind: 'animal3d', id: 'stag', look: 'real' },   // the character being shown in the studio
 };
-let gallery = null, sculpt = null, composer = null, tracker = null, cardUrl = null, hostMeta = null;
+let gallery = null, sculpt = null, composer = null, tracker = null, cardUrl = null, hostMeta = null, turntable = null;
 let face = null, hands = [];
 
 // ---------------------------------------------------------------- i18n
@@ -32,6 +33,8 @@ function show(view) {
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('is-active', v.id === `view-${view}`));
   document.body.classList.toggle('in-stage', view === 'stage');
   document.body.classList.toggle('in-sculpt', view === 'create');
+  document.body.classList.toggle('in-studio', view === 'character');
+  if (view !== 'character' && turntable) { turntable.dispose(); turntable = null; }
   if (view !== 'stage') clearBubbles();
   window.scrollTo(0, 0);
 }
@@ -159,51 +162,38 @@ function stopCamera() {
   sculpt?.externalBrush(null);
 }
 
-// ---------------------------------------------------------------- 5 · visitor
+// ---------------------------------------------------------------- 5 · character studio
 const SWATCHES = ['#c98a4b', '#9a7b5c', '#e2c48a', '#7f8f9c', '#5d6b4f', '#b8524a', '#3f5a9e', '#efe9dc'];
-function openVisitor(notice = '') {
-  openModal(`
-    <p class="kicker">${esc(t('stepOf', { n: 4 }))} · ${esc(t(`roles.${state.role}.name`))}${tracker ? ' · ' + esc(t('camOn')) : ''}</p>
-    <h2>${esc(t('visitorHeading'))}</h2>
-    <p class="sub">${esc(t('visitorIntro'))}</p>
+function openVisitor(notice = '') { closeModal(); openStudio(notice); }
+async function openStudio(notice = '') {
+  show('character');
+  $('#studio-kicker').textContent = `${t('stepOf', { n: 4 })} · ${t(`roles.${state.role}.name`)}${tracker ? ' · ' + t('camOn') : ''}`;
+  $('#studio-draw').innerHTML = `
+    <h2>${esc(t('studioDraw'))}</h2>
     ${notice ? `<p class="status">${esc(notice)}</p>` : ''}
-    <div class="visitor">
-      <div class="draw-side">
-        <div class="draw-pad" id="draw-pad"><canvas id="draw-canvas" aria-label="${esc(t('drawHint'))}"></canvas>
-          <div class="match-photo"><img id="match-img" alt=""></div></div>
-        <div class="draw-tools">
-          <button class="btn small" data-action="draw-clear">${esc(t('drawClear'))}</button>
-          <button class="btn small primary" data-action="draw-go" id="draw-go">${esc(t('drawRecognise'))}</button>
-        </div>
-        <div class="draw-opts">
-          <span class="lbl">${esc(t('facing'))}</span>
-          <div class="segmented" role="group">
-            <button data-action="facing" data-facing="left" aria-pressed="${state.facing === 'left'}">${esc(t('facingLeft'))}</button>
-            <button data-action="facing" data-facing="right" aria-pressed="${state.facing === 'right'}">${esc(t('facingRight'))}</button>
-          </div>
-          <span class="lbl">${esc(t('wash'))}</span>
-          <div class="swatches">${SWATCHES.map(c => `<button data-action="swatch" data-colour="${c}" style="background:${c}" aria-label="${c}" aria-pressed="${state.colour === c}"></button>`).join('')}</div>
-        </div>
-        <p class="status" id="draw-status"><span class="loading"></span>${esc(t('drawLoading'))}</p>
-        <p class="note" style="margin-top:0">${esc(t('drawHint'))}</p>
-        <div id="draw-result"></div>
-        <div class="result-actions"><button class="btn primary cta" data-action="use-drawing">${esc(t('useDrawing'))}</button></div>
-      </div>
-      <div class="archive-side">
-        <div class="archive-head">
-          <h3>${esc(t('archiveHeading'))}</h3>
-          <div class="segmented" role="group" aria-label="${esc(t('lookLabel'))}">
-            <button data-action="look" data-look="storybook" aria-pressed="${state.look === 'storybook'}">${esc(t('lookStorybook'))}</button>
-            <button data-action="look" data-look="photo" aria-pressed="${state.look === 'photo'}">${esc(t('lookPhoto'))}</button>
-          </div>
-        </div>
-        <div class="species-grid" id="species-grid"></div>
-      </div>
+    <div class="draw-pad" id="draw-pad"><canvas id="draw-canvas" aria-label="${esc(t('drawHint'))}"></canvas>
+      <div class="match-photo"><img id="match-img" alt=""></div></div>
+    <div class="draw-tools">
+      <button class="btn small" data-action="draw-clear">${esc(t('drawClear'))}</button>
+      <button class="btn small primary" data-action="draw-go" id="draw-go">${esc(t('drawRecognise'))}</button>
     </div>
-    <div class="modal-actions">
-      <button class="btn ghost" data-action="back-role">${esc(t('back'))}</button>
-    </div>`, { wide: true });
-  renderSpecies();
+    <div class="draw-opts">
+      <span class="lbl">${esc(t('facing'))}</span>
+      <div class="segmented" role="group">
+        <button data-action="facing" data-facing="left" aria-pressed="${state.facing === 'left'}">${esc(t('facingLeft'))}</button>
+        <button data-action="facing" data-facing="right" aria-pressed="${state.facing === 'right'}">${esc(t('facingRight'))}</button>
+      </div>
+      <span class="lbl">${esc(t('wash'))}</span>
+      <div class="swatches">${SWATCHES.map(c => `<button data-action="swatch" data-colour="${c}" style="background:${c}" aria-label="${c}" aria-pressed="${state.colour === c}"></button>`).join('')}</div>
+    </div>
+    <p class="status" id="draw-status"><span class="loading"></span>${esc(t('drawLoading'))}</p>
+    <p class="note" style="margin-top:0">${esc(t('drawHint'))}</p>
+    <div id="draw-result"></div>
+    <div class="result-actions"><button class="btn" data-action="choose-drawing">${esc(t('walkInDrawing'))}</button></div>`;
+  $('#shelf-3d').innerHTML = ANIMALS3D.map(a => `
+    <button class="pick" data-action="choose-3d" data-id="${a.id}"><img src="${a.thumb}" alt="" loading="lazy"><span>${esc(t(`animals3d.${a.id}`))}</span></button>`).join('');
+  $('#shelf-2d').innerHTML = SPECIES.map(s => `
+    <button class="pick" data-action="choose-2d" data-species="${s.id}"><img src="${s.storybook}" alt="" loading="lazy"><span>${esc(t(`species.${s.id}`))}</span></button>`).join('');
   const pad = createPad($('#draw-canvas'));
   openVisitor.pad = pad;
   $('#draw-go').disabled = true;
@@ -214,57 +204,83 @@ function openVisitor(notice = '') {
     console.warn('[sketch] classifier unavailable:', err);
     if ($('#draw-status')) $('#draw-status').textContent = t('drawUnavailable');
   });
+  if (!turntable) { const { Turntable } = await import('./turntable.js'); turntable = new Turntable($('#turntable')); }
+  choose(state.choice);
 }
-function renderSpecies() {
-  $('#species-grid').innerHTML = SPECIES.map(s => `
-    <button class="species" data-action="pick-species" data-species="${s.id}">
-      <div class="thumb"><img src="${state.look === 'photo' ? s.cutout : s.storybook}" alt="" loading="lazy"></div>
-      <h3>${esc(cap(t(`species.${s.id}`)))}</h3>
-      <span class="latin">${esc(t(`speciesLatin.${s.id}`))}</span>
-      <span class="caption">${esc(t('archiveRecord', { file: s.file }))}</span>
-    </button>`).join('');
+
+// show a character on the stage and update the big button
+function choose(c) {
+  state.choice = c;
+  document.querySelectorAll('.pick').forEach(p => p.setAttribute('aria-pressed',
+    (c.kind === 'animal3d' && p.dataset.id === c.id) || (c.kind === 'species' && p.dataset.species === c.species.id)));
+  const tools = $('#tt-tools'), img2d = $('#tt-2d'), name = $('#tt-name');
+  let label;
+  if (c.kind === 'animal3d') {
+    const a = animal3dById(c.id);
+    img2d.hidden = true; $('#turntable').style.visibility = '';
+    turntable.show(a, c.look);
+    label = t(`animals3d.${a.id}`);
+    name.innerHTML = `<div class="n">${esc(label)}</div><div class="s">3D · Quaternius · CC0</div>`;
+    tools.innerHTML = `
+      <div class="segmented" role="group">${['walk', 'run', 'idle', 'eat'].map(k => `<button data-action="tt-anim" data-anim="${k}" aria-pressed="${(turntable.anim || 'walk') === k}">${esc(t({ walk: 'animWalk', run: 'animRun', idle: 'animIdle', eat: 'animEat' }[k]))}</button>`).join('')}</div>
+      <div class="segmented" role="group">
+        <button data-action="tt-look" data-look="real" aria-pressed="${c.look !== 'storybook'}">${esc(t('lookNatural'))}</button>
+        <button data-action="tt-look" data-look="storybook" aria-pressed="${c.look === 'storybook'}">${esc(t('lookStorybookShort'))}</button>
+      </div>
+      <span class="hint">${esc(t('dragToTurn'))}</span>`;
+  } else {
+    $('#turntable').style.visibility = 'hidden'; img2d.hidden = false;
+    img2d.src = c.kind === 'drawing' ? c.canvas.toDataURL('image/png') : c.species.storybook;
+    label = c.kind === 'drawing' ? t('yourDrawing') : t(`species.${c.species.id}`);
+    name.innerHTML = `<div class="n">${esc(label)}</div><div class="s">2D · ${esc(t('lookStorybook'))}</div>`;
+    tools.innerHTML = '';
+  }
+  $('#walk-in').textContent = c.kind === 'drawing' ? t('walkInDrawing') : t('walkInAs', { name: label });
 }
 
 async function recogniseSketch() {
   const pad = openVisitor.pad, out = $('#draw-result');
   if (pad.isEmpty()) { out.innerHTML = `<p class="status">${esc(t('drawEmpty'))}</p>`; return; }
   const ranked = await classify(pad.canvas);
-  const best = matchSpecies(ranked.slice(), SPECIES.filter(s => s.doodle.length))[0];
   const pct = p => (p * 100).toFixed(1);
   const top = ranked.slice(0, 4).map(r => `<li><span>${esc(r.label)}</span><span class="bar"><i style="width:${(r.p * 100).toFixed(1)}%"></i></span><span class="pct">${pct(r.p)}%</span></li>`).join('');
+  // the closest living 3D animal, if any of its drawing classes scored
+  const best3d = matchSpecies(ranked.slice(), ANIMALS3D.filter(a => a.doodle.length).map(a => ({ ...a, doodle: a.doodle })))[0];
   let html = `<div class="result"><h4>${esc(t('drawTop'))}</h4><ul class="bars">${top}</ul>`;
-  if (best.score >= 0.05) {
-    html += `<h4>${esc(t('drawMatch'))}</h4>
-      <p class="match">${esc(t(`species.${best.species.id}`))}</p>
-      <p class="caption" style="text-transform:none;letter-spacing:.04em">${esc(t('drawScore', { p: pct(best.score) }))} · ${esc(t('drawVia', { c: best.via }))}</p>
-      <div class="result-actions"><button class="btn" data-action="pick-species" data-species="${best.species.id}">${esc(t('useMatch', { species: t(`species.${best.species.id}`) }))}</button></div>`;
-    $('#match-img').src = state.look === 'photo' ? best.species.cutout : best.species.storybook;
-    $('#draw-pad').classList.add('revealed');
-    setTimeout(() => $('#draw-pad')?.classList.remove('revealed'), 3200);     // fade back to the drawing
+  if (best3d && best3d.score >= 0.05) {
+    const a = best3d.species;
+    html += `<h4>${esc(t('drawMatch'))}</h4><p class="match">${esc(t(`animals3d.${a.id}`))}</p>
+      <p class="caption" style="text-transform:none;letter-spacing:.04em">${esc(t('drawScore', { p: pct(best3d.score) }))} · ${esc(t('drawVia', { c: best3d.via }))}</p>
+      <div class="result-actions"><button class="btn" data-action="choose-3d" data-id="${a.id}">${esc(t('bringMatch', { name: t(`animals3d.${a.id}`) }))}</button></div>`;
   } else {
-    html += `<p class="status" style="margin-top:14px">${esc(t('drawNoMatch', { p: pct(best.score) }))}</p>`;
+    const best = matchSpecies(ranked.slice(), SPECIES.filter(s => s.doodle.length))[0];
+    html += `<p class="status" style="margin-top:14px">${esc(t('drawNoMatch', { p: pct(best ? best.score : 0) }))}</p>`;
   }
   out.innerHTML = html + '</div>';
-  out.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
 // ---------------------------------------------------------------- 6 · gallery
 const bubbles = new Map();
-function say(who, name, text) {
+function say(who, name, text, hold = 4200) {
+  // one speaker at a time on screen: older bubbles fade so painted animals stay visible
+  bubbles.forEach((el, k) => { if (k !== who) el.classList.remove('show'); });
   let b = bubbles.get(who);
   if (!b) { b = document.createElement('div'); b.className = 'bubble'; $('#bubble-layer').appendChild(b); bubbles.set(who, b); }
   b.classList.remove('show');
   b.innerHTML = `<span class="who"></span><span class="txt"></span>`;
   b.querySelector('.who').textContent = name; b.querySelector('.txt').textContent = text;
   requestAnimationFrame(() => b.classList.add('show'));
+  clearTimeout(b._t);
+  if (hold) b._t = setTimeout(() => b.classList.remove('show'), hold + text.length * 35);
 }
 function clearBubbles() { bubbles.forEach(b => b.remove()); bubbles.clear(); }
 function placeBubbles(g) {
-  const items = [...bubbles.entries()].map(([who, el]) => ({ who, el, p: g.project(g.anchor(who)) }));
-  // keep two bubbles from overlapping: lift the left one if they collide
-  if (items.length === 2) {
-    const [a, b] = items;
-    if (Math.abs(a.p.x - b.p.x) < 300 && Math.abs(a.p.y - b.p.y) < 120) (a.p.x < b.p.x ? a : b).p.y -= 110;
+  const items = [...bubbles.entries()].filter(([, el]) => el.classList.contains('show'))
+    .map(([who, el]) => ({ el, p: g.project(g.anchor(who)) }));
+  items.sort((a, b) => a.p.x - b.p.x);
+  for (let i = 1; i < items.length; i++) {          // push overlapping bubbles apart sideways
+    const a = items[i - 1], b = items[i];
+    if (b.p.x - a.p.x < 300 && Math.abs(a.p.y - b.p.y) < 110) { a.p.x -= 150; b.p.x += 150; }
   }
   for (const { el, p } of items) {
     const x = Math.max(170, Math.min(innerWidth - 170, p.x)), y = Math.max(150, p.y);
@@ -306,20 +322,26 @@ async function enterStage(visitor) {
   runStory(gallery);
 }
 
-// the visitor as an actor: a 2D character (drawing / storybook / photo cut-out)
+// the visitor as an actor: a rigged 3D animal, or a 2D character (drawing / storybook)
 async function makeVisitorActor() {
   const v = state.visitor;
+  if (v.kind === 'animal3d') {
+    const { loadAnimal3D } = await import('./animal3d.js');
+    const a = animal3dById(v.id);
+    return loadAnimal3D(a.glb, { height: a.height, look: v.look });
+  }
   const { Character } = await import('./character.js');
   if (v.kind === 'drawing') return new Character(v.canvas, { height: 0.55, headSide: v.facing });
-  const img = await visitorImage();
-  return new Character(img, { height: 0.55, headSide: v.species.faces, lit: state.look === 'photo', gait: v.species.gait });
+  const img = await loadImage(v.species.storybook);
+  return new Character(img, { height: 0.55, headSide: v.species.faces, gait: v.species.gait });
 }
 
 const pickLine = arr => arr[Math.floor(Math.random() * arr.length)];
 const hostNameOf = i => cap(t(`hostNames.${state.hosts[i].id}`));
-function sayHost(i, text) { say(i, hostNameOf(i), text); }
+function sayHost(i, text, hold) { say(i, hostNameOf(i), text, hold); }
 
-const visitorName = () => state.visitor.kind === 'drawing' ? t('yourDrawing') : t(`species.${state.visitor.species.id}`);
+const visitorName = () => state.visitor.kind === 'drawing' ? t('yourDrawing')
+  : state.visitor.kind === 'animal3d' ? t(`animals3d.${state.visitor.id}`) : t(`species.${state.visitor.species.id}`);
 const hostName = () => t(`hostNames.${state.host.id}`);   // the first painted animal
 
 async function runStory(g) {
@@ -351,7 +373,7 @@ async function runStory(g) {
   }
   if (g !== gallery) return;
   for (let i = 1; i < state.hosts.length; i++) bubbles.get(i)?.classList.remove('show');
-  sayHost(0, t('hostAsk'));
+  say(0, hostNameOf(0), t('hostAsk'), 0);
   state.awaiting = true;
   controls(`${tracker ? `<span class="hint">${esc(t('answerHint'))}</span>` : ''}
     <button class="btn" data-action="answer" data-answer="no">${esc(t('no'))}</button>
@@ -686,20 +708,23 @@ document.addEventListener('click', e => {
     case 'cam-start': startCamera(); break;
     case 'cam-skip': openVisitor(); break;
     case 'cam-stop': stopCamera(); break;
-    case 'back-role': openRole(); break;
-    case 'look': state.look = el.dataset.look; pressGroup(el); renderSpecies(); break;
+    case 'back-role': show('index'); openRole(); break;
     case 'facing': state.facing = el.dataset.facing; pressGroup(el); break;
     case 'swatch': state.colour = el.dataset.colour; pressGroup(el); break;
     case 'draw-clear': openVisitor.pad.clear(); $('#draw-pad').classList.remove('revealed'); $('#draw-result').innerHTML = ''; break;
     case 'draw-go': recogniseSketch(); break;
-    case 'use-drawing': {
+    case 'choose-drawing': {
       const pad = openVisitor.pad;
       if (pad.isEmpty()) { $('#draw-result').innerHTML = `<p class="status">${esc(t('drawEmpty'))}</p>`; break; }
       const canvas = drawingToCharacter(pad.canvas, state.colour);
-      if (canvas) enterStage({ kind: 'drawing', canvas, facing: state.facing });
+      if (canvas) choose({ kind: 'drawing', canvas, facing: state.facing });
       break;
     }
-    case 'pick-species': enterStage({ kind: 'species', species: speciesById(el.dataset.species) }); break;
+    case 'choose-3d': choose({ kind: 'animal3d', id: el.dataset.id, look: state.choice.look || 'real' }); break;
+    case 'choose-2d': choose({ kind: 'species', species: speciesById(el.dataset.species) }); break;
+    case 'tt-anim': pressGroup(el); turntable?.setAnim(el.dataset.anim); break;
+    case 'tt-look': pressGroup(el); state.choice.look = el.dataset.look; choose(state.choice); break;
+    case 'walk-in': enterStage({ ...state.choice }); break;
     case 'answer': answer(el.dataset.answer); break;
     case 'step-in': stepIn(); break;
     case 'to-create': gallery?.dispose(); gallery = null; clearBubbles(); enterCreate('sculpt'); break;
