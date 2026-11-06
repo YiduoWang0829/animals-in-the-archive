@@ -101,13 +101,30 @@ export class Tracker {
       const size = Math.hypot(mid.x - wrist.x, mid.y - wrist.y) || 1e-3;
       const ext = [8, 12, 16, 20].filter(t => Math.hypot(lm[t].x - wrist.x, lm[t].y - wrist.y) >
                                              Math.hypot(lm[t - 2].x - wrist.x, lm[t - 2].y - wrist.y) * 1.12).length;
-      const pinch = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y) / size < 0.38;
+      const pinchDist = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y) / size;
+      const pinch = pinchDist < 0.38;
       const cx = lm.reduce((a, p) => a + p.x, 0) / lm.length, cy = lm.reduce((a, p) => a + p.y, 0) / lm.length;
       return {
-        x: 1 - cx, y: cy, size, pinch, open: ext >= 4 && !pinch, fist: ext <= 1 && !pinch,
+        x: 1 - cx, y: cy, size, pinch, pinchDist, open: ext >= 4 && !pinch, fist: ext <= 1 && !pinch,
         pinchX: 1 - (lm[4].x + lm[8].x) / 2, pinchY: (lm[4].y + lm[8].y) / 2, lm,
       };
     });
+    // steadier hands: smooth positions, and give pinch hysteresis so it does not flicker.
+    // Hands are matched to last frame's by nearest position.
+    const prev = this.prevHands || [];
+    for (const h of hands) {
+      let best = null, bd = 0.2;
+      for (const p of prev) { const d = Math.hypot(p.rawX - h.x, p.rawY - h.y); if (d < bd) { bd = d; best = p; } }
+      h.rawX = h.x; h.rawY = h.y;
+      if (best) {
+        const k = 0.45;                                   // 0 = frozen, 1 = raw
+        h.x = best.x + (h.x - best.x) * k; h.y = best.y + (h.y - best.y) * k;
+        h.pinchX = best.pinchX + (h.pinchX - best.pinchX) * k; h.pinchY = best.pinchY + (h.pinchY - best.pinchY) * k;
+        h.pinch = best.pinch ? h.pinchDist < 0.5 : h.pinchDist < 0.32;
+      } else h.pinch = h.pinchDist < 0.32;
+      h.open = h.open && !h.pinch;
+    }
+    this.prevHands = hands;
     this.h.onHands?.(hands);
     // wave (open palm moving side to side) and swipe (one fast sideways sweep)
     const open = hands.find(h => h.open);

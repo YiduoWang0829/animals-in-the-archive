@@ -293,7 +293,7 @@ function status(html) { $('#stage-status').innerHTML = html ? `<div class="glass
 async function visitorImage() {
   const v = state.visitor;
   if (v.kind === 'drawing') return v.canvas;
-  return loadImage(state.look === 'photo' ? v.species.cutout : v.species.storybook);
+  return loadImage(v.species.storybook);
 }
 
 async function enterStage(visitor) {
@@ -496,18 +496,19 @@ function onHands(hs) {
     } else {
       onHands.zd = null;
       if (open.length === 1) {                       // one open hand = look around, like a joystick
-        const h = open[0];
-        gallery.look((h.x - 0.5) * 0.06, -(h.y - 0.5) * 0.04);
+        const h = open[0], dz = v => Math.abs(v) < 0.12 ? 0 : v - Math.sign(v) * 0.12;   // dead zone in the middle
+        gallery.look(dz(h.x - 0.5) * 0.08, -dz(h.y - 0.5) * 0.05);
       }
     }
   }
-  if (view !== 'view-create') return;
+  if (view !== 'view-create' && !(view === 'view-stage' && gallery?.inside)) { $('#hand-cursor').hidden = $('#hand-cursor-2').hidden = true; return; }
   const c1 = $('#hand-cursor'), c2 = $('#hand-cursor-2');
   [c1, c2].forEach((c, i) => {
     const h = hs[i];
     c.hidden = !h;
     if (h) { c.style.left = h.pinchX * innerWidth + 'px'; c.style.top = h.pinchY * innerHeight + 'px'; c.classList.toggle('pinch', h.pinch); }
   });
+  if (view !== 'view-create') return;
   if (!$('#compose-wrap').hidden) { composer?.handInput(hs); return; }
   sculpt?.handInput(hs);
 }
