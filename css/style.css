@@ -350,3 +350,9 @@ body.in-stage .footer, body.in-sculpt .footer { display: none; }
   .brand-name { display: none; }
   .nav { gap: 16px; }
 }
+
+/* shown only when index.html is opened as a file (see index.html) */
+.file-warning { position: relative; z-index: 60; margin: 16px; padding: 18px 20px; font-size: 14px; color: var(--ink); }
+.file-warning strong { font: 400 22px var(--serif); display: block; margin-bottom: 4px; }
+.file-warning code { display: block; margin: 8px 0; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,.35); font: 12px var(--mono); overflow-wrap: anywhere; }
+.file-warning p { margin: 6px 0; color: var(--ink-2); }

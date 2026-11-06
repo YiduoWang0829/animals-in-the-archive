@@ -104,6 +104,22 @@
     </filter>
   </svg>
 
+  <!-- Opened by double-click (file://)? Browsers block ES modules there, so js/app.js
+       never runs. This plain script still runs and explains what to do. (Its text
+       cannot come from js/strings.js, because that module is the part that is blocked.) -->
+  <script>
+    if (location.protocol === 'file:') {
+      document.addEventListener('DOMContentLoaded', function () {
+        var d = document.createElement('div');
+        d.className = 'file-warning glass';
+        d.innerHTML = '<strong>This site needs a local web server.</strong>' +
+          '<p>Browsers block its scripts when the page is opened as a file. In Terminal, run:</p>' +
+          '<code>cd ' + decodeURI(location.pathname.replace(/\/index\.html$/, '')) + ' &amp;&amp; python3 -m http.server 8000</code>' +
+          '<p>then open <b>http://localhost:8000</b>. Online (GitHub Pages) it works directly.</p>';
+        document.body.prepend(d);
+      });
+    }
+  </script>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>
