@@ -29,23 +29,31 @@ works. The camera only works on `localhost` or `https://`.
    and how the painted animals react to you (they turn to you, or turn away).
 3. **Camera (optional).** An unchecked consent box, then face and hand tracking
    (MediaPipe, on this device only). Everything also works with mouse or touch.
-4. **Character studio.** A full page. Draw your own animal: it becomes a walking
+4. **Character studio.** A full page. Give your animal a name (or keep the suggested one). Draw your own animal: it becomes a walking
    watercolour character. DoodleNet suggests the nearest 3D animal, with its real score.
    Or choose one of 11 rigged 3D animals, shown on a turntable that walks, runs, stands or
    grazes, in a Natural or Storybook (ink outline) look, or one of 13 storybook animals.
-5. **Gallery.** The animal walks in using its own walk or gallop animation, looks back at
-   you (towards your face if the camera is on), and you can wave to it. Two or three
-   painted animals, chosen at random each visit, wake up, step out of their places
-   (the ground behind them was repainted), talk to the visitor, and one asks
-   "Do you like this painting?" (nod or shake your head, or click).
+5. **Gallery.** The animal walks in using its own walk or gallop animation, turns to face
+   you and says hello. With the camera on, wave and it waves back; click it to greet it.
+   Two or three painted animals, chosen at random each visit, wake up, step out of their
+   places (the ground behind them was repainted) and talk with the visitor. They ask its
+   name, and one asks you "Do you like this painting?". All talk is one line at a time,
+   in order. Questions to you wait, with everyone turned towards you, until you nod or
+   shake your head (or click Yes or No).
+   On "yes" the animal climbs the steps below the frame and walks into the painting,
+   with the camera following behind it.
 6. **Inside the painting.** The camera passes through the frame. The painting becomes a
    depth relief you can explore: zoom in with the scroll wheel or by spreading two hands,
-   pan with a drag or an open hand, and parallax follows your head. The animals live
-   there: they wander, run, follow you, talk, and come when you click or pinch them.
-   The visitor takes on the painting's manner.
+   pan with a drag or an open hand, and parallax follows your head. When you stop
+   steering, the view drifts back to your animal. The painted animals gather in a loose
+   circle round it, run to catch up when it walks, and keep a steady conversation going:
+   they ask it questions, and ask you yes/no questions they wait for. There are about 70
+   lines in `js/strings.js`. The visitor takes on the painting's manner.
 7. **Create.** Two options:
-   - **Monument (3D):** the painting carved as a relief into a plinth, with the visitor
-     and painted animals as statues on top, in marble, bronze, clay or painted finish.
+   - **Monument (3D):** the painting carved in relief, with the visitor and painted
+     animals as statues. There are five forms: stele, cube, drum (the painting wrapped
+     round it), chalice and medallion. There are four materials: marble, bronze, clay
+     and painted. Swipe a hand to change the form.
      Turn it by dragging or pinching, carry statues, and export it as `.glb` for Blender.
    - **New painting (2D):** a collage on any of the three paintings, using 22 animals cut
      from all three works plus your visitor. Move, scale, turn and flip them, change the

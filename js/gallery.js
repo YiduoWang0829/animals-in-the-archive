@@ -294,7 +294,7 @@ export class Gallery {
     v.zoom += (v.tz - v.zoom) * 0.08;
     const D = Math.max(0.2, this.viewDist - v.zoom);          // distance to the picture plane
     const halfH = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * D, halfW = halfH * cam.aspect;
-    const maxX = Math.max(0, this.pw / 2 * 0.97 - halfW), maxY = Math.max(0, this.ph / 2 * 0.97 - halfH);
+    const maxX = Math.max(0, this.pw / 2 * 0.88 - halfW), maxY = Math.max(0, this.ph / 2 * 0.9 - halfH);
     v.ty = THREE.MathUtils.clamp(v.ty, -maxX, maxX); v.tp = THREE.MathUtils.clamp(v.tp, -maxY, maxY);
     // keep the visitor in view: when you are not steering, the view drifts back to it
     if (this.follow && (this.simT || 0) - (this.lastLook || -99) > 2.5) {

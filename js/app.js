@@ -271,7 +271,7 @@ function say(who, name, text, hold = 4200) {
   b.classList.remove('show');
   b.innerHTML = `<span class="who"></span><span class="txt"></span>`;
   b.querySelector('.who').textContent = name; b.querySelector('.txt').textContent = text;
-  requestAnimationFrame(() => b.classList.add('show'));
+  setTimeout(() => b.classList.add('show'), 20);
   clearTimeout(b._t);
   if (hold) b._t = setTimeout(() => b.classList.remove('show'), hold + text.length * 35);
 }
@@ -382,7 +382,8 @@ function askUser(who, question) {
     const before = $('#stage-controls').innerHTML;
     controls(`${tracker ? `<span class="hint">${esc(t('answerHint'))}</span>` : ''}
       <button class="btn" data-action="answer" data-answer="no">${esc(t('no'))}</button>
-      <button class="btn primary cta" data-action="answer" data-answer="yes">${esc(t('yes'))}</button>`);
+      <button class="btn primary cta" data-action="answer" data-answer="yes">${esc(t('yes'))}</button>
+      ${state.inside ? `<button class="btn small ghost" data-action="to-create">${esc(t('create'))}</button>` : ''}`);
     let k = 0;
     const remind = setInterval(() => {
       if (tok !== storyToken) return finish(null);
