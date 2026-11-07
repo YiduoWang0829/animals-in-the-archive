@@ -58,40 +58,44 @@ export class Tracker {
   loop() {
     if (!this.running) return;
     const v = this.video, now = performance.now();
-    if (v.readyState >= 2 && v.currentTime !== this.lastT) {
-      this.lastT = v.currentTime;
-      // alternate the two models frame by frame to keep the page smooth
+    // ~30 detections a second in total (hands and face alternate), so the 3D scene
+    // keeps most of each frame for itself
+    if (v.readyState >= 2 && v.currentTime !== this.lastT && now - (this.lastRun || 0) > 33) {
+      this.lastT = v.currentTime; this.lastRun = now;
       if (this.frame++ % 2 === 0) this.detectFace(now); else this.detectHands(now);
     }
-    // keep running even if animation frames are throttled
     this.raf = requestAnimationFrame(() => this.loop());
   }
 
   detectFace(now) {
     const res = this.face.detectForVideo(this.video, now);
     const d = res.detections?.[0];
-    if (!d) { this.h.onFace?.({ present: false }); return; }
+    if (!d) { this.h.onFace?.({ present: false }); this.faceHist = []; return; }
     const b = d.boundingBox, W = this.video.videoWidth, H = this.video.videoHeight;
     const f = { present: true, x: 1 - (b.originX + b.width / 2) / W, y: (b.originY + b.height / 2) / H, size: b.width / W };
+    // nose keypoint (index 2) moves more than the box when you nod: use it if present
+    const nose = d.keypoints?.[2];
+    const ny = nose ? nose.y : f.y, nx = nose ? 1 - nose.x : f.x;
     this.h.onFace?.(f);
-    // nod / shake: oscillation of the face centre over the last ~1.3 s
-    this.faceHist.push({ t: now, x: f.x, y: f.y, s: f.size });
-    this.faceHist = this.faceHist.filter(p => now - p.t < 1300);
-    if (this.faceHist.length > 10 && now - this.lastGesture > 1500) {
-      const s = f.size || 0.2;
-      const osc = key => {
-        let turns = 0, dir = 0, min = 1, max = 0;
-        for (let i = 1; i < this.faceHist.length; i++) {
-          const dv = this.faceHist[i][key] - this.faceHist[i - 1][key];
-          min = Math.min(min, this.faceHist[i][key]); max = Math.max(max, this.faceHist[i][key]);
-          if (Math.abs(dv) > s * 0.012) { const nd = Math.sign(dv); if (dir && nd !== dir) turns++; dir = nd; }
-        }
-        return { turns, range: (max - min) / s };
-      };
-      const vy = osc('y'), vx = osc('x');
-      if (vy.turns >= 2 && vy.range > 0.12 && vy.range > vx.range * 1.4) this.gesture('nod', now);
-      else if (vx.turns >= 2 && vx.range > 0.16 && vx.range > vy.range * 1.4) this.gesture('shake', now);
+    this.faceHist.push({ t: now, x: nx, y: ny });
+    this.faceHist = this.faceHist.filter(p => now - p.t < 1100);
+    if (this.faceHist.length < 5 || now - this.lastGesture < 1100) return;
+    // a nod = down then back up; a shake = sideways and back. Measured relative to
+    // face size so it works near or far from the camera.
+    const s = f.size || 0.2, H0 = this.faceHist[0];
+    const ys = this.faceHist.map(p => p.y), xs = this.faceHist.map(p => p.x);
+    const yMax = Math.max(...ys), yMin = Math.min(...ys), xMax = Math.max(...xs), xMin = Math.min(...xs);
+    const iMax = ys.indexOf(yMax), last = this.faceHist[this.faceHist.length - 1];
+    const dy = (yMax - yMin) / s, dx = (xMax - xMin) / s;
+    const nod = dy > 0.07 && dy > dx * 1.3 && (yMax - H0.y) / s > 0.04 && (yMax - last.y) / s > 0.035 && iMax > 0 && iMax < ys.length - 1;
+    let turns = 0, dir = 0;
+    for (let i = 1; i < xs.length; i++) {
+      const dv = xs[i] - xs[i - 1];
+      if (Math.abs(dv) > s * 0.01) { const nd = Math.sign(dv); if (dir && nd !== dir) turns++; dir = nd; }
     }
+    const shake = dx > 0.09 && dx > dy * 1.3 && turns >= 1;
+    if (nod) this.gesture('nod', now);
+    else if (shake) this.gesture('shake', now);
   }
 
   detectHands(now) {
@@ -138,7 +142,8 @@ export class Tracker {
       }
       const first = this.handHist[0], last = this.handHist[this.handHist.length - 1];
       const sweep = last.x - first.x, dt = last.t - first.t;
-      if (turns >= 2) this.gesture('wave', now);
+      const span = Math.max(...this.handHist.map(p => p.x)) - Math.min(...this.handHist.map(p => p.x));
+      if (turns >= 2 || (turns >= 1 && span > 0.12)) this.gesture('wave', now);
       else if (Math.abs(sweep) > 0.35 && dt < 700) this.gesture(sweep > 0 ? 'swipeRight' : 'swipeLeft', now);
     }
   }

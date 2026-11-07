@@ -19,7 +19,8 @@ function makeMaterial(kind, map) {
   switch (kind) {
     case 'bronze': return new THREE.MeshStandardMaterial({ color: 0x8a6232, metalness: 0.9, roughness: 0.38 });
     case 'clay': return new THREE.MeshStandardMaterial({ color: 0xb8775a, metalness: 0, roughness: 0.95 });
-    case 'painted': return new THREE.MeshStandardMaterial({ map, metalness: 0, roughness: 0.8 });
+    case 'painted': return map ? new THREE.MeshStandardMaterial({ map, metalness: 0, roughness: 0.8 })
+      : new THREE.MeshStandardMaterial({ color: 0x5a4632, metalness: 0.1, roughness: 0.7 });
     default: return new THREE.MeshStandardMaterial({ color: 0xe9e4da, metalness: 0, roughness: 0.55 });
   }
 }
@@ -74,26 +75,102 @@ export async function createMonument(container, { work, visitor, statues }) {
   const sculpture = new THREE.Group(); scene.add(sculpture);
   const [W, H] = work.size, pw = 2.4, ph = pw * H / W, base = 0.5;
 
-  // ---- plinth: the painting carved in relief on its front face ----
+  // ---- the painting's depth, used to carve every form ----
   const [img, depthImg] = await Promise.all([loadImg(work.hd), loadImg(work.depth)]);
   const map = new THREE.Texture(img); map.colorSpace = THREE.SRGBColorSpace; map.needsUpdate = true;
-  const dc = document.createElement('canvas'); dc.width = 260; dc.height = Math.round(200 * H / W);
-  const dx = dc.getContext('2d', { willReadFrequently: true }); dx.drawImage(depthImg, 0, 0, dc.width, dc.height);
-  const dd = dx.getImageData(0, 0, dc.width, dc.height).data;
-  const relief = new THREE.PlaneGeometry(pw, ph, dc.width - 1, dc.height - 1);
-  const rp = relief.attributes.position;
-  for (let i = 0; i < rp.count; i++) rp.setZ(i, Math.pow(dd[i * 4] / 255, 1.4) * 0.2);   // near = stands out
-  relief.computeVertexNormals();
-  const block = new THREE.BoxGeometry(pw + 0.16, ph + 0.16, 0.5);
-  const parts = { relief: new THREE.Mesh(relief), block: new THREE.Mesh(block), top: new THREE.Mesh(new THREE.BoxGeometry(pw + 0.5, 0.06, 1.3)) };
-  parts.relief.position.set(0, base + ph / 2, 0.26);
-  parts.block.position.set(0, base + ph / 2, 0);
-  parts.top.position.set(0, base + ph + 0.11, 0.25);
-  const step = new THREE.Mesh(new THREE.BoxGeometry(pw + 0.7, base, 1.6)); step.position.set(0, base / 2, 0.15);
-  parts.step = step;
-  for (const m of Object.values(parts)) sculpture.add(m);
-  parts.relief.userData.map = map;
-  const topY = base + ph + 0.14;
+  const wrapMap = map.clone(); wrapMap.wrapS = THREE.RepeatWrapping; wrapMap.repeat.set(2, 1); wrapMap.needsUpdate = true;
+  const aspect = W / H;
+  const dw = 260, dh = Math.round(260 / aspect);
+  const dc = document.createElement('canvas'); dc.width = dw; dc.height = dh;
+  const dx = dc.getContext('2d', { willReadFrequently: true }); dx.drawImage(depthImg, 0, 0, dw, dh);
+  const dd = dx.getImageData(0, 0, dw, dh).data;
+  const depthAt = (u, v) => {
+    u = u - Math.floor(u); v = Math.min(1, Math.max(0, v));
+    return Math.pow(dd[(Math.round((1 - v) * (dh - 1)) * dw + Math.round(u * (dw - 1))) * 4] / 255, 1.4);
+  };
+  // a flat relief panel; clip() may pull edge vertices onto an outline (oval)
+  function reliefPanel(w, h, amp, clip) {
+    const g = new THREE.PlaneGeometry(w, h, dw - 1, dh - 1), p = g.attributes.position, uv = g.attributes.uv;
+    for (let i = 0; i < p.count; i++) {
+      if (clip) { const [x, y] = clip(p.getX(i), p.getY(i)); p.setXY(i, x, y); }
+      p.setZ(i, depthAt(uv.getX(i), uv.getY(i)) * amp);
+    }
+    g.computeVertexNormals();
+    const m = new THREE.Mesh(g); m.userData.map = map; return m;
+  }
+  // carve the painting around a curved surface (uv.x around, uv.y along v0..v1)
+  function wrapRelief(g, amp, v0 = 0, v1 = 1) {
+    const p = g.attributes.position, n = g.attributes.normal, uv = g.attributes.uv;
+    for (let i = 0; i < p.count; i++) {
+      const v = (uv.getY(i) - v0) / (v1 - v0);
+      if (v < 0 || v > 1) continue;
+      const d = depthAt(uv.getX(i) * 2, v) * amp * Math.sin(Math.PI * v) ** 0.3;   // fades at the rims
+      p.setXYZ(i, p.getX(i) + n.getX(i) * d, p.getY(i) + n.getY(i) * d, p.getZ(i) + n.getZ(i) * d);
+    }
+    g.computeVertexNormals();
+    const m = new THREE.Mesh(g); m.userData.map = wrapMap; return m;
+  }
+  const mesh = (geo, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(geo); m.position.set(x, y, z); m.userData.map = null; return m; };
+
+  // ---- the forms. Each returns its group, where statues stand, and its height ----
+  const FORMS = {
+    stele() {
+      const g = new THREE.Group(), ph = 2.4 / aspect, pw = 2.4;
+      g.add(mesh(new THREE.BoxGeometry(pw + 0.7, base, 1.6), 0, base / 2, 0.15));
+      g.add(mesh(new THREE.BoxGeometry(pw + 0.16, ph + 0.16, 0.5), 0, base + ph / 2, 0));
+      const r = reliefPanel(pw, ph, 0.2); r.position.set(0, base + ph / 2, 0.26); g.add(r);
+      g.add(mesh(new THREE.BoxGeometry(pw + 0.5, 0.06, 1.3), 0, base + ph + 0.11, 0.25));
+      return { g, topY: base + ph + 0.14, z: 0.3, height: base + ph + 0.6, spread: pw + 0.3 };
+    },
+    cube() {
+      const g = new THREE.Group(), S = 1.9, b = 0.3, inner = S - 0.26;
+      const rw = aspect >= 1 ? inner : inner * aspect, rh = rw / aspect;
+      g.add(mesh(new THREE.BoxGeometry(S + 0.4, b, S + 0.4), 0, b / 2, 0));
+      g.add(mesh(new THREE.BoxGeometry(S, S, S), 0, b + S / 2, 0));
+      const r = reliefPanel(rw, rh, 0.16); r.position.set(0, b + S / 2, S / 2 + 0.004); g.add(r);
+      g.add(mesh(new THREE.BoxGeometry(S + 0.12, 0.06, S + 0.12), 0, b + S + 0.03, 0));
+      return { g, topY: b + S + 0.06, z: 0.1, height: b + S + 0.6, spread: S };
+    },
+    drum() {
+      const g = new THREE.Group(), R = 1.0, Hd = 1.45, b = 0.28;
+      g.add(mesh(new THREE.CylinderGeometry(R + 0.25, R + 0.3, b, 96), 0, b / 2, 0));
+      const side = wrapRelief(new THREE.CylinderGeometry(R, R, Hd, 360, 120, true), 0.13);
+      side.position.y = b + Hd / 2; g.add(side);
+      g.add(mesh(new THREE.CylinderGeometry(R + 0.06, R + 0.06, 0.08, 96), 0, b + Hd + 0.04, 0));
+      g.add(mesh(new THREE.CylinderGeometry(R + 0.06, R + 0.06, 0.06, 96), 0, b + 0.03, 0));
+      return { g, topY: b + Hd + 0.08, z: 0.05, height: b + Hd + 0.6, spread: 1.8 };
+    },
+    chalice() {
+      const g = new THREE.Group();
+      const foot = [[0, 0], [0.8, 0], [0.82, 0.07], [0.6, 0.15], [0.3, 0.28], [0.17, 0.45], [0.15, 0.7], [0.2, 0.82], [0.24, 0.86]]
+        .map(([x, y]) => new THREE.Vector2(x, y));
+      g.add(mesh(new THREE.LatheGeometry(foot, 128)));
+      const bowl = [];
+      for (let i = 0; i <= 60; i++) { const k = i / 60; bowl.push(new THREE.Vector2(0.24 + 0.84 * Math.pow(Math.sin(k * Math.PI / 2), 0.75), 0.86 + 1.1 * k)); }
+      g.add(wrapRelief(new THREE.LatheGeometry(bowl, 360), 0.11, 0.18, 0.98));
+      g.add(mesh(new THREE.CylinderGeometry(1.12, 1.09, 0.06, 128), 0, 1.99, 0));
+      return { g, topY: 2.02, z: 0.05, height: 2.6, spread: 1.9 };
+    },
+    medallion() {
+      const g = new THREE.Group(), a = 1.15, bb = a / Math.max(0.75, Math.min(1.35, aspect)) * 1.05, b = 0.3;
+      const cy = b + 0.12 + bb;
+      const ell = (x, y) => { const k = Math.hypot(x / a, y / bb); return k > 1 ? [x / k, y / k] : [x, y]; };
+      const r = reliefPanel(2 * a, 2 * bb, 0.17, ell); r.position.set(0, cy, 0.1); g.add(r);
+      const shape = new THREE.Shape(); shape.absellipse(0, 0, a + 0.04, bb + 0.04, 0, Math.PI * 2);
+      const back = mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.22, bevelEnabled: false, curveSegments: 96 }), 0, cy, -0.12); g.add(back);
+      const rim = mesh(new THREE.TorusGeometry(1, 0.055, 16, 160), 0, cy, 0.1); rim.scale.set(a + 0.04, bb + 0.04, 1); g.add(rim);
+      g.add(mesh(new THREE.BoxGeometry(2 * a + 0.6, b, 1.5), 0, b / 2, 0.2));
+      return { g, topY: b, z: 0.62, height: cy + bb + 0.4, spread: 2 * a + 0.3 };
+    },
+  };
+  let form = null, formName = '';
+  function buildForm(name) {
+    if (form) { sculpture.remove(form.g); form.g.traverse(o => { o.geometry?.dispose(); [].concat(o.material || []).forEach(m => m.dispose?.()); }); }
+    form = FORMS[name](); formName = name;
+    sculpture.add(form.g);
+  }
+  buildForm('stele');
+  const topY = form.topY;
 
   // ---- statues on top ----
   const actors = [];                 // 3D animals keep their pose; we freeze them mid-stride
@@ -111,8 +188,8 @@ export async function createMonument(container, { work, visitor, statues }) {
       g = await slabStatue(s.src, Math.max(0.45, s.height * 1.2));
       if (s.flip) g.scale.x *= -1;
     }
-    const x = (k - (all.length - 1) / 2) * Math.min(0.85, (pw + 0.3) / all.length);
-    g.position.set(x, topY, 0.3);
+    const x = (k - (all.length - 1) / 2) * Math.min(0.85, form.spread / all.length);
+    g.position.set(x, form.topY, form.z);
     g.userData.statue = true;
     sculpture.add(g); statueGroups.push(g);
   }
@@ -124,7 +201,7 @@ export async function createMonument(container, { work, visitor, statues }) {
     sculpture.traverse(o => {
       if (!o.isMesh) return;
       const old = o.material;
-      o.material = makeMaterial(kind, o.userData.map || map);
+      o.material = makeMaterial(kind, o.userData.map === undefined ? map : o.userData.map);
       if (o.isSkinnedMesh) o.material.skinning = true;
       [].concat(old).forEach(m => m.dispose?.());
     });
@@ -133,7 +210,7 @@ export async function createMonument(container, { work, visitor, statues }) {
 
   // ---- camera / controls ----
   const view = { yaw: -0.4, pitch: 0.2, dist: 7.6, ty: -0.4, tp: 0.2, td: 7.6 };
-  const target = new THREE.Vector3(0, base + ph * 0.72, 0.2);
+  const target = new THREE.Vector3(0, form.height * 0.55, 0.2);
   const resize = () => { const w = container.clientWidth, h = container.clientHeight; r.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); };
   const ro = new ResizeObserver(resize); ro.observe(container); resize();
 
@@ -148,6 +225,7 @@ export async function createMonument(container, { work, visitor, statues }) {
     return o;
   };
   const topPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -topY);
+  const setTopPlane = () => { topPlane.constant = -form.topY; };
   const moveStatue = (g, cx, cy) => {
     const b = r.domElement.getBoundingClientRect();
     ndc.set((cx - b.left) / b.width * 2 - 1, -((cy - b.top) / b.height * 2 - 1));
@@ -155,8 +233,8 @@ export async function createMonument(container, { work, visitor, statues }) {
     const p = new THREE.Vector3();
     if (!ray.ray.intersectPlane(topPlane, p)) return;
     const local = sculpture.worldToLocal(p);
-    g.position.x = THREE.MathUtils.clamp(local.x, -pw / 2 - 0.15, pw / 2 + 0.15);
-    g.position.z = THREE.MathUtils.clamp(local.z, -0.35, 0.85);
+    g.position.x = THREE.MathUtils.clamp(local.x, -form.spread / 2 - 0.1, form.spread / 2 + 0.1);
+    g.position.z = THREE.MathUtils.clamp(local.z, form.z - 0.6, form.z + 0.6);
   };
 
   let drag = null;
@@ -208,6 +286,15 @@ export async function createMonument(container, { work, visitor, statues }) {
     materials: MATERIALS,
     get material() { return current; },
     setMaterial,
+    forms: Object.keys(FORMS),
+    get form() { return formName; },
+    // switch the plinth's form; statues keep their order and step onto the new top
+    setForm(name) {
+      buildForm(name); setTopPlane(); setMaterial(current);
+      statueGroups.forEach((g, k) => { g.position.set((k - (statueGroups.length - 1) / 2) * Math.min(0.85, form.spread / statueGroups.length), form.topY, form.z); });
+      target.y = form.height * 0.55; view.td = 5.2 + form.height * 0.9;
+    },
+    nextForm(step = 1) { const f = Object.keys(FORMS); this.setForm(f[(f.indexOf(formName) + step + f.length) % f.length]); },
     nextMaterial(step = 1) { setMaterial(MATERIALS[(MATERIALS.indexOf(current) + step + MATERIALS.length) % MATERIALS.length]); },
     handInput,
     // turn the step so it would advance a fixed amount (testing)

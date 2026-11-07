@@ -204,6 +204,7 @@ async function openStudio(notice = '') {
     console.warn('[sketch] classifier unavailable:', err);
     if ($('#draw-status')) $('#draw-status').textContent = t('drawUnavailable');
   });
+  if (!$('#vname').value) $('#vname').value = state.name || pickLine(t('names'));
   if (!turntable) { const { Turntable } = await import('./turntable.js'); turntable = new Turntable($('#turntable')); }
   choose(state.choice);
 }
@@ -299,6 +300,7 @@ async function visitorImage() {
 
 async function enterStage(visitor) {
   state.visitor = visitor; state.answer = null; state.inside = false; state.hostAwake = false;
+  storyToken++; giveAnswer(null); speechLock = Promise.resolve();
   closeModal(); show('stage');
   status(`<span class="loading"></span>${esc(t('loadingRoom'))}`); controls('');
   const w = state.work;
@@ -316,7 +318,6 @@ async function enterStage(visitor) {
     work: w, workText: W(w.id), visitor: actor,
     hosts: state.hosts.map(h => ({ host: h, meta: hostMeta[h.id] })),
     onFrame: g => { placeBubbles(g); stageFrame(g); },
-    onEvent: (kind, i) => { if (kind === 'run' && Math.random() < 0.5) sayHost(i, pickLine(t('runAway'))); },
   });
   await gallery.init();
   status('');
@@ -341,55 +342,110 @@ const pickLine = arr => arr[Math.floor(Math.random() * arr.length)];
 const hostNameOf = i => cap(t(`hostNames.${state.hosts[i].id}`));
 function sayHost(i, text, hold) { say(i, hostNameOf(i), text, hold); }
 
-const visitorName = () => state.visitor.kind === 'drawing' ? t('yourDrawing')
+const visitorKind = () => state.visitor.kind === 'drawing' ? t('yourDrawing')
   : state.visitor.kind === 'animal3d' ? t(`animals3d.${state.visitor.id}`) : t(`species.${state.visitor.species.id}`);
+const visitorName = () => state.name;
 const hostName = () => t(`hostNames.${state.host.id}`);   // the first painted animal
 
+// ---- conversation: one speaker at a time, in order ----------------------------
+let speechLock = Promise.resolve();
+let storyToken = 0;                       // bumped when the stage closes: stops all scripts
+let pendingAnswer = null, waveWaiter = null;
+const fill = s => String(s).replace(/\{name\}/g, state.name || '');
+const speakerName = who => who === 'visitor' ? state.name : hostNameOf(who);
+const shuffled = arr => [...arr].sort(() => Math.random() - 0.5);
+
+// say a line after whoever is speaking now has finished; resolves when it has been read
+function speak(who, text, { pause = 350 } = {}) {
+  const tok = storyToken;
+  const run = speechLock.then(async () => {
+    if (tok !== storyToken || !gallery) return;
+    gallery.actorOf(who)?.nod?.(1);
+    say(who, speakerName(who), fill(text), 0);
+    await sleep(1500 + fill(text).length * 48);
+    bubbles.get(who)?.classList.remove('show');
+    await sleep(pause);
+  });
+  speechLock = run.catch(() => {});
+  return run;
+}
+
+// ask the person in front of the screen. Everyone turns to you and waits:
+// nod / shake (camera) or the Yes / No buttons. A gentle reminder now and then.
+function askUser(who, question) {
+  const tok = storyToken;
+  const run = speechLock.then(() => new Promise(resolve => {
+    if (tok !== storyToken || !gallery) return resolve(null);
+    const g = gallery, q = fill(question);
+    say(who, speakerName(who), q, 0);
+    g.attendAll(true);
+    const before = $('#stage-controls').innerHTML;
+    controls(`${tracker ? `<span class="hint">${esc(t('answerHint'))}</span>` : ''}
+      <button class="btn" data-action="answer" data-answer="no">${esc(t('no'))}</button>
+      <button class="btn primary cta" data-action="answer" data-answer="yes">${esc(t('yes'))}</button>`);
+    let k = 0;
+    const remind = setInterval(() => {
+      if (tok !== storyToken) return finish(null);
+      say(who, speakerName(who), t('waitingYou')[k++ % t('waitingYou').length], 0);
+      setTimeout(() => { if (pendingAnswer === finish) say(who, speakerName(who), q, 0); }, 2800);
+    }, 10000);
+    function finish(ans) {
+      clearInterval(remind); pendingAnswer = null;
+      if (gallery === g) { g.attendAll(false); controls(before); bubbles.get(who)?.classList.remove('show'); }
+      resolve(ans);
+    }
+    pendingAnswer = finish;
+  }));
+  speechLock = run.then(() => sleep(250)).catch(() => {});
+  return run;
+}
+function giveAnswer(a) { pendingAnswer?.(a); }
+
 async function runStory(g) {
+  const tok = storyToken, alive = () => g === gallery && tok === storyToken;
   const x = W(state.work.id);
   await g.walkIn();
-  if (g !== gallery) return;
-  // the visitor stops and looks back at you (towards your face if the camera sees you)
-  const side = face ? (face.x < 0.45 ? -1 : 1) : 1;
-  say('visitor', cap(visitorName()), t(`visitorGreet.${state.role}`));
-  await g.lookBack(side);
-  await sleep(1600);
-  if (g !== gallery) return;
-  bubbles.get('visitor')?.classList.remove('show');
-  await g.approach();
-  // the first painted animal wakes and speaks
-  await g.wakeHost(0, 0);
-  if (g !== gallery) return;
-  state.hostAwake = true;
-  sayHost(0, `${t(`works.${state.work.id}.welcome`, { visitor: visitorName() })} ${x.greet[state.role]}`);
-  await sleep(2600);
-  // the others wake up one by one, curious about the visitor
-  const chorus = [...x.chorus].sort(() => Math.random() - 0.5);
-  for (let i = 1; i < state.hosts.length; i++) {
-    if (g !== gallery) return;
-    g.wakeHost(i, i % 2 ? -1 : 1);
-    await sleep(1400);
-    sayHost(i, chorus[(i - 1) % chorus.length]);
-    await sleep(1900);
+  if (!alive()) return;
+  // the visitor stops, turns to you and says hello
+  g.visitor.attend(true, face ? (face.x - 0.5) * 2 : 0);
+  await speak('visitor', pickLine(t('visitorHello')));
+  if (tracker && alive()) {                         // invite a wave (only with the camera on)
+    status(esc(t('waveHint')));
+    await new Promise(res => { waveWaiter = res; setTimeout(res, 5000); });
+    waveWaiter = null; status('');
   }
-  if (g !== gallery) return;
-  for (let i = 1; i < state.hosts.length; i++) bubbles.get(i)?.classList.remove('show');
-  say(0, hostNameOf(0), t('hostAsk'), 0);
-  state.awaiting = true;
-  controls(`${tracker ? `<span class="hint">${esc(t('answerHint'))}</span>` : ''}
-    <button class="btn" data-action="answer" data-answer="no">${esc(t('no'))}</button>
-    <button class="btn primary cta" data-action="answer" data-answer="yes">${esc(t('yes'))}</button>`);
+  await speak('visitor', t(`visitorGreet.${state.role}`));
+  if (!alive()) return;
+  g.visitor.attend(false);
+  await g.approach();
+  // the first painted animal wakes, steps forward and greets the visitor
+  await g.wakeHost(0, 0);
+  if (!alive()) return;
+  state.hostAwake = true;
+  await speak(0, `${t(`works.${state.work.id}.welcome`, { visitor: state.name })} ${x.greet[state.role]}`);
+  const qa = t('qa')[0];                          // "What's your name?"
+  await speak(0, qa[0]); await speak('visitor', qa[1]); await speak(0, qa[2]);
+  // the others wake one by one
+  const chorus = shuffled(x.chorus);
+  for (let i = 1; i < state.hosts.length; i++) {
+    if (!alive()) return;
+    g.wakeHost(i, i % 2 ? -1 : 1);
+    await sleep(1200);
+    await speak(i, chorus[(i - 1) % chorus.length]);
+  }
+  if (!alive()) return;
+  const a = await askUser(0, t('hostAsk'));
+  if (a && alive()) answer(a);
 }
 
 async function answer(a) {
-  if (!state.awaiting || !gallery) return;
-  state.awaiting = false; state.answer = a;
+  if (!gallery) return;
+  state.answer = a;
   const g = gallery, x = W(state.work.id);
-  controls('');
-  say('visitor', cap(visitorName()), a === 'yes' ? t('visitorYes') : t('visitorNo'));
-  await sleep(900);
-  sayHost(0, x[a]);
-  if (a === 'yes') { await sleep(2600); await stepIn(g); }
+  await speak('visitor', a === 'yes' ? t('visitorYes') : t('visitorNo'));
+  await speak(0, x[a]);
+  if (g !== gallery) return;
+  if (a === 'yes') await stepIn(g);
   else {
     await g.hostsRefuse();
     controls(`<button class="btn" data-action="home">${esc(t('anotherPainting'))}</button>
@@ -398,25 +454,51 @@ async function answer(a) {
 }
 
 async function stepIn(g = gallery) {
-  if (!g || g.inside) return;
+  if (!g || g.inside || g.entering) return;
+  g.entering = true;
+  const tok = storyToken, alive = () => g === gallery && tok === storyToken;
   controls(''); clearBubbles();
   state.hostAwake = false;
   await g.enter();
-  if (g !== gallery) return;
+  if (!alive()) return;
   state.inside = true;
   status(esc(tracker ? t('insideHint') : t('insideHintMouse')));
   controls(`<button class="btn primary cta" data-action="to-create">${esc(t('create'))}</button>`);
-  // now and then one of them says something
-  const chorus = W(state.work.id).chorus;
-  (async () => {
-    while (gallery === g && g.inside) {
-      await sleep(7000 + Math.random() * 5000);
-      if (gallery !== g) break;
-      const i = Math.floor(Math.random() * state.hosts.length);
-      sayHost(i, pickLine(chorus));
-      setTimeout(() => bubbles.get(i)?.classList.remove('show'), 4200);
-    }
-  })();
+  await speak(0, t('welcomeInside'));
+  insideLife(g, tok);
+}
+
+// inside the painting: a steady, readable conversation around the visitor
+async function insideLife(g, tok) {
+  const alive = () => g === gallery && tok === storyToken && g.inside;
+  const qa = shuffled(t('qa').slice(1)), ask = shuffled(t('askYou')), toYou = shuffled(t('visitorToYou'));
+  const chorus = shuffled(W(state.work.id).chorus);
+  const awake = () => state.hosts.map((h, i) => i).filter(i => g.hosts[i].awake);
+  let n = 0;
+  while (alive()) {
+    await sleep(2200 + Math.random() * 2200);
+    if (!alive()) break;
+    const hs = awake(), i = hs[n % hs.length];
+    const kind = ['qa', 'ask', 'chorus', 'qa', 'you', 'ask'][n % 6]; n++;
+    if (kind === 'qa' && qa.length) {
+      const [q, ans, back] = qa.shift();
+      await speak(i, q);
+      if (/run fast/i.test(q)) {                      // show, don't tell
+        const p0 = g.visitor.position.clone(), p1 = p0.clone(); p1.x += p0.x > 0 ? -0.6 : 0.6;
+        g.visitor.walkTo(p1, 1.0, { run: true }).then(() => g.visitor.walkTo(p0, 1.0, { run: true }));
+      }
+      await speak('visitor', ans); await speak(i, back);
+    } else if (kind === 'ask' && ask.length) {
+      const [q, yes, no] = ask.shift();
+      const a = await askUser(i, q);
+      if (a) await speak(i, a === 'yes' ? yes : no);
+    } else if (kind === 'you' && toYou.length) {
+      g.visitor.attend(true);
+      await speak('visitor', toYou.shift());
+      g.visitor.attend(false);
+    } else if (chorus.length) await speak(i, chorus.shift());
+    else if (!qa.length && !ask.length) { await sleep(6000); }
+  }
 }
 
 // per frame: parallax from your head (or the mouse) and the host's role reaction
@@ -429,7 +511,7 @@ function stageFrame(g) {
   const you = face ? face.x * innerWidth : hands[0] ? hands[0].x * innerWidth : pointer ? (pointer[0] + 1) / 2 * innerWidth : null;
   if (you === null) return;
   g.hosts.forEach((h, i) => {
-    if (!h.awake || h.actor.target) return;
+    if (!h.awake || h.actor.target || h.actor.attending) return;
     const hx = g.project(g.anchor(i)).x;
     const toward = Math.sign(you - hx) || 1;
     h.actor.setDir(state.role === 'guard' ? -toward : toward);   // the guard's animals turn away
@@ -447,17 +529,31 @@ stage3d.addEventListener('pointermove', e => {
 stage3d.addEventListener('pointerdown', e => { drag = [e.clientX, e.clientY, e.clientX, e.clientY]; });
 stage3d.addEventListener('pointerup', e => {
   const wasDrag = drag?.moved; drag = null;
-  if (!gallery?.inside || wasDrag) return;
+  if (!gallery || wasDrag) return;
   const nx = e.clientX / innerWidth * 2 - 1, ny = -(e.clientY / innerHeight * 2 - 1);
-  tapInside(nx, ny);
+  if (gallery.visitorAt(nx, ny)) return greetBack();       // click your animal: it greets you
+  if (gallery.inside) tapInside(nx, ny);
 });
 stage3d.addEventListener('wheel', e => { if (gallery?.inside) { e.preventDefault(); gallery.zoomBy(-e.deltaY * 0.0015); } }, { passive: false });
 
 // a tap/pinch inside the picture: call the animal under it, or walk there
 function tapInside(nx, ny) {
   const i = gallery.hostAt(nx, ny);
-  if (i >= 0) { gallery.callHost(i); sayHost(i, pickLine(t('called'))); setTimeout(() => bubbles.get(i)?.classList.remove('show'), 3600); }
+  if (i >= 0) { gallery.callHost(i); speak(i, pickLine(t('called'))); }
   else gallery.walkVisitorToScreen(nx, ny);
+}
+
+// you waved (or clicked the visitor): everyone turns to you; the visitor waves back
+let lastGreet = 0;
+function greetBack() {
+  if (!gallery || performance.now() - lastGreet < 2500) return;
+  lastGreet = performance.now();
+  const g = gallery;
+  waveWaiter?.();
+  g.visitor.hopOnce(0.1); g.visitor.nod(2);
+  g.hosts.forEach(h => { if (h.awake) { h.actor.nod(2); h.actor.hopOnce(0.03); } });
+  if (!pendingAnswer) { g.attendAll(true); setTimeout(() => { if (!pendingAnswer && gallery === g) g.attendAll(false); }, 3500); }
+  speak('visitor', pickLine(t('waveBack')));
 }
 
 // ---------------------------------------------------------------- camera events
@@ -465,20 +561,15 @@ let lastPinchWalk = 0;
 function onGesture(g) {
   const view = document.querySelector('.view.is-active')?.id;
   if (view === 'view-stage' && gallery) {
-    if (g === 'nod' && state.awaiting) answer('yes');
-    else if (g === 'shake' && state.awaiting) answer('no');
-    else if (g === 'wave') {
-      gallery.visitor.hopOnce(0.1); gallery.visitor.nod(2);
-      say('visitor', cap(visitorName()), t('waveReply'));
-      setTimeout(() => bubbles.get('visitor')?.classList.remove('show'), 2500);
-      gallery.hosts.forEach(h => { if (h.awake) { h.actor.nod(2); h.actor.hopOnce(0.03); } });
-    }
+    if (g === 'nod') giveAnswer('yes');
+    else if (g === 'shake') giveAnswer('no');
+    else if (g === 'wave') greetBack();
   }
   if (view === 'view-create') {
     const step = g === 'swipeLeft' ? -1 : g === 'swipeRight' ? 1 : 0;
     if (!step) return;
     if (!$('#compose-wrap').hidden) { composer?.nextVariant(step); syncVariant(); }
-    else { sculpt?.nextMaterial(step); syncMaterial(); }
+    else { sculpt?.nextForm(step); syncForm(); }
   }
 }
 function onHands(hs) {
@@ -527,6 +618,8 @@ async function openSculpt() {
   if ($('#collage-shelf')) $('#collage-shelf').hidden = true;
   createStatus(t('monumentHint') + (tracker ? ' ' + t('monumentHands') : ''));
   $('#create-tools').innerHTML = `
+    <div class="segmented" role="group" id="form-group">${['stele', 'cube', 'drum', 'chalice', 'medallion'].map(f =>
+      `<button data-action="form" data-form="${f}" aria-pressed="${f === (sculpt?.form || 'stele')}">${esc(t(`forms.${f}`))}</button>`).join('')}</div>
     <div class="segmented" role="group" id="mat-group">${['marble', 'bronze', 'clay', 'painted'].map(m =>
       `<button data-action="material" data-mat="${m}" aria-pressed="${m === 'marble'}">${esc(t(`materials.${m}`))}</button>`).join('')}</div>
     <button class="btn small" data-action="export-glb">${esc(t('exportGLB'))}</button>
@@ -542,6 +635,9 @@ async function openSculpt() {
     statues: state.hosts.map(h => ({ kind: 'slab', src: h.sprite, height: Math.min(0.75, Math.max(0.3, (hostMeta[h.id].box[3] - hostMeta[h.id].box[1]) / state.work.size[1] * 2.2)), flip: h.faces === 'left' })),
   });
   window.__aia.sculpt = sculpt;          // console/debug access only
+}
+function syncForm() {
+  document.querySelectorAll('#form-group button').forEach(b => b.setAttribute('aria-pressed', b.dataset.form === sculpt?.form));
 }
 function syncMaterial() {
   document.querySelectorAll('#mat-group button').forEach(b => b.setAttribute('aria-pressed', b.dataset.mat === sculpt?.material));
@@ -618,7 +714,7 @@ async function openCard() {
   const blob = await makeCard({
     screenshot: shot, record: recordNumber(date), date: date.toISOString().slice(0, 10),
     work: w, workText: x, roleName: t(`roles.${state.role}.name`),
-    speciesName: v.kind === 'species' ? `${t(`species.${v.species.id}`)} (${t(`speciesLatin.${v.species.id}`)})` : visitorName(),
+    speciesName: `${state.name}, ${v.kind === 'species' ? `${t(`species.${v.species.id}`)} (${t(`speciesLatin.${v.species.id}`)})` : visitorKind()}`,
     hostName: state.hosts.map(h => t(`hostNames.${h.id}`)).join(', '), mood: t(`moods.${state.role}.${state.answer || 'yes'}`), made: state.made,
     photoCredit: v.kind === 'drawing' ? t('cardDrawingCredit') : v.kind === 'animal3d' ? t('card3dCredit', { name: t(`animals3d.${v.id}`) })
       : t('cardPhotoCredit', { file: v.species.file + '.png' }),
@@ -638,6 +734,7 @@ async function openCard() {
 }
 
 function teardown() {
+  storyToken++; giveAnswer(null); speechLock = Promise.resolve();
   gallery?.dispose(); gallery = null;
   sculpt?.dispose(); sculpt = null;
   composer = null; clearBubbles(); status(''); controls('');
@@ -714,14 +811,15 @@ document.addEventListener('click', e => {
     case 'choose-2d': choose({ kind: 'species', species: speciesById(el.dataset.species) }); break;
     case 'tt-anim': pressGroup(el); turntable?.setAnim(el.dataset.anim); break;
     case 'tt-look': pressGroup(el); state.choice.look = el.dataset.look; choose(state.choice); break;
-    case 'walk-in': enterStage({ ...state.choice }); break;
-    case 'answer': answer(el.dataset.answer); break;
+    case 'walk-in': state.name = $('#vname').value.trim().slice(0, 16) || pickLine(t('names')); enterStage({ ...state.choice }); break;
+    case 'answer': giveAnswer(el.dataset.answer); break;
     case 'step-in': stepIn(); break;
-    case 'to-create': gallery?.dispose(); gallery = null; clearBubbles(); enterCreate('sculpt'); break;
+    case 'to-create': storyToken++; giveAnswer(null); gallery?.dispose(); gallery = null; clearBubbles(); status(''); controls(''); enterCreate('sculpt'); break;
     case 'create-mode':
       $('#create-modes').querySelectorAll('button').forEach(b => b.setAttribute('aria-selected', b === el));
       if (el.dataset.mode === 'sculpt') openSculpt(); else openCompose(); break;
     case 'material': pressGroup(el); sculpt?.setMaterial(el.dataset.mat); break;
+    case 'form': pressGroup(el); sculpt?.setForm(el.dataset.form); break;
     case 'add-collage': loadImage(`assets/collage/${el.dataset.id}.webp`).then(img => composer?.addItem(img, 0.12 + Math.random() * 0.76, 0.7 + Math.random() * 0.25, 0.14 + Math.random() * 0.1)); break;
     case 'remove-sel': composer?.removeSelected(); break;
     case 'export-glb': exportGLB(); break;

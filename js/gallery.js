@@ -69,7 +69,7 @@ export class Gallery {
   async init() {
     const { work } = this.o;
     const r = this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-    r.setPixelRatio(Math.min(devicePixelRatio, 2));
+    r.setPixelRatio(Math.min(devicePixelRatio, 1.5));   // smoother on laptops and phones
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.0;
     Object.assign(r.domElement.style, { width: '100%', height: '100%', display: 'block' });
@@ -87,7 +87,7 @@ export class Gallery {
     const [W, H] = work.size;
     this.W = W; this.H = H;
     const pw = this.pw = work.realWidth, ph = this.ph = pw * H / W;
-    const cy = this.cy = Math.max(1.5, ph / 2 + 0.62);
+    const cy = this.cy = ph / 2 + 0.36;           // hung low, with three steps up to it
     this.bottom = cy - ph / 2;
     const [img, depthImg] = await Promise.all([loadImg(work.hd), loadImg(work.depth)]);
     // the painting lives on a canvas so walked-away animals can be painted out
@@ -133,6 +133,12 @@ export class Gallery {
     const skirting = new THREE.Mesh(new THREE.BoxGeometry(18, 0.12, 0.03),
       new THREE.MeshStandardMaterial({ color: 0x141210, roughness: 0.7 }));
     skirting.position.set(0, 0.06, 0.015); scene.add(skirting);
+    // three stone steps up to the frame: the visitor climbs them and walks in
+    const stone = new THREE.MeshStandardMaterial({ color: 0x2c2823, roughness: 0.85 });
+    for (let k = 1; k <= 3; k++) {
+      const h = 0.12 * k, step = new THREE.Mesh(new THREE.BoxGeometry(pw + 0.5 - k * 0.08, h, 0.18), stone);
+      step.position.set(0, h / 2, 0.18 * (3 - k) + 0.09); scene.add(step);
+    }
 
     const gold = new THREE.MeshStandardMaterial({ color: 0x9a7740, metalness: 0.85, roughness: 0.32 });
     const liner = new THREE.MeshStandardMaterial({ color: 0x2b2116, metalness: 0.3, roughness: 0.6 });
@@ -163,7 +169,7 @@ export class Gallery {
     g.fillText(`${this.o.workText.artist}`.slice(0, 44), 30, 232); g.fillText(this.o.workText.date, 30, 262);
     const labelTex = new THREE.CanvasTexture(lc); labelTex.colorSpace = THREE.SRGBColorSpace;
     const label = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.196), new THREE.MeshStandardMaterial({ map: labelTex, roughness: 0.8 }));
-    label.position.set(pw / 2 + 0.42, 1.25, 0.012); scene.add(label);
+    label.position.set(pw / 2 + 0.42, Math.min(1.25, cy), 0.012); scene.add(label);
 
     // lights (also light the 3D animals)
     scene.add(new THREE.HemisphereLight(0xfff1df, 0x16120e, 0.55));
@@ -224,19 +230,14 @@ export class Gallery {
     return new THREE.Vector3((u - 0.5) * this.pw, (v - 0.5) * this.ph, -0.03 - (1 - d) * this.paintU.uDepth.value + lift);
   }
 
-  // paint the ground back where an animal stood (fades in over ~1 s)
+  // paint the ground back where an animal stood (one texture upload, no stutter)
   async revealGround(h) {
     if (h.host.inPlace || h.away) return;
     h.away = true;
     const patch = await loadImg(h.host.patch);
     const [x0, y0, x1, y1] = h.meta.box, s = this.plate.width / this.W;
-    for (let i = 1; i <= 10; i++) {
-      await this.tween(0.1, () => {});
-      this.plateCtx.globalAlpha = 0.35;
-      this.plateCtx.drawImage(patch, x0 * s, y0 * s, (x1 - x0) * s, (y1 - y0) * s);
-      this.plateCtx.globalAlpha = 1;
-      this.map.needsUpdate = true;
-    }
+    this.plateCtx.drawImage(patch, x0 * s, y0 * s, (x1 - x0) * s, (y1 - y0) * s);
+    this.map.needsUpdate = true;
   }
 
   tween(dur, fn) { return new Promise(res => this.tweens.push({ t: 0, dur, fn, res })); }
@@ -275,6 +276,11 @@ export class Gallery {
 
   updateCamera() {
     const cam = this.camera, px = this.parallax, v = this.view;
+    if (this.follow && !this.inside) {                 // walking up to the picture: follow behind
+      const vp = this.visitor.position;
+      this.camBase.set(vp.x * 0.5, vp.y + 0.85, vp.z + 2.3);
+      this.camLook.set(vp.x * 0.5, vp.y + 0.55, vp.z - 1.2);
+    }
     if (!this.inside) {
       const k = 0.55;
       cam.position.x += (this.camBase.x + px.x * k - cam.position.x) * 0.08;
@@ -290,6 +296,12 @@ export class Gallery {
     const halfH = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * D, halfW = halfH * cam.aspect;
     const maxX = Math.max(0, this.pw / 2 * 0.97 - halfW), maxY = Math.max(0, this.ph / 2 * 0.97 - halfH);
     v.ty = THREE.MathUtils.clamp(v.ty, -maxX, maxX); v.tp = THREE.MathUtils.clamp(v.tp, -maxY, maxY);
+    // keep the visitor in view: when you are not steering, the view drifts back to it
+    if (this.follow && (this.simT || 0) - (this.lastLook || -99) > 2.5) {
+      const vp = this.visitor.position;
+      v.ty += (vp.x - v.ty) * 0.04; v.tp += (vp.y + this.visitor.height * 0.6 - v.tp) * 0.04;
+      v.ty = THREE.MathUtils.clamp(v.ty, -maxX, maxX); v.tp = THREE.MathUtils.clamp(v.tp, -maxY, maxY);
+    }
     v.yaw += (v.ty - v.yaw) * 0.08; v.pitch += (v.tp - v.pitch) * 0.08;
     const pos = this.camBase.clone();
     pos.x += v.yaw + px.x * 0.1 * (maxX > 0.05 ? 1 : 0.4);
@@ -304,11 +316,11 @@ export class Gallery {
   // ---- VR-style controls inside the painting (mouse drag, wheel, head, hands)
   look(dx, dy) {                       // pan across the picture (metres-ish units)
     if (!this.inside) return;
-    this.view.ty += dx * 1.6; this.view.tp += dy * 1.6;
+    this.view.ty += dx * 1.6; this.view.tp += dy * 1.6; this.lastLook = this.simT || 0;
   }
   zoomBy(d) {
     if (!this.inside) return;
-    this.view.tz = THREE.MathUtils.clamp(this.view.tz + d, -0.25, this.maxZoom || 1);
+    this.view.tz = THREE.MathUtils.clamp(this.view.tz + d, -0.25, this.maxZoom || 1); this.lastLook = this.simT || 0;
   }
 
   // screen position (CSS px) of a world point, for speech bubbles
@@ -319,6 +331,10 @@ export class Gallery {
   }
   anchor(who) { return (who === 'visitor' ? this.visitor : this.hosts[who].actor).topWorld(); }
 
+  visitorAt(nx, ny) {
+    const ray = new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2(nx, ny), this.camera);
+    return ray.intersectObject(this.visitor.group, true).length > 0;
+  }
   // which painted animal is under a screen point (normalised -1..1)?
   hostAt(nx, ny) {
     const ray = new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2(nx, ny), this.camera);
@@ -342,7 +358,7 @@ export class Gallery {
   }
   async approach() {
     await this.faceAway();
-    await this.visitor.walkTo(new THREE.Vector3(-0.35, 0, 0.55), 0.7);
+    await this.visitor.walkTo(new THREE.Vector3(-0.3, 0, 0.9), 0.7);
     this.visitor.setDir(1);
   }
 
@@ -376,29 +392,30 @@ export class Gallery {
   async enter() {
     const v = this.visitor;
     await this.faceAway();
-    v.setDir(1);
-    const from = v.position.clone(), to = new THREE.Vector3(-0.2, this.bottom + 0.005, 0.03);
+    // climb the three steps, the camera following just behind
+    this.follow = true;
+    const x = -0.12;
+    for (const [z, y] of [[0.62, 0], [0.45, 0.12], [0.27, 0.24], [0.09, 0.36], [0.0, this.bottom]]) {
+      await v.walkTo(new THREE.Vector3(x, y, z), 0.42);
+    }
     v.shadow.visible = false;
-    await this.tween(0.75, (e, raw) => {
-      v.position.lerpVectors(from, to, raw);
-      v.position.y += Math.sin(raw * Math.PI) * 0.35;
-    });
+    // keep walking: across the frame and into the picture, while the view opens up
     this.paintGroup.attach(v.group);
-    this.inside = true;
+    this.inside = true; this.follow = false;
     const depth0 = this.paintU.uDepth.value, depth1 = this.pw * 0.38;
-    const camFrom = this.camBase.clone(), lookFrom = this.camLook.clone();
+    const camFrom = this.camera.position.clone(), lookFrom = this.camLook.clone();
     const vf = THREE.MathUtils.degToRad(this.camera.fov / 2);
     // overscan: the picture slightly overfills the screen
     const dist = Math.min(this.ph / 2 / Math.tan(vf), this.pw / 2 / (Math.tan(vf) * this.camera.aspect)) * 0.76;
     this.maxZoom = dist * 0.72; this.viewDist = dist;
     const recede = dist + 0.3;
     const camTo = new THREE.Vector3(0, this.cy, dist - recede - 0.03), lookTo = new THREE.Vector3(0, this.cy, -recede);
-    const inside = this.paintPoint(0.42, 0.1, 0); inside.z += 0.3;
     const h0 = v.height, ref = this.hosts.find(h => !h.host.inPlace)?.actor.height ?? this.ph * 0.15;
-    const h1 = Math.max(0.1, Math.min(ref * 0.85, this.ph * 0.17));
-    v.walkTo(inside, 0.5);
+    const h1 = Math.max(0.12, Math.min(Math.max(ref, this.ph * 0.16), this.ph * 0.22));
+    const inside = new THREE.Vector3(-0.15, this.groundY(0.35), 0.35);
+    v.walkTo(inside, 0.32);
     this.keyLight.intensity = 0;
-    await this.tween(3.4, e => {
+    await this.tween(3.6, e => {
       this.paintU.uDepth.value = depth0 + (depth1 - depth0) * e;
       this.paintU.uEdge.value = 1 - e * 0.6;
       this.camBase.lerpVectors(camFrom, camTo, e);
@@ -408,16 +425,9 @@ export class Gallery {
       this.keyLight.intensity = e * 1.6;
     });
     v.setPaintAll?.(1);
-    this.camera.position.copy(this.camBase);
-    // everyone awake gathers near the visitor
-    const meetY = this.groundY(0.32);
-    v.walkTo(new THREE.Vector3(-0.2, meetY, 0.36), 0.45);
-    for (const [k, h] of this.hosts.entries()) {
-      if (!h.awake || h.host.inPlace) continue;
-      h.actor.walkTo(new THREE.Vector3(0.12 + k * 0.22, this.groundY(0.3 - k * 0.12), 0.3 - k * 0.12), 0.45);
-      h.next = rand(3, 6);
-    }
-    await this.wait(2.5);
+    this.follow = true;                      // from now on the view keeps the visitor in sight
+    this.lastLook = -99;
+    await this.wait(1.5);
   }
 
   // a believable "ground" inside the picture: further back is higher up
@@ -427,27 +437,36 @@ export class Gallery {
     return new THREE.Vector3(rand(-this.pw / 2 + 0.25, this.pw / 2 - 0.25), this.groundY(z), z);
   }
 
-  // inside: the animals keep living. They wander, run, follow the visitor or rest.
+  // inside: the painted animals stay close to the visitor, in a loose circle,
+  // and face it (or you, when someone is talking to you)
   liveInside(dt) {
+    const v = this.visitor, vp = v.position, s = Math.max(0.28, v.height * 1.35);
+    const SLOTS = [[0.9, -0.05], [-0.95, -0.1], [0.45, -0.45], [-0.5, -0.5]];
+    let k = 0;
     for (const h of this.hosts) {
-      if (!h.awake || h.host.inPlace || h.called) continue;
-      h.next -= dt;
-      if (h.next > 0 || h.actor.target) continue;
-      const roll = Math.random();
-      if (roll < 0.35) {                              // follow the visitor
-        const p = this.visitor.position.clone(); p.x += rand(-0.35, 0.35); p.z = THREE.MathUtils.clamp(p.z + rand(-0.15, 0.1), -0.5, 0.45);
-        p.y = this.groundY(p.z);
-        h.actor.walkTo(p, 0.4);
-      } else if (roll < 0.75) {                       // wander, sometimes at a run
-        const run = Math.random() < 0.35;
-        h.actor.walkTo(this.randomGround(), run ? 0.9 : 0.35, { run });
-        if (run) this.o.onEvent?.('run', this.hosts.indexOf(h));
-      } else {                                         // rest: look around, nod
-        h.actor.setDir(Math.random() < 0.5 ? -1 : 1); h.actor.nod(1);
-      }
-      h.next = rand(3.5, 8);
+      if (!h.awake || h.host.inPlace) continue;
+      const a = h.actor, slot = SLOTS[k++ % SLOTS.length];
+      if (h.called) continue;
+      const tz = THREE.MathUtils.clamp(vp.z + slot[1] * s, -this.paintU.uDepth.value * 0.6, 0.45);
+      const tx = THREE.MathUtils.clamp(vp.x + slot[0] * s, -this.pw / 2 + 0.15, this.pw / 2 - 0.15);
+      const target = new THREE.Vector3(tx, this.groundY(tz), tz);
+      const d = target.distanceTo(a.position);
+      if (d > 0.14 && (!a.target || a.target.distanceTo(target) > 0.2)) a.walkTo(target, d > 0.7 ? 0.95 : 0.42, { run: d > 0.7 });
+      if (!a.target && !a.attending) a.setDir(Math.sign(vp.x - a.position.x) || 1);
+    }
+    if (!v.target && !v.attending && this.hosts.some(h => h.awake)) {
+      const near = this.hosts.filter(h => h.awake).sort((p, q) => p.actor.position.distanceTo(vp) - q.actor.position.distanceTo(vp))[0];
+      v.setDir(Math.sign(near.actor.position.x - vp.x) || 1);
     }
   }
+  // everyone (or one) turns to face you, the person in front of the screen
+  attendAll(on, only = null) {
+    for (const a of [this.visitor, ...this.hosts.filter(h => h.awake).map(h => h.actor)]) {
+      if (only && a !== only) continue;
+      a.attend?.(on);
+    }
+  }
+  actorOf(who) { return who === 'visitor' ? this.visitor : this.hosts[who]?.actor; }
 
   // walk the visitor to a screen point (mouse click or pinch in the air)
   walkVisitorToScreen(nx, ny) {
@@ -475,7 +494,7 @@ export class Gallery {
     h.actor.setDir(Math.sign(this.visitor.position.x - p.x) || 1);
     h.actor.nod(2);
     this.visitor.setDir(Math.sign(p.x - this.visitor.position.x) || 1);
-    h.called = false; h.next = rand(4, 7);
+    h.called = false;
   }
 
   screenshot() { this.renderer.render(this.scene, this.camera); return this.renderer.domElement.toDataURL('image/png'); }

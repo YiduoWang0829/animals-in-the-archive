@@ -178,6 +178,8 @@ export class Animal3D {
   setHeight(h) { this._h = h; this.inner.scale.setScalar(h); this.shadow.scale.set(h * this.length * 0.9, h * 0.6, 1); }
   addTo(scene) { scene.add(this.group); scene.add(this.shadow); return this; }
   setDir(d) { this.dir = d; }
+  // turn to face the person in front of the screen (+z), slightly towards where they are
+  attend(on, side = 0) { this.attending = on; this.attendYaw = side * 0.35; }
   lookTurn(a) { this.lookA = a; }
   get lookAngle() { return this.lookA; }
   setPaint(style, frameRect, wallZ) {
@@ -228,7 +230,8 @@ export class Animal3D {
     }
     this.mixer.update(dt);
     // facing: travel heading while moving, else side-on (dir), plus a turn towards the viewer
-    const want = (heading ?? (this.dir > 0 ? Math.PI / 2 : -Math.PI / 2)) + this.lookA * 1.8 * this.dir;
+    let want = (heading ?? (this.dir > 0 ? Math.PI / 2 : -Math.PI / 2)) + this.lookA * 1.8 * this.dir;
+    if (!moving && this.attending) want = this.attendYaw || 0;
     let dy = want - this.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
     this.yaw += dy * Math.min(1, dt * 6);
     this.inner.rotation.y = this.yaw;

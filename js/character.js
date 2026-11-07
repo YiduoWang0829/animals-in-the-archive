@@ -271,6 +271,7 @@ export class Character {
     const sx = this.height * (Math.abs(this.turn) < 0.08 ? 0.08 * Math.sign(this.turn || 1) : this.turn);
     this.mesh.scale.set(sx, this.height * breathe, this.height);
 
+    if (this.lookTarget !== undefined) this.mesh.rotation.y += (this.lookTarget - this.mesh.rotation.y) * Math.min(1, dt * 6);
     const gy = this.ground ? this.ground(this.group.position.x, this.group.position.z) : this.group.position.y;
     this.mesh.position.y = this.hop;
     this.shadow.position.set(this.group.position.x, gy + 0.004, this.group.position.z + 0.02);
@@ -287,7 +288,9 @@ export class Character {
     const s = new THREE.Vector3(); this.mesh.getWorldScale(s);
     return p.add(new THREE.Vector3(0, Math.abs(s.y) * 1.02, 0));
   }
-  lookTurn(a) { this.mesh.rotation.y = a; }
+  lookTurn(a) { this.mesh.rotation.y = a; this.lookTarget = undefined; }
+  // a flat figure cannot face you, so it half-turns towards you and lifts its head
+  attend(on) { this.attending = on; this.lookTarget = on ? 0.5 * -this.dir : 0; if (on) this.nod(1); }
   get lookAngle() { return this.mesh.rotation.y; }
 
   dispose() {
