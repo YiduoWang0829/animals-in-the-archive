@@ -265,12 +265,14 @@ async function recogniseSketch() {
 const bubbles = new Map();
 function say(who, name, text, hold = 4200) {
   // one speaker at a time on screen: older bubbles fade so painted animals stay visible
-  bubbles.forEach((el, k) => { if (k !== who) el.classList.remove('show'); });
+  // a new speaker hides everyone else at once (no fading bubbles left overlapping)
+  bubbles.forEach((el, k) => { if (k !== who) { el.classList.remove('show'); el.style.visibility = 'hidden'; } });
   let b = bubbles.get(who);
   if (!b) { b = document.createElement('div'); b.className = 'bubble'; $('#bubble-layer').appendChild(b); bubbles.set(who, b); }
   b.classList.remove('show');
   b.innerHTML = `<span class="who"></span><span class="txt"></span>`;
   b.querySelector('.who').textContent = name; b.querySelector('.txt').textContent = text;
+  b.style.visibility = 'visible';
   setTimeout(() => b.classList.add('show'), 20);
   clearTimeout(b._t);
   if (hold) b._t = setTimeout(() => b.classList.remove('show'), hold + text.length * 35);
