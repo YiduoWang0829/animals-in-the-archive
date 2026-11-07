@@ -145,7 +145,7 @@ export class Animal3D {
     const byName = n => { let b = null; this.root.traverse(o => { if (!b && o.isBone && o.name === n) b = o; }); return b; };
     this.head = byName('Head');
     this.neck = ['Neck2', 'Neck3', 'Neck'].map(byName).filter(Boolean);
-    this.aimChain = [...this.neck.map(b => ({ b, share: 0.3, limit: 0.35 })), ...(this.head ? [{ b: this.head, share: 1, limit: 0.75 }] : [])];
+    this.aimChain = [...this.neck.map(b => ({ b, share: 0.25, limit: 0.16 })), ...(this.head ? [{ b: this.head, share: 1, limit: 0.5 }] : [])];
     this.root.updateMatrixWorld(true);
     const qw = new THREE.Quaternion();
     for (const c of this.aimChain) c.fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(c.b.getWorldQuaternion(qw).invert());
@@ -277,7 +277,7 @@ export class Animal3D {
       }
     } else {
       this.idleT -= dt;
-      if (this.idleT < 0) {                  // now and then: graze or look around
+      if (this.idleT < 0 && !this.gazeAt && !this.calm) {   // now and then: graze or look around
         this.play(Math.random() < 0.5 ? 'eat' : 'idle2', 0.4);
         setTimeout(() => { if (!this.target) this.play('idle', 0.5); }, 2600);
         this.idleT = 5 + Math.random() * 6;
@@ -325,6 +325,13 @@ export class Animal3D {
     const hp = new THREE.Vector3(), q = new THREE.Quaternion(), pq = new THREE.Quaternion(), id = new THREE.Quaternion();
     this.head.getWorldPosition(hp);
     const want = target.clone().sub(hp).normalize();
+    // a real neck looks up or down only a little: limit the vertical part of the look
+    const flat = Math.hypot(want.x, want.z);
+    want.y = THREE.MathUtils.clamp(want.y, -flat * 0.35, flat * 0.45); want.normalize();
+    // and never past the shoulder: if the target is behind, the body must turn first
+    const bodyF = new THREE.Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw));
+    if (this.group.parent) bodyF.transformDirection(this.group.parent.matrixWorld);
+    if (bodyF.dot(new THREE.Vector3(want.x, 0, want.z).normalize()) < 0.05) return;
     for (const c of this.aimChain) {
       c.b.getWorldQuaternion(q);
       const f = c.fwd.clone().applyQuaternion(q);

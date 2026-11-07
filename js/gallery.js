@@ -270,19 +270,18 @@ export class Gallery {
       for (const a of [this.visitor, ...this.hosts.map(h => h.actor)]) { a.group.getWorldPosition(p); a.setSpot?.(p); }
       this.liveInside(dt);
     }
-    // where the visitor looks: at you when talking to you, otherwise at whoever speaks
+    // where the visitor looks: at you when you move your head or raise a hand, or when it
+    // talks to you; otherwise at whoever is speaking. The point follows your head/hand.
     const v = this.visitor;
-    if ('gazeAt' in v || v.aimChain) {
-      if (v.attending) {
-        // looking at you, and following your hand if you raise one
-        const c = this.camera, g = c.position.clone();
-        if (this.handGaze) {
-          const right = new THREE.Vector3(1, 0, 0).applyQuaternion(c.quaternion), up = new THREE.Vector3(0, 1, 0).applyQuaternion(c.quaternion);
-          g.addScaledVector(right, (this.handGaze.x - 0.5) * 2.2).addScaledVector(up, (0.5 - this.handGaze.y) * 1.4);
-        }
+    if (v.aimChain) {
+      const c = this.camera, u = this.userGaze;
+      const atYou = v.attending || (u && u.active);
+      if (atYou && !v.target) {
+        const g = c.position.clone();
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(c.quaternion), up = new THREE.Vector3(0, 1, 0).applyQuaternion(c.quaternion);
+        if (u) g.addScaledVector(right, (u.x - 0.5) * 2.6).addScaledVector(up, (0.5 - u.y) * 1.2);
         v.gazeAt = g;
-      }
-      else if (this.gazeHost != null && this.hosts[this.gazeHost]?.awake) v.gazeAt = this.hosts[this.gazeHost].actor.topWorld();
+      } else if (!v.target && this.gazeHost != null && this.hosts[this.gazeHost]?.awake) v.gazeAt = this.hosts[this.gazeHost].actor.topWorld();
       else v.gazeAt = null;
     }
     this.visitor.update(dt, t);
@@ -314,8 +313,8 @@ export class Gallery {
     const vis = this.visitor, T = new THREE.Vector3();
     vis.group.getWorldPosition(T);
     T.y += vis.height * 0.55;
-    const base = Math.max(vis.height * 3.2, (this.viewDist || 2) * 0.62);
-    const D = THREE.MathUtils.clamp(base * (1 - v.zoom), vis.height * 2.2, base * 1.25);
+    const base = Math.max(vis.height * 4.2, (this.viewDist || 2) * 0.72);
+    const D = THREE.MathUtils.clamp(base * (1 - v.zoom), vis.height * 3.0, base * 1.3);
     const pitch = 0.16 + v.pitch;
     const want = new THREE.Vector3(T.x + Math.sin(v.yaw) * Math.cos(pitch) * D, T.y + Math.sin(pitch) * D, T.z + Math.cos(v.yaw) * Math.cos(pitch) * D);
     // keep the picture's edges out of view
@@ -343,10 +342,10 @@ export class Gallery {
     this.view.ty = THREE.MathUtils.clamp(yaw, -0.6, 0.6); this.view.tp = THREE.MathUtils.clamp(pitch, -0.12, 0.45);
   }
   orbitBy(d) { if (this.inside) this.view.ty = THREE.MathUtils.clamp(this.view.ty + d, -0.65, 0.65); }
-  zoomTo(z) { if (this.inside) this.view.tz = THREE.MathUtils.clamp(z, -0.25, 0.6); }
+  zoomTo(z) { if (this.inside) this.view.tz = THREE.MathUtils.clamp(z, -0.3, 0.45); }
   zoomBy(d) {
     if (!this.inside) return;
-    this.view.tz = THREE.MathUtils.clamp(this.view.tz + d, -0.25, 0.6);
+    this.view.tz = THREE.MathUtils.clamp(this.view.tz + d, -0.3, 0.45);
   }
 
   // screen position (CSS px) of a world point, for speech bubbles
@@ -429,7 +428,8 @@ export class Gallery {
     const camTo = new THREE.Vector3(0, this.cy, dist - recede - 0.03), lookTo = new THREE.Vector3(0, this.cy, -recede);
     const h0 = v.height, ref = this.hosts.find(h => !h.host.inPlace)?.actor.height ?? this.ph * 0.15;
     const h1 = Math.max(0.1, Math.min(Math.max(ref * 0.9, this.ph * 0.1), this.ph * 0.15));   // the size of the painted animals
-    const inside = new THREE.Vector3(-0.15, this.groundY(0.35), 0.35);
+    // keep walking forward, into the depth of the picture (away from you)
+    const inside = new THREE.Vector3(-0.1, this.groundY(-0.22), -0.22);
     v.walkTo(inside, 0.22);
     this.keyLight.intensity = 0;
     await this.tween(3.6, e => {

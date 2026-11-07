@@ -286,8 +286,11 @@ function placeBubbles(g) {
     const a = items[i - 1], b = items[i];
     if (b.p.x - a.p.x < 300 && Math.abs(a.p.y - b.p.y) < 110) { a.p.x -= 150; b.p.x += 150; }
   }
+  const chip = !$('#cam-chip').hidden ? $('#cam-chip').getBoundingClientRect() : null;
   for (const { el, p } of items) {
-    const x = Math.max(170, Math.min(innerWidth - 170, p.x)), y = Math.min(innerHeight - 120, Math.max(160, p.y));
+    let x = Math.max(170, Math.min(innerWidth - 170, p.x)), y = Math.min(innerHeight - 120, Math.max(160, p.y));
+    // keep clear of the camera window
+    if (chip && x + 170 > chip.left - 10 && y - el.offsetHeight - 14 < chip.bottom + 10) x = Math.min(x, chip.left - 180);
     el.style.left = x + 'px'; el.style.top = y + 'px';
   }
 }
@@ -564,7 +567,18 @@ async function insideLife(g, tok) {
 // per frame: parallax from your head (or the mouse) and the host's role reaction
 let pointer = null, drag = null;
 function stageFrame(g) {
-  g.handGaze = hands[0] ? { x: hands[0].x, y: hands[0].y } : null;
+  // your animal watches you when you move your head or raise a hand (for ~3 s after)
+  const now = performance.now();
+  if (face && stageFrame.fx !== undefined && Math.abs(face.x - stageFrame.fx) > 0.015) stageFrame.moved = now;
+  if (face) stageFrame.fx = face.x;
+  if (hands[0]) stageFrame.moved = now;
+  const src = hands[0] || face;
+  g.userGaze = src && now - (stageFrame.moved || 0) < 3000 ? { x: src.x, y: src.y, active: true } : null;
+  if (g.visitor) g.visitor.calm = g.inside;
+  if (g.inside && g.userGaze && state.hostAwake) {            // painted animals turn towards your side
+    const you = g.userGaze.x * innerWidth;
+    g.hosts.forEach((h, i) => { if (h.awake && !h.actor.target) h.actor.setDir(Math.sign(you - g.project(g.anchor(i)).x) || 1); });
+  }
   if (face) g.parallax.set((face.x - 0.5) * 2.2, -(face.y - 0.45) * 2.2);
   else if (pointer && !g.inside) g.parallax.set(pointer[0], pointer[1]);
   if (!state.hostAwake || g.inside) return;
