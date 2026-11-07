@@ -41,7 +41,12 @@ works. The camera only works on `localhost` or `https://`.
    painting, then whether to go in. On yes it walks in one continuous path: up the three
    steps and across the frame, while the view opens into the picture. All talk is one
    line at a time, and questions wait for your nod, shake or click.
-6. **Inside the painting.** The camera passes through the frame. The painting becomes a
+6. **Inside the painting.** The camera passes through the frame, then follows your animal
+   from just behind and above. Zoom moves closer to or further from the animal, and
+   looking around orbits it, so you never lose it. 3D animals turn their neck and head
+   (rig bones) toward you or the speaker, with the body turning only as far as a real
+   animal would. The opening is a fixed little scene: startled, shy, polite, then
+   "Follow me!" / "Okay!". After that every question gets an answer. The painting becomes a
    depth relief you can explore: zoom in with the scroll wheel or by spreading two hands,
    pan with a drag or an open hand, and parallax follows your head. When you stop
    steering, the view drifts back to your animal. Two or three painted animals, chosen
