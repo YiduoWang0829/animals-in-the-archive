@@ -299,7 +299,7 @@ export class Animal3D {
     }
     this.inner.position.y = this.hop;
     // head: aim at the look target on top of the animation, then nod
-    this.aimW += ((this.gazeAt ? 1 : 0) - (this.aimW || 0)) * Math.min(1, dt * 5);
+    this.aimW = (this.aimW || 0) + ((this.gazeAt ? 1 : 0) - (this.aimW || 0)) * Math.min(1, dt * 5);
     if (this.aimW > 0.01 && this.aimChain.length) this.aim(this.gazeAt || this.lastLook, this.aimW);
     if (this.gazeAt) this.lastLook = this.gazeAt.clone();
     if (this.nodT !== undefined && this.head) {
@@ -325,7 +325,7 @@ export class Animal3D {
       const r = new THREE.Quaternion().setFromUnitVectors(f, want);
       const ang = 2 * Math.acos(Math.min(1, Math.abs(r.w)));
       const k = Math.min(c.share, ang > 1e-4 ? c.limit / ang : 1) * weight;
-      r.copy(id).slerp(r, k);
+      r.slerpQuaternions(id, r.clone(), k);          // take only this bone's share of the turn
       c.b.parent.getWorldQuaternion(pq);
       c.b.quaternion.copy(pq.invert().multiply(r.multiply(q)));
       c.b.updateMatrixWorld(true);
