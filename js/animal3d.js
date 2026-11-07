@@ -155,6 +155,9 @@ export class Animal3D {
     this.actions = {};
     for (const [k, c] of Object.entries(this.anim)) if (c) this.actions[k] = this.mixer.clipAction(c);
     this.current = null;
+    // measure how far one cycle of each gait carries the animal (in body heights),
+    // so playback speed can match ground speed: the feet plant instead of sliding
+    this.stride = { walk: this.measureStride(this.anim.walk) || { len: 0.9, dur: 1 }, run: this.measureStride(this.anim.run) || { len: 2.2, dur: 1 } };
     this.play('idle', 0);
 
     this.shadow = blobShadow();
@@ -162,6 +165,24 @@ export class Animal3D {
     this.target = null; this.speed = 0.7; this.running = false;
     this.hop = 0; this.hopT = -1; this.idleT = 3 + Math.random() * 4;
     this.setHeight(height);
+  }
+
+  measureStride(clip) {
+    if (!clip) return 0;
+    let foot = null;
+    this.root.traverse(o => { if (!foot && /^FrontLowerLeg\.?L(_end)?$/.test(o.name) && (o.name.endsWith('_end') || !o.children.length)) foot = o; });
+    if (!foot) return 0;
+    const act = this.mixer.clipAction(clip); act.reset().play();
+    const p = new THREE.Vector3(); let zMin = 1e9, zMax = -1e9;
+    for (let i = 0; i <= 24; i++) {
+      this.mixer.setTime(clip.duration * i / 24);
+      this.root.updateMatrixWorld(true);
+      foot.getWorldPosition(p); this.inner.worldToLocal(p);
+      zMin = Math.min(zMin, p.z); zMax = Math.max(zMax, p.z);
+    }
+    act.stop(); this.mixer.setTime(0);
+    // one cycle = one full stance per foot: the body travels about the foot's sweep
+    return { len: (zMax - zMin), dur: clip.duration };
   }
 
   play(name, fade = 0.3) {
@@ -197,12 +218,18 @@ export class Animal3D {
     const s = new THREE.Vector3(); this.group.getWorldScale(s);
     return p.add(new THREE.Vector3(0, this._h * s.y * 1.05, 0));
   }
+  // walk to a point, or along several points without stopping in between
   walkTo(target, speed = 0.7, { run = false } = {}) {
-    this.target = target.clone(); this.speed = run ? Math.max(speed, 1.1) : speed; this.running = run;
-    const dx = target.x - this.group.position.x;
+    const pts = Array.isArray(target) ? target.map(p => p.clone()) : [target.clone()];
+    this._arrive?.();                         // a new order replaces the old one
+    this.target = pts.shift(); this.path = pts;
+    this.speed = run ? Math.max(speed, 1.1) : speed; this.running = run;
+    const dx = this.target.x - this.group.position.x;
     if (Math.abs(dx) > 0.02) this.dir = Math.sign(dx);
     return new Promise(res => { this._arrive = res; });
   }
+  // face a fixed direction while standing (yaw: 0 = towards you, PI = towards the wall)
+  face(yaw) { this.faceYaw = yaw; }
   stop() { this.target = null; this._arrive?.(); this._arrive = null; }
   hopOnce(h = 0.1) { this.hopT = 0; this.hopH = h; }
   nod(times = 2) { this.nodT = 0; this.nodN = times; }
@@ -210,15 +237,30 @@ export class Animal3D {
   update(dt, t) {
     const p = this.group.position;
     let moving = false, heading = null;
+    // ground speed follows the animation: at most ~1.5× the gait's natural pace, so
+    // the hooves and paws stay planted. A walk that is asked to go much faster gallops.
+    const natW = this.stride.walk.len * this._h / this.stride.walk.dur, natR = this.stride.run.len * this._h / this.stride.run.dur;
     if (this.target) {
-      const d = this.target.clone().sub(p), dist = d.length(), step = this.speed * dt;
-      if (dist <= step) { p.copy(this.target); this.target = null; this._arrive?.(); this._arrive = null; }
-      else { heading = Math.atan2(d.x, d.z); p.addScaledVector(d.normalize(), step); moving = true; }
+      const running = this.running || this.speed > natW * 2.4;
+      this.gaitRun = running;
+      this.effSpeed = Math.min(this.speed, (running ? natR : natW) * 1.5);
     }
+    if (this.target) {
+      const d = this.target.clone().sub(p), dist = d.length(), step = this.effSpeed * dt;
+      if (dist <= step) {
+        p.copy(this.target);
+        if (this.path?.length) { this.target = this.path.shift(); moving = true; heading = this.lastHeading; }
+        else { this.target = null; this._arrive?.(); this._arrive = null; }
+      } else { heading = Math.atan2(d.x, d.z); this.lastHeading = heading; p.addScaledVector(d.normalize(), step); moving = true; }
+    }
+    // only settle into idle after a moment of standing still (no hitch between two walks)
+    this.stillT = moving ? 0 : (this.stillT || 0) + dt;
     // animation follows what the animal is doing; speed matches the stride
-    if (moving) {
-      this.play(this.running ? 'run' : 'walk', 0.25);
-      this.current.timeScale = this.speed / (this._h * (this.running ? 2.2 : 1.1));
+    if (moving || this.stillT < 0.18) {
+      if (moving) {
+        this.play(this.gaitRun ? 'run' : 'walk', 0.3);
+        this.current.timeScale = THREE.MathUtils.clamp(this.effSpeed / (this.gaitRun ? natR : natW), 0.5, 1.6);
+      }
     } else {
       this.idleT -= dt;
       if (this.idleT < 0) {                  // now and then: graze or look around
@@ -231,6 +273,7 @@ export class Animal3D {
     this.mixer.update(dt);
     // facing: travel heading while moving, else side-on (dir), plus a turn towards the viewer
     let want = (heading ?? (this.dir > 0 ? Math.PI / 2 : -Math.PI / 2)) + this.lookA * 1.8 * this.dir;
+    if (!moving && this.faceYaw !== undefined && this.faceYaw !== null) want = this.faceYaw;
     if (!moving && this.attending) want = this.attendYaw || 0;
     let dy = want - this.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
     this.yaw += dy * Math.min(1, dt * 6);
@@ -247,7 +290,7 @@ export class Animal3D {
       this.head.rotation.x += Math.sin(this.nodT * Math.PI) * 0.35;
       if (this.nodT >= this.nodN) this.nodT = undefined;
     }
-    this.shadow.position.set(p.x, (this.ground?.(p.x, p.z) ?? 0) + 0.004, p.z + 0.02);
+    this.shadow.position.set(p.x, (this.ground ? this.ground(p.x, p.z) : p.y) + 0.004, p.z + 0.02);
     this.shadow.material.opacity = 1 - Math.min(0.7, this.hop * 3);
   }
 

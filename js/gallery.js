@@ -101,7 +101,7 @@ export class Gallery {
     this.depthImg = depthImg;
     this.paintU = {
       uMap: { value: map }, uDepthTex: { value: depth },
-      uDepth: { value: pw * 0.16 }, uEdge: { value: 1 }, uTime: { value: 0 }, uWind: { value: 1 }, uBright: { value: 1.0 },
+      uDepth: { value: pw * 0.16 }, uEdge: { value: 1 }, uTime: { value: 0 }, uWind: { value: 0 }, uBright: { value: 1.0 },
     };
     this.paintGroup = new THREE.Group();
     this.paintGroup.position.set(0, cy, 0);
@@ -170,6 +170,7 @@ export class Gallery {
     const labelTex = new THREE.CanvasTexture(lc); labelTex.colorSpace = THREE.SRGBColorSpace;
     const label = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.196), new THREE.MeshStandardMaterial({ map: labelTex, roughness: 0.8 }));
     label.position.set(pw / 2 + 0.42, Math.min(1.25, cy), 0.012); scene.add(label);
+    this.labelX = pw / 2 + 0.42;
 
     // lights (also light the 3D animals)
     scene.add(new THREE.HemisphereLight(0xfff1df, 0x16120e, 0.55));
@@ -187,7 +188,7 @@ export class Gallery {
     v.addTo(scene);
     v.setPaint?.(work.style, this.frameRect, 0.0);
     v.setSpot?.(new THREE.Vector3(-0.8, 0, 1.6));
-    v.position.set(-4.6, 0, 1.8);
+    v.position.set(-3.0, 0, 1.75);
     v.setDir(1, true);
 
     // ---- painted animals ------------------------------------------------------
@@ -197,7 +198,7 @@ export class Gallery {
       const hh = (by1 - by0) / H * ph;
       const a = new Character(sprite, { height: hh, headSide: host.faces });
       a.shadow.visible = false;
-      this.paintGroup.add(a.group);
+      this.paintGroup.add(a.group); this.paintGroup.add(a.shadow);
       const home = this.paintPoint((bx0 + bx1) / 2 / W, 1 - by1 / H, 0.004);
       a.position.copy(home);
       a.setDir(host.faces === 'right' ? 1 : -1, true);
@@ -282,7 +283,7 @@ export class Gallery {
       this.camLook.set(vp.x * 0.5, vp.y + 0.55, vp.z - 1.2);
     }
     if (!this.inside) {
-      const k = 0.55;
+      const k = this.follow ? 0 : 0.12;          // the painting stays still on the wall
       cam.position.x += (this.camBase.x + px.x * k - cam.position.x) * 0.08;
       cam.position.y += (this.camBase.y + px.y * k * 0.5 - cam.position.y) * 0.08;
       cam.position.z += (this.camBase.z - cam.position.z) * 0.08;
@@ -342,65 +343,56 @@ export class Gallery {
     return hits.length ? this.hosts.findIndex(h => h.actor.mesh === hits[0].object) : -1;
   }
 
-  // ---- choreography (gallery) ---------------------------------------------
-  async walkIn() { await this.visitor.walkTo(new THREE.Vector3(-1.35, 0, 1.25), 0.75); }
-  // turn toward the viewer, nod and a little hop
-  async lookBack(side = 1) {
-    const v = this.visitor;
-    v.setDir(side);
-    await this.tween(0.5, e => v.lookTurn(e * 0.55 * -side));
-    v.nod(2); v.hopOnce(0.06);
-    await this.wait(1.1);
+  // ---- the gallery tour: just the visitor and you ----------------------------
+  async walkIn() { await this.visitor.walkTo([new THREE.Vector3(-1.9, 0, 1.5), new THREE.Vector3(-1.0, 0, 1.25)], 0.32); }
+  // stand and face a direction (null = free), or face you
+  async goTo(points, speed = 0.32) { this.visitor.face?.(null); await this.visitor.walkTo(points, speed); }
+  async toLabel() {
+    await this.goTo([new THREE.Vector3(this.labelX - 0.25, 0, 0.9), new THREE.Vector3(this.labelX - 0.05, 0, 0.62)]);
+    this.visitor.face?.(Math.PI); this.visitor.setDir(1);
+    await this.wait(0.8);
   }
-  async faceAway() {
-    const v = this.visitor, a0 = v.lookAngle;
-    await this.tween(0.4, e => v.lookTurn((1 - e) * a0));
+  async toPainting() {
+    await this.goTo([new THREE.Vector3(this.labelX * 0.5, 0, 1.0), new THREE.Vector3(0.05, 0, 1.05)]);
+    this.visitor.face?.(Math.PI);
+    await this.wait(1.2);
   }
-  async approach() {
-    await this.faceAway();
-    await this.visitor.walkTo(new THREE.Vector3(-0.3, 0, 0.9), 0.7);
-    this.visitor.setDir(1);
-  }
+  talkToYou(on) { this.visitor.face?.(null); this.visitor.attend?.(on); }
 
-  // a painted animal comes alive and steps to the front of the picture (slot -1..1 spreads them)
-  async wakeHost(i, slot = 0) {
-    const h = this.hosts[i], a = h.actor;
-    h.awake = true;
-    a.hopOnce(0.04 * a.height / 0.3);
-    await this.wait(0.45);
-    a.nod(2);
-    if (h.host.inPlace) {                       // too big to leave: it lifts its head and stamps
-      a.uniforms.uWalk.value = 0.25;
-      await this.tween(1.0, e => { a.uniforms.uPhase.value = e * Math.PI * 2; });
-      a.uniforms.uWalk.value = 0;
-      return;
+  // inside: the painted animals were only paint; they freeze, then all look at the visitor
+  async startle() {
+    const vp = this.visitor.position;
+    for (const h of this.hosts) {
+      h.actor.hopOnce(0.05 * h.actor.height / 0.3);
+      h.actor.setDir(Math.sign(vp.x - h.actor.position.x) || 1);
+      h.actor.nod(1);
     }
+    await this.wait(0.8);
+  }
+  // one painted animal steps out of its place and joins the visitor
+  wakeHost(i) {
+    const h = this.hosts[i];
+    if (h.awake) return;
+    h.awake = true;
+    if (h.host.inPlace) return;                     // too big to leave: it talks from where it is
     this.revealGround(h);
-    const front = this.paintPoint(0.5, 0.06, 0);
-    front.z = 0.02;
-    front.x = THREE.MathUtils.clamp(0.15 + slot * this.pw * 0.22, -this.pw / 2 + a.height, this.pw / 2 - a.height);
-    await a.walkTo(front, 0.45, { run: Math.random() < 0.4 });
-    a.setDir(-1);
+    h.actor.ground = (x, z) => this.groundY(z);
+    h.actor.shadow.visible = true;
   }
-  async hostsRefuse() {
-    for (const h of this.hosts.filter(h => h.awake)) { h.actor.setDir(h.actor.dir * -1); h.actor.setLight(0.8); }
-    this.visitor.setDir(-1);
-    await this.lookBack(-1);
-  }
+  async hostsRefuse() {}
 
   // ---- step into the picture ------------------------------------------------
   async enter() {
     const v = this.visitor;
-    await this.faceAway();
-    // climb the three steps, the camera following just behind
+    v.face?.(null); v.attend?.(false);
+    // one continuous walk: to the steps, up them, across the frame
     this.follow = true;
-    const x = -0.12;
-    for (const [z, y] of [[0.62, 0], [0.45, 0.12], [0.27, 0.24], [0.09, 0.36], [0.0, this.bottom]]) {
-      await v.walkTo(new THREE.Vector3(x, y, z), 0.42);
-    }
-    v.shadow.visible = false;
-    // keep walking: across the frame and into the picture, while the view opens up
-    this.paintGroup.attach(v.group);
+    const x = -0.1;
+    await v.walkTo([new THREE.Vector3(x, 0, 0.8), new THREE.Vector3(x, 0, 0.56), new THREE.Vector3(x, 0.12, 0.45),
+      new THREE.Vector3(x, 0.24, 0.27), new THREE.Vector3(x, 0.36, 0.09), new THREE.Vector3(x, this.bottom, 0.0)], 0.3);
+    // keep walking: into the picture, while the view opens up
+    this.paintGroup.attach(v.group); this.paintGroup.attach(v.shadow);
+    v.ground = (px, pz) => this.groundY(pz);
     this.inside = true; this.follow = false;
     const depth0 = this.paintU.uDepth.value, depth1 = this.pw * 0.38;
     const camFrom = this.camera.position.clone(), lookFrom = this.camLook.clone();
@@ -411,13 +403,12 @@ export class Gallery {
     const recede = dist + 0.3;
     const camTo = new THREE.Vector3(0, this.cy, dist - recede - 0.03), lookTo = new THREE.Vector3(0, this.cy, -recede);
     const h0 = v.height, ref = this.hosts.find(h => !h.host.inPlace)?.actor.height ?? this.ph * 0.15;
-    const h1 = Math.max(0.12, Math.min(Math.max(ref, this.ph * 0.16), this.ph * 0.22));
+    const h1 = Math.max(0.1, Math.min(Math.max(ref * 0.9, this.ph * 0.1), this.ph * 0.15));   // the size of the painted animals
     const inside = new THREE.Vector3(-0.15, this.groundY(0.35), 0.35);
-    v.walkTo(inside, 0.32);
+    v.walkTo(inside, 0.22);
     this.keyLight.intensity = 0;
     await this.tween(3.6, e => {
       this.paintU.uDepth.value = depth0 + (depth1 - depth0) * e;
-      this.paintU.uEdge.value = 1 - e * 0.6;
       this.camBase.lerpVectors(camFrom, camTo, e);
       this.camLook.lerpVectors(lookFrom, lookTo, e);
       this.paintGroup.position.z = -e * recede;
@@ -425,6 +416,7 @@ export class Gallery {
       this.keyLight.intensity = e * 1.6;
     });
     v.setPaintAll?.(1);
+    this.paintU.uWind.value = 1;             // inside, the picture breathes
     this.follow = true;                      // from now on the view keeps the visitor in sight
     this.lastLook = -99;
     await this.wait(1.5);

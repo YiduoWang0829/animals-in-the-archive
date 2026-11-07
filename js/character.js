@@ -225,11 +225,14 @@ export class Character {
 
   // run = longer, faster strides with bigger leg swing
   walkTo(target, speed = 0.8, { run = false } = {}) {
-    this.target = target.clone(); this.speed = speed; this.running = run;
-    const dx = target.x - this.group.position.x;
+    const pts = Array.isArray(target) ? target.map(p => p.clone()) : [target.clone()];
+    this._arrive?.();
+    this.target = pts.shift(); this.path = pts; this.speed = speed; this.running = run;
+    const dx = this.target.x - this.group.position.x;
     if (Math.abs(dx) > 0.02) this.setDir(Math.sign(dx));
     return new Promise(res => { this._arrive = res; });
   }
+  face() {}
   stop() { this.target = null; this._arrive?.(); this._arrive = null; }
   hopOnce(height = 0.12) { this.hopT = 0; this.hopH = height; }
   nod(times = 2) { this.nodT = 0; this.nodN = times; }
@@ -240,7 +243,11 @@ export class Character {
     if (this.target) {
       const p = this.group.position, d = this.target.clone().sub(p);
       const dist = d.length(), step = this.speed * dt;
-      if (dist <= step) { p.copy(this.target); this.target = null; this._arrive?.(); this._arrive = null; }
+      if (dist <= step) {
+        p.copy(this.target);
+        if (this.path?.length) { this.target = this.path.shift(); walking = true; }
+        else { this.target = null; this._arrive?.(); this._arrive = null; }
+      }
       else { p.addScaledVector(d.normalize(), step); walking = true; }
       // stride length ~ 0.55 × height: legs cycle in step with the distance covered
       if (walking) u.uPhase.value += (step / (this.height * (this.running ? 0.9 : 0.55))) * Math.PI;

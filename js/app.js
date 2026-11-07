@@ -330,7 +330,7 @@ async function makeVisitorActor() {
   if (v.kind === 'animal3d') {
     const { loadAnimal3D } = await import('./animal3d.js');
     const a = animal3dById(v.id);
-    return loadAnimal3D(a.glb, { height: a.height, look: v.look });
+    return loadAnimal3D(a.glb, { height: a.height * 1.35, look: v.look });
   }
   const { Character } = await import('./character.js');
   if (v.kind === 'drawing') return new Character(v.canvas, { height: 0.55, headSide: v.facing });
@@ -402,53 +402,50 @@ function askUser(who, question) {
 }
 function giveAnswer(a) { pendingAnswer?.(a); }
 
+const kindOf = () => {
+  const v = state.visitor;
+  return v.kind === 'drawing' ? 'drawing' : v.kind === 'animal3d' ? animal3dById(v.id).kind : v.species.kind;
+};
+
+// ---- part 1: the gallery. Only your animal and you. It reads the label, looks,
+// tells you what it sees, and asks before walking in.
 async function runStory(g) {
   const tok = storyToken, alive = () => g === gallery && tok === storyToken;
-  const x = W(state.work.id);
+  const w = state.work, x = W(w.id), kind = kindOf();
   await g.walkIn();
   if (!alive()) return;
-  // the visitor stops, turns to you and says hello
-  g.visitor.attend(true, face ? (face.x - 0.5) * 2 : 0);
+  g.talkToYou(true);
   await speak('visitor', pickLine(t('visitorHello')));
   if (tracker && alive()) {                         // invite a wave (only with the camera on)
     status(esc(t('waveHint')));
     await new Promise(res => { waveWaiter = res; setTimeout(res, 5000); });
     waveWaiter = null; status('');
   }
-  await speak('visitor', t(`visitorGreet.${state.role}`));
+  g.talkToYou(false);
+  await Promise.all([g.toLabel(), speak('visitor', pickLine(t('tourArrive')))]);
   if (!alive()) return;
-  g.visitor.attend(false);
-  await g.approach();
-  // the first painted animal wakes, steps forward and greets the visitor
-  await g.wakeHost(0, 0);
+  await speak('visitor', t('tourLabel', { title: x.title, artist: x.artist, date: x.date }));
+  for (const f of x.facts) await speak('visitor', f);
   if (!alive()) return;
-  state.hostAwake = true;
-  await speak(0, `${t(`works.${state.work.id}.welcome`, { visitor: state.name })} ${x.greet[state.role]}`);
-  const qa = t('qa')[0];                          // "What's your name?"
-  await speak(0, qa[0]); await speak('visitor', qa[1]); await speak(0, qa[2]);
-  // the others wake one by one
-  const chorus = shuffled(x.chorus);
-  for (let i = 1; i < state.hosts.length; i++) {
-    if (!alive()) return;
-    g.wakeHost(i, i % 2 ? -1 : 1);
-    await sleep(1200);
-    await speak(i, chorus[(i - 1) % chorus.length]);
-  }
+  await Promise.all([g.toPainting(), speak('visitor', t('tourSee', { animals: x.see }))]);
+  await speak('visitor', kind === 'drawing' ? t('tourDrawing')
+    : w.kinds.includes(kind) ? t('tourSame', { kind: t(`kinds.${kind}`) }) : t('tourNotSame', { kind: t(`kinds.${kind}`) }));
   if (!alive()) return;
-  const a = await askUser(0, t('hostAsk'));
-  if (a && alive()) answer(a);
+  g.talkToYou(true);
+  const like = await askUser('visitor', t('tourLikeQ'));
+  if (!like || !alive()) return;
+  await speak('visitor', like === 'yes' ? t('tourLikeYes') : t('tourLikeNo'));
+  await askToGoIn(g);
 }
 
-async function answer(a) {
-  if (!gallery) return;
-  state.answer = a;
-  const g = gallery, x = W(state.work.id);
-  await speak('visitor', a === 'yes' ? t('visitorYes') : t('visitorNo'));
-  await speak(0, x[a]);
-  if (g !== gallery) return;
-  if (a === 'yes') await stepIn(g);
+async function askToGoIn(g) {
+  const tok = storyToken;
+  const go = await askUser('visitor', t('tourGoQ'));
+  if (!go || g !== gallery || tok !== storyToken) return;
+  state.answer = go;
+  if (go === 'yes') { await speak('visitor', t('tourGoYes')); stepIn(g); }
   else {
-    await g.hostsRefuse();
+    await speak('visitor', t('tourGoNo'));
     controls(`<button class="btn" data-action="home">${esc(t('anotherPainting'))}</button>
       <button class="btn primary cta" data-action="step-in">${esc(t('stepInAnyway'))}</button>`);
   }
@@ -458,21 +455,51 @@ async function stepIn(g = gallery) {
   if (!g || g.inside || g.entering) return;
   g.entering = true;
   const tok = storyToken, alive = () => g === gallery && tok === storyToken;
-  controls(''); clearBubbles();
-  state.hostAwake = false;
+  controls(''); clearBubbles(); g.talkToYou(false);
   await g.enter();
   if (!alive()) return;
   state.inside = true;
   status(esc(tracker ? t('insideHint') : t('insideHintMouse')));
   controls(`<button class="btn primary cta" data-action="to-create">${esc(t('create'))}</button>`);
-  await speak(0, t('welcomeInside'));
+  insideStory(g, tok);
+}
+
+// ---- part 2: inside. The painted animals were only paint. They freeze, stare at
+// the visitor, come alive, and each side learns how the other lives.
+async function insideStory(g, tok) {
+  const alive = () => g === gallery && tok === storyToken && g.inside;
+  const x = W(state.work.id), kind = kindOf();
+  const H = state.hosts.length, hid = i => state.hosts[i % H].id;
+  await sleep(1200);
+  if (!alive()) return;
+  await g.startle();
+  await speak(0, t('insideStartled'));
+  await speak(0, t('insideMoved', { date: x.date.replace(/^c\. /, '') }));
+  for (let i = 0; i < H; i++) { g.wakeHost(i); await sleep(500); }
+  state.hostAwake = true;
+  await speak('visitor', t('insideHello'));
+  const life = t(`life.${kind}`), host = i => t(`hostLife.${hid(i)}`);
+  const B = H > 1 ? 1 : 0;
+  const script = [
+    [B, t('insideAskOut')], ['visitor', life[0]],
+    ['visitor', t('insideAskIn')], [0, host(0)[0]],
+    [B, t('insideAskEat')], ['visitor', life[1]],
+    ['visitor', t('insideAskDay')], [B, host(B)[1]],
+    ...(H > 2 ? [[2, host(2)[0]]] : []),
+  ];
+  for (const [who, line] of script) { if (!alive()) return; await speak(who, line); }
+  const friend = await askUser(0, t('insideAskFriend'));
+  if (!alive()) return;
+  if (friend) await speak(0, friend === 'yes' ? t('insideFriendYes') : t('insideFriendNo'));
+  await speak('visitor', t('insideLeave'));
+  await speak(B, t('insideRemember'));
   insideLife(g, tok);
 }
 
 // inside the painting: a steady, readable conversation around the visitor
 async function insideLife(g, tok) {
   const alive = () => g === gallery && tok === storyToken && g.inside;
-  const qa = shuffled(t('qa').slice(1)), ask = shuffled(t('askYou')), toYou = shuffled(t('visitorToYou'));
+  const qa = shuffled(t('qa').slice(1, 7)), ask = shuffled(t('askYou')), toYou = shuffled(t('visitorToYou'));
   const chorus = shuffled(W(state.work.id).chorus);
   const awake = () => state.hosts.map((h, i) => i).filter(i => g.hosts[i].awake);
   let n = 0;

@@ -10,6 +10,7 @@ export const WORKS = [
     depth: 'assets/paintings/depth/garden-of-eden.png',
     size: [2400, 1550], realWidth: 2.3,
     hosts: ['eden-lion', 'eden-horse', 'eden-deer', 'eden-rabbit', 'eden-dog', 'eden-peacock'],
+    kinds: ['lion', 'tiger', 'horse', 'deer', 'dog', 'cat', 'rabbit', 'cattle', 'bird'],   // animal kinds painted in it
     wall: 0x2a2622,
   },
   {
@@ -19,6 +20,7 @@ export const WORKS = [
     depth: 'assets/paintings/depth/knight-death-devil.png',
     size: [1847, 2400], realWidth: 1.45,
     hosts: ['durer-horse', 'durer-dog'],
+    kinds: ['horse', 'dog'],
     wall: 0x24231f,
   },
   {
@@ -28,6 +30,7 @@ export const WORKS = [
     depth: 'assets/paintings/depth/fate-of-the-animals.png',
     size: [2385, 1783], realWidth: 2.4,
     hosts: ['marc-deer', 'marc-boar'],
+    kinds: ['deer'],
     wall: 0x22252a,
   },
 ];
@@ -54,19 +57,19 @@ for (const [id, h] of Object.entries(HOSTS)) {
 // doodle = DoodleNet (QuickDraw) classes that count as this species.
 // gait = force 'hop' for animals that hop rather than walk.
 export const SPECIES = [
-  { id: 'domestic_cat', file: 'domestic_cat_236808539', faces: 'right', doodle: ['cat'] },
-  { id: 'domestic_dog', file: 'domestic_dog_251913625', faces: 'right', doodle: ['dog'] },
-  { id: 'rabbit',       file: 'rabbit_78502673',        faces: 'left',  doodle: ['rabbit'], gait: 'hop' },
-  { id: 'red_deer',     file: 'red_deer_10941056',      faces: 'left',  doodle: ['giraffe', 'camel', 'kangaroo'] },
-  { id: 'horse',        file: 'horse_121483510',        faces: 'left',  doodle: ['horse', 'cow', 'zebra'] },
-  { id: 'red_fox',      file: 'red_fox_2262475',        faces: 'left',  doodle: ['raccoon'] },
-  { id: 'red_squirrel', file: 'red_squirrel_171989381', faces: 'right', doodle: ['squirrel', 'mouse'] },
-  { id: 'hedgehog',     file: 'hedgehog_203070926',     faces: 'right', doodle: ['hedgehog'] },
-  { id: 'owl',          file: 'owl_324147361',          faces: 'right', doodle: ['owl', 'bird', 'parrot', 'duck'], gait: 'hop' },
-  { id: 'brown_bear',   file: 'brown_bear_24160860',    faces: 'right', doodle: ['bear', 'teddy-bear', 'panda'] },
-  { id: 'grey_wolf',    file: 'grey_wolf_4909114',      faces: 'right', doodle: [] },
-  { id: 'lion',         file: 'lion_236419',            faces: 'left',  doodle: ['lion'] },
-  { id: 'tiger',        file: 'tiger_50541307',         faces: 'right', doodle: ['tiger'] },
+  { id: 'domestic_cat', kind: 'cat', file: 'domestic_cat_236808539', faces: 'right', doodle: ['cat'] },
+  { id: 'domestic_dog', kind: 'dog', file: 'domestic_dog_251913625', faces: 'right', doodle: ['dog'] },
+  { id: 'rabbit',       kind: 'rabbit', file: 'rabbit_78502673',        faces: 'left',  doodle: ['rabbit'], gait: 'hop' },
+  { id: 'red_deer',     kind: 'deer', file: 'red_deer_10941056',      faces: 'left',  doodle: ['giraffe', 'camel', 'kangaroo'] },
+  { id: 'horse',        kind: 'horse', file: 'horse_121483510',        faces: 'left',  doodle: ['horse', 'cow', 'zebra'] },
+  { id: 'red_fox',      kind: 'fox', file: 'red_fox_2262475',        faces: 'left',  doodle: ['raccoon'] },
+  { id: 'red_squirrel', kind: 'squirrel', file: 'red_squirrel_171989381', faces: 'right', doodle: ['squirrel', 'mouse'] },
+  { id: 'hedgehog',     kind: 'hedgehog', file: 'hedgehog_203070926',     faces: 'right', doodle: ['hedgehog'] },
+  { id: 'owl',          kind: 'bird', file: 'owl_324147361',          faces: 'right', doodle: ['owl', 'bird', 'parrot', 'duck'], gait: 'hop' },
+  { id: 'brown_bear',   kind: 'bear', file: 'brown_bear_24160860',    faces: 'right', doodle: ['bear', 'teddy-bear', 'panda'] },
+  { id: 'grey_wolf',    kind: 'wolf', file: 'grey_wolf_4909114',      faces: 'right', doodle: [] },
+  { id: 'lion',         kind: 'lion', file: 'lion_236419',            faces: 'left',  doodle: ['lion'] },
+  { id: 'tiger',        kind: 'tiger', file: 'tiger_50541307',         faces: 'right', doodle: ['tiger'] },
 ].map(s => ({
   ...s,
   original: `assets/animals/originals/${s.file}.png`,
@@ -79,17 +82,17 @@ export const SPECIES = [
 // Rigged, animated 3D animals (Quaternius, CC0). height = metres in the gallery
 // (kept relative to each other; slightly smaller than life to suit the room).
 export const ANIMALS3D = [
-  { id: 'fox',         height: 0.3,  doodle: ['raccoon', 'squirrel'] },
-  { id: 'shiba_inu',   height: 0.34, doodle: ['dog'] },
-  { id: 'husky',       height: 0.44, doodle: [] },
-  { id: 'deer',        height: 0.56, doodle: ['kangaroo'] },
-  { id: 'stag',        height: 0.66, doodle: [] },
-  { id: 'alpaca',      height: 0.64, doodle: ['camel', 'giraffe'] },
-  { id: 'donkey',      height: 0.6,  doodle: [] },
-  { id: 'white_horse', height: 0.8,  doodle: ['horse'] },
-  { id: 'zebra',       height: 0.74, doodle: ['zebra'] },
-  { id: 'cow',         height: 0.7,  doodle: ['cow'] },
-  { id: 'bull',        height: 0.76, doodle: [] },
+  { id: 'fox', kind: 'fox',         height: 0.3,  doodle: ['raccoon', 'squirrel'] },
+  { id: 'shiba_inu', kind: 'dog',   height: 0.34, doodle: ['dog'] },
+  { id: 'husky', kind: 'dog',       height: 0.44, doodle: [] },
+  { id: 'deer', kind: 'deer',        height: 0.56, doodle: ['kangaroo'] },
+  { id: 'stag', kind: 'deer',        height: 0.66, doodle: [] },
+  { id: 'alpaca', kind: 'alpaca',      height: 0.64, doodle: ['camel', 'giraffe'] },
+  { id: 'donkey', kind: 'donkey',      height: 0.6,  doodle: [] },
+  { id: 'white_horse', kind: 'horse', height: 0.8,  doodle: ['horse'] },
+  { id: 'zebra', kind: 'zebra',       height: 0.74, doodle: ['zebra'] },
+  { id: 'cow', kind: 'cattle',         height: 0.7,  doodle: ['cow'] },
+  { id: 'bull', kind: 'cattle',        height: 0.76, doodle: [] },
 ].map(a => ({ ...a, glb: `assets/animals/3d/${a.id}.glb`, thumb: `assets/animals/3d/thumbs/${a.id}.webp` }));
 
 export const workById = id => WORKS.find(w => w.id === id);
