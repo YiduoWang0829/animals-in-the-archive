@@ -216,7 +216,12 @@ export class Character {
   get position() { return this.group.position; }
 
   // face left/right; the turn is animated as a quick squash so it reads as turning around
-  setDir(d, instant = false) { this.dir = d; if (instant) this.turn = d; }
+  setDir(d, instant = false) {
+    if (instant) { this.dir = d; this.turn = d * (this.headSide === 'right' ? 1 : -1); this.lastFlip = this.clock || 0; return; }
+    if (d === this.dir) return;
+    if ((this.clock || 0) - (this.lastFlip ?? -9) < 1.4 && !this.target) return;   // standing animals don't fidget
+    this.dir = d; this.lastFlip = this.clock || 0;
+  }
   headPoint() {
     const p = this.group.position.clone();
     const u = (this.rig.headU - 0.5) * this.aspect * this.height * (this.headSide === 'right' ? 1 : -1) * this.turn;
@@ -239,6 +244,7 @@ export class Character {
 
   update(dt, t) {
     const u = this.uniforms;
+    this.clock = (this.clock || 0) + dt;
     let walking = false;
     if (this.target) {
       const p = this.group.position, d = this.target.clone().sub(p);
@@ -268,19 +274,28 @@ export class Character {
       u.uNod.value = Math.sin(this.nodT * Math.PI) * 0.6;
       if (this.nodT >= this.nodN) { this.nodT = undefined; u.uNod.value = 0; }
     }
-    // breathing when idle
-    const breathe = 1 + Math.sin(t * 2.1) * 0.012 * (1 - u.uWalk.value);
+    // breathing when idle, and now and then a small nod: alive, never frozen
+    const breathe = 1 + Math.sin(t * 2.1 + this.height * 7) * 0.014 * (1 - u.uWalk.value);
+    this.idleT = (this.idleT ?? 2 + Math.random() * 4) - dt;
+    if (!walking && this.idleT < 0) { if (this.nodT === undefined) this.nod(1); this.idleT = 3 + Math.random() * 5; }
 
-    // animated turn: scale.x goes through 0 → reads as turning the body
+    // turning round: an eased half-turn that never fully collapses, with a little lift
     const want = this.dir * (this.headSide === 'right' ? 1 : -1);
-    this.turn += (want - this.turn) * Math.min(1, dt * 7);
+    const dTurn = want - this.turn;
+    this.turn += Math.sign(dTurn) * Math.min(Math.abs(dTurn), dt * 4.2);
     u.uFlip.value = Math.sign(this.turn) || 1;
-    const sx = this.height * (Math.abs(this.turn) < 0.08 ? 0.08 * Math.sign(this.turn || 1) : this.turn);
+    const turning = Math.abs(this.turn) < 0.95;
+    const mag = 0.28 + 0.72 * Math.abs(this.turn);                       // narrowest point is 28%, not a sliver
+    const sx = this.height * mag * (Math.sign(this.turn) || 1);
+    // walking: the body rises and rocks with each step; standing: slow breathing and weight shifts
+    const ph = u.uPhase.value, w = u.uWalk.value;
+    const bob = Math.abs(Math.sin(ph)) * 0.035 * w + (turning ? 0.03 : 0);
+    this.mesh.rotation.z = Math.sin(ph) * 0.035 * w * (Math.sign(this.turn) || 1) + Math.sin(t * 0.7 + this.height * 9) * 0.008 * (1 - w);
     this.mesh.scale.set(sx, this.height * breathe, this.height);
 
     if (this.lookTarget !== undefined) this.mesh.rotation.y += (this.lookTarget - this.mesh.rotation.y) * Math.min(1, dt * 6);
     const gy = this.ground ? this.ground(this.group.position.x, this.group.position.z) : this.group.position.y;
-    this.mesh.position.y = this.hop;
+    this.mesh.position.y = this.hop + bob * this.height;
     this.shadow.position.set(this.group.position.x, gy + 0.004, this.group.position.z + 0.02);
     this.shadow.material.opacity = 1 - Math.min(0.7, this.hop * 3);
   }

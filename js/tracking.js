@@ -88,13 +88,13 @@ export class Tracker {
     const yMax = Math.max(...ys), yMin = Math.min(...ys), xMax = Math.max(...xs), xMin = Math.min(...xs);
     const iMax = ys.indexOf(yMax), last = this.faceHist[this.faceHist.length - 1];
     const dy = (yMax - yMin) / s, dx = (xMax - xMin) / s;
-    const nod = dy > 0.07 && dy > dx * 1.3 && (yMax - H0.y) / s > 0.04 && (yMax - last.y) / s > 0.035 && iMax > 0 && iMax < ys.length - 1;
+    const nod = dy > 0.055 && dy > dx * 1.2 && (yMax - H0.y) / s > 0.03 && (yMax - last.y) / s > 0.028 && iMax > 0 && iMax < ys.length - 1;
     let turns = 0, dir = 0;
     for (let i = 1; i < xs.length; i++) {
       const dv = xs[i] - xs[i - 1];
       if (Math.abs(dv) > s * 0.01) { const nd = Math.sign(dv); if (dir && nd !== dir) turns++; dir = nd; }
     }
-    const shake = dx > 0.09 && dx > dy * 1.3 && turns >= 1;
+    const shake = dx > 0.07 && dx > dy * 1.2 && turns >= 1;
     if (nod) this.gesture('nod', now);
     else if (shake) this.gesture('shake', now);
   }
@@ -126,8 +126,8 @@ export class Tracker {
         const k = Math.min(0.9, 0.3 + Math.hypot(h.x - best.x, h.y - best.y) * 9);
         h.x = best.x + (h.x - best.x) * k; h.y = best.y + (h.y - best.y) * k;
         h.pinchX = best.pinchX + (h.pinchX - best.pinchX) * k; h.pinchY = best.pinchY + (h.pinchY - best.pinchY) * k;
-        h.pinch = best.pinch ? h.pinchDist < 0.5 : h.pinchDist < 0.32;
-      } else h.pinch = h.pinchDist < 0.32;
+        h.pinch = best.pinch ? h.pinchDist < 0.55 : h.pinchDist < 0.36;
+      } else h.pinch = h.pinchDist < 0.36;
       h.open = h.open && !h.pinch;
     }
     this.prevHands = hands;

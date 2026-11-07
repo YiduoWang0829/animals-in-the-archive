@@ -342,6 +342,7 @@ export class Gallery {
     if (!this.inside) return;
     this.view.ty = THREE.MathUtils.clamp(yaw, -0.6, 0.6); this.view.tp = THREE.MathUtils.clamp(pitch, -0.12, 0.45);
   }
+  orbitBy(d) { if (this.inside) this.view.ty = THREE.MathUtils.clamp(this.view.ty + d, -0.65, 0.65); }
   zoomTo(z) { if (this.inside) this.view.tz = THREE.MathUtils.clamp(z, -0.25, 0.6); }
   zoomBy(d) {
     if (!this.inside) return;
@@ -453,28 +454,57 @@ export class Gallery {
     return new THREE.Vector3(rand(-this.pw / 2 + 0.25, this.pw / 2 - 0.25), this.groundY(z), z);
   }
 
-  // inside: the painted animals stay close to the visitor, in a loose circle,
-  // and face it (or you, when someone is talking to you)
+  // inside: the painted animals stay near the visitor, in a loose half-circle.
+  // Each keeps at least its own width (plus a margin) from the others and stands at
+  // its own depth, so two flat figures never overlap or flicker.
+  widthOf(a) { return a.aspect ? a.aspect * a.height : (a.length || 1) * a.height; }
   liveInside(dt) {
-    const v = this.visitor, vp = v.position, s = Math.max(0.28, v.height * 1.35);
-    const SLOTS = [[0.9, -0.05], [-0.95, -0.1], [0.45, -0.45], [-0.5, -0.5]];
-    let k = 0;
-    for (const h of this.hosts) {
-      if (!h.awake || h.host.inPlace) continue;
-      const a = h.actor, slot = SLOTS[k++ % SLOTS.length];
-      if (h.called) continue;
-      const tz = THREE.MathUtils.clamp(vp.z + slot[1] * s, -this.paintU.uDepth.value * 0.6, 0.45);
-      const tx = THREE.MathUtils.clamp(vp.x + slot[0] * s, -this.pw / 2 + 0.15, this.pw / 2 - 0.15);
+    const v = this.visitor, vp = v.position;
+    const hs = this.hosts.filter(h => h.awake && !h.host.inPlace);
+    // only re-form when the visitor has actually gone somewhere new (calm, no milling about)
+    const settled = this.formAnchor && vp.distanceTo(this.formAnchor) < 0.35 && hs.every(h => h.placed);
+    if (!settled) this.formAnchor = vp.clone();
+    let side = 1, reachL = this.widthOf(v) / 2, reachR = this.widthOf(v) / 2;
+    hs.forEach((h, k) => {
+      const a = h.actor, w = this.widthOf(a);
+      if (h.called || h.meeting) return;
+      if (settled) { if (!a.target && !a.attending) a.setDir(Math.sign(vp.x - a.position.x) || 1); return; }
+      // alternate right / left of the visitor, further out each time, a step back each time
+      let tx;
+      if (side > 0) { tx = vp.x + reachR + 0.08 + w / 2; reachR += w + 0.08; }
+      else { tx = vp.x - reachL - 0.08 - w / 2; reachL += w + 0.08; }
+      side = -side;
+      const tz = THREE.MathUtils.clamp(vp.z - 0.1 - k * 0.12, -this.paintU.uDepth.value * 0.6, 0.42);
+      tx = THREE.MathUtils.clamp(tx, -this.pw / 2 + w / 2, this.pw / 2 - w / 2);
       const target = new THREE.Vector3(tx, this.groundY(tz), tz);
       const d = target.distanceTo(a.position);
-      if (d > 0.14 && (!a.target || a.target.distanceTo(target) > 0.2)) a.walkTo(target, d > 0.7 ? 0.95 : 0.42, { run: d > 0.7 });
-      if (!a.target && !a.attending) a.setDir(Math.sign(vp.x - a.position.x) || 1);
-    }
-    if (!v.target && !v.attending && this.hosts.some(h => h.awake)) {
-      const near = this.hosts.filter(h => h.awake).sort((p, q) => p.actor.position.distanceTo(vp) - q.actor.position.distanceTo(vp))[0];
-      v.setDir(Math.sign(near.actor.position.x - vp.x) || 1);
-    }
+      if (d > 0.12 && (!a.target || a.target.distanceTo(target) > 0.18)) { h.placed = false; a.walkTo(target, d > 0.7 ? 0.9 : 0.4, { run: d > 0.7 }).then(() => { h.placed = true; }); }
+      else if (!a.target) h.placed = true;
+      if (!a.target) a.setDir(Math.sign(vp.x - a.position.x) || 1);
+    });
+    // draw order follows depth: nearer figures are drawn last (no flicker)
+    const all = [v, ...this.hosts.map(h => h.actor)];
+    const wp = new THREE.Vector3();
+    all.map(a => { a.group.getWorldPosition(wp); return [a, wp.z]; }).sort((x, y) => x[1] - y[1])
+      .forEach(([a], i) => a.group.traverse(o => { if (o.isMesh) o.renderOrder = 10 + i; }));
   }
+  // before talking, the visitor and a painted animal walk towards each other
+  async meet(i) {
+    const h = this.hosts[i];
+    if (!h || !h.awake || h.host.inPlace) return;
+    const v = this.visitor, a = h.actor, vp = v.position.clone();
+    const side = Math.sign(a.position.x - vp.x) || 1, gap = (this.widthOf(v) + this.widthOf(a)) / 2 + 0.06;
+    const mid = vp.clone().lerp(a.position, 0.35);
+    const vT = new THREE.Vector3(mid.x - side * gap * 0.5, 0, THREE.MathUtils.clamp(mid.z, -this.paintU.uDepth.value * 0.5, 0.42));
+    vT.y = this.groundY(vT.z);
+    const aT = new THREE.Vector3(vT.x + side * gap, 0, vT.z - 0.04); aT.y = this.groundY(aT.z);
+    h.meeting = true;
+    await Promise.all([v.walkTo(vT, 0.35), a.walkTo(aT, 0.35)]);
+    a.lastFlip = -9; a.setDir(-side); v.setDir(side);
+    h.meeting = false;
+    this.formAnchor = v.position.clone();       // everyone else stays where they are
+  }
+
   // a painted animal leads the visitor somewhere close by ("follow me")
   async lead(i) {
     const h = this.hosts[i];

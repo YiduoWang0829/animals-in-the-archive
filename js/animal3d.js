@@ -259,7 +259,13 @@ export class Animal3D {
         p.copy(this.target);
         if (this.path?.length) { this.target = this.path.shift(); moving = true; heading = this.lastHeading; }
         else { this.target = null; this._arrive?.(); this._arrive = null; }
-      } else { heading = Math.atan2(d.x, d.z); this.lastHeading = heading; p.addScaledVector(d.normalize(), step); moving = true; }
+      } else {
+        heading = Math.atan2(d.x, d.z); this.lastHeading = heading;
+        // like a real animal: turn first, then walk (never shuffle backwards or sideways)
+        let off = heading - this.yaw; off = Math.atan2(Math.sin(off), Math.cos(off));
+        const k = Math.abs(off) > 0.6 ? 0 : Math.abs(off) > 0.3 ? 0.4 : 1;
+        p.addScaledVector(d.normalize(), step * k); moving = true;
+      }
     }
     // only settle into idle after a moment of standing still (no hitch between two walks)
     this.stillT = moving ? 0 : (this.stillT || 0) + dt;
@@ -290,7 +296,7 @@ export class Animal3D {
       if (Math.abs(off) > 0.85) want = this.yaw + off - Math.sign(off) * 0.85; else want = this.yaw;
     }
     let dy = want - this.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
-    this.yaw += dy * Math.min(1, dt * 6);
+    this.yaw += dy * Math.min(1, dt * (moving ? 7 : 5));
     this.inner.rotation.y = this.yaw;
     // hop arc
     if (this.hopT >= 0) {

@@ -287,7 +287,7 @@ function placeBubbles(g) {
     if (b.p.x - a.p.x < 300 && Math.abs(a.p.y - b.p.y) < 110) { a.p.x -= 150; b.p.x += 150; }
   }
   for (const { el, p } of items) {
-    const x = Math.max(170, Math.min(innerWidth - 170, p.x)), y = Math.max(150, p.y);
+    const x = Math.max(170, Math.min(innerWidth - 170, p.x)), y = Math.min(innerHeight - 120, Math.max(160, p.y));
     el.style.left = x + 'px'; el.style.top = y + 'px';
   }
 }
@@ -463,6 +463,7 @@ async function stepIn(g = gallery) {
   if (!alive()) return;
   state.inside = true;
   status(esc(tracker ? t('insideHint') : t('insideHintMouse')));
+  setTimeout(() => { if (gallery === g) status(''); }, 9000);
   controls(`<button class="btn primary cta" data-action="to-create">${esc(t('create'))}</button>`);
   insideStory(g, tok);
 }
@@ -495,16 +496,30 @@ async function insideStory(g, tok) {
     await speak('visitor', t('openWow'));
   }
   if (!alive()) return;
-  // getting to know each other: every question gets an answer
+  // getting to know each other: a different mix every visit, and every question is answered.
+  // Before each exchange the two walk towards each other.
   const life = t(`life.${kind}`), host = i => t(`hostLife.${hid(i)}`);
+  const cat = kind === 'drawing' ? 'drawing' : ['dog', 'cat', 'horse', 'cattle', 'alpaca', 'donkey', 'rabbit'].includes(kind) ? 'home' : 'wild';
+  const vQ = shuffled([0, 1, 2, 3, 4, 5, 6, 7]).slice(0, 3), hQ = shuffled([0, 1, 2, 3, 4, 5, 6, 7]).slice(0, 3);
+  const free = [...Array(H).keys()].filter(i => !state.hosts[i].inPlace);
+  const asker = n => free.length ? free[n % free.length] : 0;
   const pairs = [
-    [B, t('insideAskOut'), 'visitor', life[0]],
-    ['visitor', t('insideAskIn'), 0, host(0)[0]],
-    [B, t('insideAskEat'), 'visitor', life[1]],
-    ['visitor', t('insideAskDay'), B, host(B)[1]],
+    [asker(0), t('insideAskOut'), 'visitor', life[0]],
+    ['visitor', t('insideAskIn'), asker(0), host(asker(0))[0]],
+    ...vQ.flatMap((qi, n) => [
+      [asker(n + 1), t('askVisitor')[qi], 'visitor', t(`answerVisitor.${cat}`)[qi]],
+      ['visitor', t('askHost')[hQ[n]], asker(n), t(`answerHost.${state.work.id}`)[hQ[n]]],
+    ]),
+    ['visitor', t('insideAskDay'), asker(1), host(asker(1))[1]],
   ];
-  for (const [q, ql, a, al] of pairs) { if (!alive()) return; await speak(q, ql); await speak(a, al); }
-  if (H > 2) { await speak(2, host(2)[0]); await speak('visitor', pickLine(t('reactions'))); }
+  let lastHost = null;
+  for (const [q, ql, a, al] of pairs) {
+    if (!alive()) return;
+    const hostIdx = q === 'visitor' ? a : q;
+    if (hostIdx !== lastHost) { await g.meet(hostIdx); lastHost = hostIdx; }
+    await speak(q, ql); await speak(a, al);
+    if (Math.random() < 0.3) await speak(q, pickLine(t('reactions')));
+  }
   const friend = await askUser(0, t('insideAskFriend'));
   if (!alive()) return;
   if (friend) await speak(0, friend === 'yes' ? t('insideFriendYes') : t('insideFriendNo'));
@@ -620,19 +635,21 @@ function onGesture(g) {
 }
 function onHands(hs) {
   const view = document.querySelector('.view.is-active')?.id;
-  // inside the painting: pinch in the air to send the visitor there
+  // inside the painting, one hand is enough:
+  //   open palm = come closer · pinch and hold = step back · pinch and drag sideways = turn round
   if (view === 'view-stage' && gallery?.inside) {
-    const p = hs.find(h => h.pinch), open = hs.filter(h => h.open);
-    if (p && performance.now() - lastPinchWalk > 600) {
-      lastPinchWalk = performance.now();
-      tapInside(p.pinchX * 2 - 1, -(p.pinchY * 2 - 1));
-    }
-    if (open.length === 2) {                         // two hands: spread = come closer to your animal
-      const d = Math.hypot(open[0].x - open[1].x, open[0].y - open[1].y);
-      gallery.zoomTo((d - 0.3) * 1.6);
-    } else if (open.length === 1) {                  // one open hand: the view orbits your animal, following the hand
-      const h = open[0];
-      gallery.lookTo((h.x - 0.5) * 1.3, (0.5 - h.y) * 0.7);
+    const h = hs[0], now = performance.now(), dt = Math.min(0.1, (now - (onHands.last || now)) / 1000);
+    onHands.last = now;
+    if (!h) onHands.pinch = null;
+    else if (h.pinch) {
+      const ps = onHands.pinch ||= { x0: h.pinchX, last: h.pinchX, t0: now, moved: false };
+      const dx = h.pinchX - ps.last; ps.last = h.pinchX;
+      if (Math.abs(h.pinchX - ps.x0) > 0.035) ps.moved = true;
+      if (ps.moved) gallery.orbitBy(dx * 3.6);
+      else if (now - ps.t0 > 220) gallery.zoomBy(-dt * 1.1);
+    } else {
+      onHands.pinch = null;
+      if (h.open) gallery.zoomBy(dt * 1.1);
     }
   }
   if (view !== 'view-create' && !(view === 'view-stage' && gallery?.inside)) { $('#hand-cursor').hidden = $('#hand-cursor-2').hidden = true; return; }
