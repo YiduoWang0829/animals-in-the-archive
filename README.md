@@ -45,7 +45,12 @@ works. The camera only works on `localhost` or `https://`.
    from just behind and above. Zoom moves closer to or further from the animal, and
    looking around orbits it, so you never lose it. 3D animals turn their neck and head
    (rig bones) toward you or the speaker, with the body turning only as far as a real
-   animal would. The opening is a fixed little scene: startled, shy, polite, then
+   animal would, and always turn before they walk. Painted (2D) animals walk with a
+   stepping rhythm, breathe, and turn round rarely and smoothly. Every figure keeps its
+   own space and depth, so none of them overlap. Before each exchange the visitor and the
+   painted animal walk towards each other. The questions come from 64 lines, different
+   on every visit. One hand steers: open palm to come closer, pinch and hold to step
+   back, pinch and drag sideways to walk round. The opening is a fixed little scene: startled, shy, polite, then
    "Follow me!" / "Okay!". After that every question gets an answer. The painting becomes a
    depth relief you can explore: zoom in with the scroll wheel or by spreading two hands,
    pan with a drag or an open hand, and parallax follows your head. When you stop

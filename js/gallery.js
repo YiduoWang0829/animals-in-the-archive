@@ -482,6 +482,19 @@ export class Gallery {
       else if (!a.target) h.placed = true;
       if (!a.target) a.setDir(Math.sign(vp.x - a.position.x) || 1);
     });
+    // personal space: if two figures overlap at nearly the same depth, the painted one
+    // steps aside (and a little back), so no two flat figures ever share a spot
+    const crowd = [v, ...this.hosts.filter(h => h.awake && !h.host.inPlace).map(h => h.actor)];
+    for (let i = 0; i < crowd.length; i++) for (let j = i + 1; j < crowd.length; j++) {
+      const A = crowd[i], B = crowd[j], wa = this.widthOf(A), wb = this.widthOf(B);
+      const ov = Math.min(A.position.x + wa / 2, B.position.x + wb / 2) - Math.max(A.position.x - wa / 2, B.position.x - wb / 2);
+      if (ov <= 0.1 * Math.min(wa, wb) || Math.abs(A.position.z - B.position.z) > 0.14) continue;
+      const mover = B, sgn = Math.sign(B.position.x - A.position.x) || 1;
+      mover.position.x = THREE.MathUtils.clamp(mover.position.x + sgn * Math.min(ov, 0.02), -this.pw / 2 + wb / 2, this.pw / 2 - wb / 2);
+      mover.position.z = Math.max(-this.paintU.uDepth.value * 0.6, mover.position.z - 0.006);
+      mover.position.y = this.groundY(mover.position.z);
+      if (mover.target) { mover.target.x += sgn * Math.min(ov, 0.02); }
+    }
     // draw order follows depth: nearer figures are drawn last (no flicker)
     const all = [v, ...this.hosts.map(h => h.actor)];
     const wp = new THREE.Vector3();
@@ -493,7 +506,7 @@ export class Gallery {
     const h = this.hosts[i];
     if (!h || !h.awake || h.host.inPlace) return;
     const v = this.visitor, a = h.actor, vp = v.position.clone();
-    const side = Math.sign(a.position.x - vp.x) || 1, gap = (this.widthOf(v) + this.widthOf(a)) / 2 + 0.06;
+    const side = Math.sign(a.position.x - vp.x) || 1, gap = (this.widthOf(v) + this.widthOf(a)) / 2 + 0.1;
     const mid = vp.clone().lerp(a.position, 0.35);
     const vT = new THREE.Vector3(mid.x - side * gap * 0.5, 0, THREE.MathUtils.clamp(mid.z, -this.paintU.uDepth.value * 0.5, 0.42));
     vT.y = this.groundY(vT.z);
