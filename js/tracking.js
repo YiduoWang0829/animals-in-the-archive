@@ -60,9 +60,10 @@ export class Tracker {
     const v = this.video, now = performance.now();
     // ~30 detections a second in total (hands and face alternate), so the 3D scene
     // keeps most of each frame for itself
-    if (v.readyState >= 2 && v.currentTime !== this.lastT && now - (this.lastRun || 0) > 33) {
+    // hands twice as often as the face: hands steer, the face only nods and shakes
+    if (v.readyState >= 2 && v.currentTime !== this.lastT && now - (this.lastRun || 0) > 22) {
       this.lastT = v.currentTime; this.lastRun = now;
-      if (this.frame++ % 2 === 0) this.detectFace(now); else this.detectHands(now);
+      if (this.frame++ % 3 === 0) this.detectFace(now); else this.detectHands(now);
     }
     this.raf = requestAnimationFrame(() => this.loop());
   }
@@ -121,7 +122,8 @@ export class Tracker {
       for (const p of prev) { const d = Math.hypot(p.rawX - h.x, p.rawY - h.y); if (d < bd) { bd = d; best = p; } }
       h.rawX = h.x; h.rawY = h.y;
       if (best) {
-        const k = 0.45;                                   // 0 = frozen, 1 = raw
+        // adaptive smoothing: steady when the hand is still, quick when it moves
+        const k = Math.min(0.9, 0.3 + Math.hypot(h.x - best.x, h.y - best.y) * 9);
         h.x = best.x + (h.x - best.x) * k; h.y = best.y + (h.y - best.y) * k;
         h.pinchX = best.pinchX + (h.pinchX - best.pinchX) * k; h.pinchY = best.pinchY + (h.pinchY - best.pinchY) * k;
         h.pinch = best.pinch ? h.pinchDist < 0.5 : h.pinchDist < 0.32;

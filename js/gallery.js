@@ -270,6 +270,21 @@ export class Gallery {
       for (const a of [this.visitor, ...this.hosts.map(h => h.actor)]) { a.group.getWorldPosition(p); a.setSpot?.(p); }
       this.liveInside(dt);
     }
+    // where the visitor looks: at you when talking to you, otherwise at whoever speaks
+    const v = this.visitor;
+    if ('gazeAt' in v || v.aimChain) {
+      if (v.attending) {
+        // looking at you, and following your hand if you raise one
+        const c = this.camera, g = c.position.clone();
+        if (this.handGaze) {
+          const right = new THREE.Vector3(1, 0, 0).applyQuaternion(c.quaternion), up = new THREE.Vector3(0, 1, 0).applyQuaternion(c.quaternion);
+          g.addScaledVector(right, (this.handGaze.x - 0.5) * 2.2).addScaledVector(up, (0.5 - this.handGaze.y) * 1.4);
+        }
+        v.gazeAt = g;
+      }
+      else if (this.gazeHost != null && this.hosts[this.gazeHost]?.awake) v.gazeAt = this.hosts[this.gazeHost].actor.topWorld();
+      else v.gazeAt = null;
+    }
     this.visitor.update(dt, t);
     for (const h of this.hosts) h.actor.update(dt, t);
     this.updateCamera();
@@ -290,38 +305,47 @@ export class Gallery {
       cam.lookAt(this.camLook);
       return;
     }
-    // inside: zoom moves you into the picture; looking around pans across it.
-    // The pan is limited so the edge of the painting never comes into view.
-    v.zoom += (v.tz - v.zoom) * 0.08;
-    const D = Math.max(0.2, this.viewDist - v.zoom);          // distance to the picture plane
-    const halfH = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * D, halfW = halfH * cam.aspect;
-    const maxX = Math.max(0, this.pw / 2 * 0.88 - halfW), maxY = Math.max(0, this.ph / 2 * 0.9 - halfH);
-    v.ty = THREE.MathUtils.clamp(v.ty, -maxX, maxX); v.tp = THREE.MathUtils.clamp(v.tp, -maxY, maxY);
-    // keep the visitor in view: when you are not steering, the view drifts back to it
-    if (this.follow && (this.simT || 0) - (this.lastLook || -99) > 2.5) {
-      const vp = this.visitor.position;
-      v.ty += (vp.x - v.ty) * 0.04; v.tp += (vp.y + this.visitor.height * 0.6 - v.tp) * 0.04;
-      v.ty = THREE.MathUtils.clamp(v.ty, -maxX, maxX); v.tp = THREE.MathUtils.clamp(v.tp, -maxY, maxY);
+    // inside: a follow camera. It stays with your animal, just behind and above it,
+    // looking where it looks. Zoom = closer to the animal; looking around = orbiting it.
+    if (!this.follow) {                      // the walk-in zoom: scripted camera move
+      cam.position.lerp(this.camBase, 0.12); cam.lookAt(this.camLook); return;
     }
-    v.yaw += (v.ty - v.yaw) * 0.08; v.pitch += (v.tp - v.pitch) * 0.08;
-    const pos = this.camBase.clone();
-    pos.x += v.yaw + px.x * 0.1 * (maxX > 0.05 ? 1 : 0.4);
-    pos.y += v.pitch + px.y * 0.05;
-    pos.z -= v.zoom;
-    cam.position.lerp(pos, 0.15);
-    // a slight turn toward where you are looking gives the depth its parallax
-    const look = new THREE.Vector3(pos.x + v.yaw * 0.25, pos.y + v.pitch * 0.25, pos.z - 1);
-    cam.lookAt(look);
+    v.yaw += (v.ty - v.yaw) * 0.1; v.pitch += (v.tp - v.pitch) * 0.1; v.zoom += (v.tz - v.zoom) * 0.1;
+    const vis = this.visitor, T = new THREE.Vector3();
+    vis.group.getWorldPosition(T);
+    T.y += vis.height * 0.55;
+    const base = Math.max(vis.height * 3.2, (this.viewDist || 2) * 0.62);
+    const D = THREE.MathUtils.clamp(base * (1 - v.zoom), vis.height * 2.2, base * 1.25);
+    const pitch = 0.16 + v.pitch;
+    const want = new THREE.Vector3(T.x + Math.sin(v.yaw) * Math.cos(pitch) * D, T.y + Math.sin(pitch) * D, T.z + Math.cos(v.yaw) * Math.cos(pitch) * D);
+    // keep the picture's edges out of view
+    const planeZ = this.paintGroup.position.z, dPlane = Math.max(0.2, want.z - planeZ);
+    const halfH = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * dPlane, halfW = halfH * cam.aspect;
+    const cx = this.paintGroup.position.x, cy = this.paintGroup.position.y;
+    want.x = THREE.MathUtils.clamp(want.x, cx - Math.max(0, this.pw / 2 * 0.92 - halfW), cx + Math.max(0, this.pw / 2 * 0.92 - halfW));
+    want.y = THREE.MathUtils.clamp(want.y, cy - Math.max(0, this.ph / 2 * 0.92 - halfH), cy + Math.max(0, this.ph / 2 * 0.92 - halfH));
+    want.x += px.x * 0.04; want.y += px.y * 0.03;                     // a touch of head parallax
+    cam.position.lerp(want, 0.08);
+    this.lookAtPt = (this.lookAtPt || T.clone()).lerp(new THREE.Vector3(T.x, T.y, T.z - 0.15), 0.12);
+    cam.lookAt(this.lookAtPt);
   }
 
   // ---- VR-style controls inside the painting (mouse drag, wheel, head, hands)
-  look(dx, dy) {                       // pan across the picture (metres-ish units)
+  // orbit around your animal (relative, e.g. a mouse drag) …
+  look(dx, dy) {
     if (!this.inside) return;
-    this.view.ty += dx * 1.6; this.view.tp += dy * 1.6; this.lastLook = this.simT || 0;
+    this.view.ty = THREE.MathUtils.clamp(this.view.ty - dx * 3.2, -0.6, 0.6);
+    this.view.tp = THREE.MathUtils.clamp(this.view.tp + dy * 2.4, -0.12, 0.45);
   }
+  // … or directly to an angle (e.g. where your open hand is)
+  lookTo(yaw, pitch) {
+    if (!this.inside) return;
+    this.view.ty = THREE.MathUtils.clamp(yaw, -0.6, 0.6); this.view.tp = THREE.MathUtils.clamp(pitch, -0.12, 0.45);
+  }
+  zoomTo(z) { if (this.inside) this.view.tz = THREE.MathUtils.clamp(z, -0.25, 0.6); }
   zoomBy(d) {
     if (!this.inside) return;
-    this.view.tz = THREE.MathUtils.clamp(this.view.tz + d, -0.25, this.maxZoom || 1); this.lastLook = this.simT || 0;
+    this.view.tz = THREE.MathUtils.clamp(this.view.tz + d, -0.25, 0.6);
   }
 
   // screen position (CSS px) of a world point, for speech bubbles
@@ -450,6 +474,22 @@ export class Gallery {
       const near = this.hosts.filter(h => h.awake).sort((p, q) => p.actor.position.distanceTo(vp) - q.actor.position.distanceTo(vp))[0];
       v.setDir(Math.sign(near.actor.position.x - vp.x) || 1);
     }
+  }
+  // a painted animal leads the visitor somewhere close by ("follow me")
+  async lead(i) {
+    const h = this.hosts[i];
+    if (!h || h.host.inPlace) return;
+    const vp = this.visitor.position;
+    const z = THREE.MathUtils.clamp(vp.z - 0.35, -this.paintU.uDepth.value * 0.5, 0.4);
+    const x = THREE.MathUtils.clamp(vp.x + (vp.x > 0 ? -0.5 : 0.5), -this.pw / 2 + 0.25, this.pw / 2 - 0.25);
+    h.called = true;
+    const dest = new THREE.Vector3(x, this.groundY(z), z);
+    const go = h.actor.walkTo(dest, 0.35);
+    await this.wait(0.7);
+    const follow = dest.clone(); follow.x += vp.x > x ? 0.3 : -0.3; follow.z += 0.12; follow.y = this.groundY(follow.z);
+    await Promise.all([go, this.visitor.walkTo(follow, 0.35)]);
+    h.actor.setDir(Math.sign(this.visitor.position.x - h.actor.position.x) || 1);
+    h.called = false;
   }
   // everyone (or one) turns to face you, the person in front of the screen
   attendAll(on, only = null) {

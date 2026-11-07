@@ -435,3 +435,5 @@ body.in-studio .footer { display: none; }
 .name-field input { background: none; border: 0; border-bottom: 1px solid var(--line-2); color: var(--ink); font: 400 22px var(--serif); width: 8.5em; padding: 4px 2px; outline: none; }
 .name-field input:focus { border-color: var(--accent); }
 @media (max-width: 760px) { .studio-cta { flex-wrap: wrap; } .name-field { order: -1; width: 100%; justify-content: center; } }
+
+.hand-cursor { transition: left .07s linear, top .07s linear, background .15s, transform .15s; }

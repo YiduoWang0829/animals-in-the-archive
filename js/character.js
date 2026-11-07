@@ -297,7 +297,7 @@ export class Character {
   }
   lookTurn(a) { this.mesh.rotation.y = a; this.lookTarget = undefined; }
   // a flat figure cannot face you, so it half-turns towards you and lifts its head
-  attend(on) { this.attending = on; this.lookTarget = on ? 0.5 * -this.dir : 0; if (on) this.nod(1); }
+  attend(on) { this.attending = on; if (on) this.nod(1); }
   get lookAngle() { return this.mesh.rotation.y; }
 
   dispose() {

@@ -140,8 +140,15 @@ export class Animal3D {
     this.root.position.y = -box.min.y * s;
     this.length = (box.max.z - box.min.z) * s;
     this.uniforms.uOutline.value = 0.0035;        // outline thickness (fraction of the screen)
-    this.head = null;
-    this.root.traverse(o => { if (o.isBone && !this.head && /head/i.test(o.name)) this.head = o; });
+    // neck and head bones, with the direction each one "faces" in the rest pose
+    // (the model faces +z), so the head can be aimed at a point anatomically
+    const byName = n => { let b = null; this.root.traverse(o => { if (!b && o.isBone && o.name === n) b = o; }); return b; };
+    this.head = byName('Head');
+    this.neck = ['Neck2', 'Neck3', 'Neck'].map(byName).filter(Boolean);
+    this.aimChain = [...this.neck.map(b => ({ b, share: 0.3, limit: 0.35 })), ...(this.head ? [{ b: this.head, share: 1, limit: 0.75 }] : [])];
+    this.root.updateMatrixWorld(true);
+    const qw = new THREE.Quaternion();
+    for (const c of this.aimChain) c.fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(c.b.getWorldQuaternion(qw).invert());
 
     // animations
     this.mixer = new THREE.AnimationMixer(this.root);
@@ -200,7 +207,7 @@ export class Animal3D {
   addTo(scene) { scene.add(this.group); scene.add(this.shadow); return this; }
   setDir(d) { this.dir = d; }
   // turn to face the person in front of the screen (+z), slightly towards where they are
-  attend(on, side = 0) { this.attending = on; this.attendYaw = side * 0.35; }
+  attend(on) { this.attending = on; }
   lookTurn(a) { this.lookA = a; }
   get lookAngle() { return this.lookA; }
   setPaint(style, frameRect, wallZ) {
@@ -243,7 +250,8 @@ export class Animal3D {
     if (this.target) {
       const running = this.running || this.speed > natW * 2.4;
       this.gaitRun = running;
-      this.effSpeed = Math.min(this.speed, (running ? natR : natW) * 1.5);
+      // a normal pace: about two of its own animation strides per second of travel
+      this.effSpeed = Math.min(this.speed, (running ? natR * 1.6 : natW * 2.3));
     }
     if (this.target) {
       const d = this.target.clone().sub(p), dist = d.length(), step = this.effSpeed * dt;
@@ -259,7 +267,7 @@ export class Animal3D {
     if (moving || this.stillT < 0.18) {
       if (moving) {
         this.play(this.gaitRun ? 'run' : 'walk', 0.3);
-        this.current.timeScale = THREE.MathUtils.clamp(this.effSpeed / (this.gaitRun ? natR : natW), 0.5, 1.6);
+        this.current.timeScale = THREE.MathUtils.clamp(this.effSpeed / (this.gaitRun ? natR : natW) * 0.78, 0.6, 1.8);
       }
     } else {
       this.idleT -= dt;
@@ -274,7 +282,13 @@ export class Animal3D {
     // facing: travel heading while moving, else side-on (dir), plus a turn towards the viewer
     let want = (heading ?? (this.dir > 0 ? Math.PI / 2 : -Math.PI / 2)) + this.lookA * 1.8 * this.dir;
     if (!moving && this.faceYaw !== undefined && this.faceYaw !== null) want = this.faceYaw;
-    if (!moving && this.attending) want = this.attendYaw || 0;
+    if (!moving && this.gazeAt) {
+      const lp = this.group.parent ? this.group.parent.worldToLocal(this.gazeAt.clone()) : this.gazeAt;
+      const toward = Math.atan2(lp.x - p.x, lp.z - p.z);
+      let off = toward - this.yaw; off = Math.atan2(Math.sin(off), Math.cos(off));
+      // like a real animal: the body turns only until the head can reach (≤ ~50°)
+      if (Math.abs(off) > 0.85) want = this.yaw + off - Math.sign(off) * 0.85; else want = this.yaw;
+    }
     let dy = want - this.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
     this.yaw += dy * Math.min(1, dt * 6);
     this.inner.rotation.y = this.yaw;
@@ -284,14 +298,49 @@ export class Animal3D {
       if (this.hopT >= 1) { this.hopT = -1; this.hop = 0; }
     }
     this.inner.position.y = this.hop;
-    // nod: add a little head pitch on top of the animation
+    // head: aim at the look target on top of the animation, then nod
+    this.aimW += ((this.gazeAt ? 1 : 0) - (this.aimW || 0)) * Math.min(1, dt * 5);
+    if (this.aimW > 0.01 && this.aimChain.length) this.aim(this.gazeAt || this.lastLook, this.aimW);
+    if (this.gazeAt) this.lastLook = this.gazeAt.clone();
     if (this.nodT !== undefined && this.head) {
       this.nodT += dt * 4;
-      this.head.rotation.x += Math.sin(this.nodT * Math.PI) * 0.35;
+      this.tilt(this.head, Math.sin(this.nodT * Math.PI) * 0.3);
       if (this.nodT >= this.nodN) this.nodT = undefined;
     }
     this.shadow.position.set(p.x, (this.ground ? this.ground(p.x, p.z) : p.y) + 0.004, p.z + 0.02);
     this.shadow.material.opacity = 1 - Math.min(0.7, this.hop * 3);
+  }
+
+  // rotate neck and head bones (in world space) so the face points at `target`,
+  // each bone taking a share of the turn and never past its natural limit
+  aim(target, weight) {
+    if (!target) return;
+    this.group.updateMatrixWorld(true);
+    const hp = new THREE.Vector3(), q = new THREE.Quaternion(), pq = new THREE.Quaternion(), id = new THREE.Quaternion();
+    this.head.getWorldPosition(hp);
+    const want = target.clone().sub(hp).normalize();
+    for (const c of this.aimChain) {
+      c.b.getWorldQuaternion(q);
+      const f = c.fwd.clone().applyQuaternion(q);
+      const r = new THREE.Quaternion().setFromUnitVectors(f, want);
+      const ang = 2 * Math.acos(Math.min(1, Math.abs(r.w)));
+      const k = Math.min(c.share, ang > 1e-4 ? c.limit / ang : 1) * weight;
+      r.copy(id).slerp(r, k);
+      c.b.parent.getWorldQuaternion(pq);
+      c.b.quaternion.copy(pq.invert().multiply(r.multiply(q)));
+      c.b.updateMatrixWorld(true);
+    }
+  }
+  // tip a bone forward/back around its own sideways axis (a real nod)
+  tilt(b, angle) {
+    const q = new THREE.Quaternion(), pq = new THREE.Quaternion();
+    b.getWorldQuaternion(q);
+    const rest = this.aimChain.find(c => c.b === b)?.fwd || new THREE.Vector3(0, 0, 1);
+    const fwd = rest.clone().applyQuaternion(q).normalize();
+    const side = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 1, 0)).normalize();
+    const r = new THREE.Quaternion().setFromAxisAngle(side, angle);
+    b.parent.getWorldQuaternion(pq);
+    b.quaternion.copy(pq.invert().multiply(r.multiply(q)));
   }
 
   dispose() {

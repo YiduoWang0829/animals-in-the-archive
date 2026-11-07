@@ -363,6 +363,7 @@ function speak(who, text, { pause = 350 } = {}) {
   const run = speechLock.then(async () => {
     if (tok !== storyToken || !gallery) return;
     gallery.actorOf(who)?.nod?.(1);
+    if (who !== 'visitor') gallery.gazeHost = who;         // the visitor turns its head to the speaker
     say(who, speakerName(who), fill(text), 0);
     await sleep(1500 + fill(text).length * 48);
     bubbles.get(who)?.classList.remove('show');
@@ -472,24 +473,38 @@ async function insideStory(g, tok) {
   const alive = () => g === gallery && tok === storyToken && g.inside;
   const x = W(state.work.id), kind = kindOf();
   const H = state.hosts.length, hid = i => state.hosts[i % H].id;
+  const B = H > 1 ? 1 : 0;
   await sleep(1200);
   if (!alive()) return;
+  // the opening: a fixed little scene the visitor does not steer
   await g.startle();
   await speak(0, t('insideStartled'));
-  await speak(0, t('insideMoved', { date: x.date.replace(/^c\. /, '') }));
-  for (let i = 0; i < H; i++) { g.wakeHost(i); await sleep(500); }
+  await speak(0, t('openShy'));
+  await speak('visitor', t('openSorry'));
+  await speak(B, t('openWhisper'));
+  await speak('visitor', t('openFriendly'));
+  for (let i = 0; i < H; i++) { g.wakeHost(i); await sleep(400); }
   state.hostAwake = true;
-  await speak('visitor', t('insideHello'));
+  const leader = state.hosts.findIndex(h => !h.inPlace);
+  if (leader >= 0) {
+    await speak(leader, t('openFollow'));
+    await speak('visitor', t('openOkay'));
+    if (!alive()) return;
+    await g.lead(leader);
+    await speak(leader, t('openHere'));
+    await speak('visitor', t('openWow'));
+  }
+  if (!alive()) return;
+  // getting to know each other: every question gets an answer
   const life = t(`life.${kind}`), host = i => t(`hostLife.${hid(i)}`);
-  const B = H > 1 ? 1 : 0;
-  const script = [
-    [B, t('insideAskOut')], ['visitor', life[0]],
-    ['visitor', t('insideAskIn')], [0, host(0)[0]],
-    [B, t('insideAskEat')], ['visitor', life[1]],
-    ['visitor', t('insideAskDay')], [B, host(B)[1]],
-    ...(H > 2 ? [[2, host(2)[0]]] : []),
+  const pairs = [
+    [B, t('insideAskOut'), 'visitor', life[0]],
+    ['visitor', t('insideAskIn'), 0, host(0)[0]],
+    [B, t('insideAskEat'), 'visitor', life[1]],
+    ['visitor', t('insideAskDay'), B, host(B)[1]],
   ];
-  for (const [who, line] of script) { if (!alive()) return; await speak(who, line); }
+  for (const [q, ql, a, al] of pairs) { if (!alive()) return; await speak(q, ql); await speak(a, al); }
+  if (H > 2) { await speak(2, host(2)[0]); await speak('visitor', pickLine(t('reactions'))); }
   const friend = await askUser(0, t('insideAskFriend'));
   if (!alive()) return;
   if (friend) await speak(0, friend === 'yes' ? t('insideFriendYes') : t('insideFriendNo'));
@@ -501,7 +516,7 @@ async function insideStory(g, tok) {
 // inside the painting: a steady, readable conversation around the visitor
 async function insideLife(g, tok) {
   const alive = () => g === gallery && tok === storyToken && g.inside;
-  const qa = shuffled(t('qa').slice(1, 7)), ask = shuffled(t('askYou')), toYou = shuffled(t('visitorToYou'));
+  const qa = shuffled(t('qa').slice(1, 7)), ask = shuffled(t('askYou')), toYou = shuffled(t('visitorAskYou'));
   const chorus = shuffled(W(state.work.id).chorus);
   const awake = () => state.hosts.map((h, i) => i).filter(i => g.hosts[i].awake);
   let n = 0;
@@ -523,10 +538,10 @@ async function insideLife(g, tok) {
       const a = await askUser(i, q);
       if (a) await speak(i, a === 'yes' ? yes : no);
     } else if (kind === 'you' && toYou.length) {
-      g.visitor.attend(true);
-      await speak('visitor', toYou.shift());
-      g.visitor.attend(false);
-    } else if (chorus.length) await speak(i, chorus.shift());
+      const [q, yes, no] = toYou.shift();
+      const a = await askUser('visitor', q);
+      if (a) await speak('visitor', a === 'yes' ? yes : no);
+    } else if (chorus.length) { await speak(i, chorus.shift()); await speak('visitor', pickLine(t('reactions'))); }
     else if (!qa.length && !ask.length) { await sleep(6000); }
   }
 }
@@ -534,6 +549,7 @@ async function insideLife(g, tok) {
 // per frame: parallax from your head (or the mouse) and the host's role reaction
 let pointer = null, drag = null;
 function stageFrame(g) {
+  g.handGaze = hands[0] ? { x: hands[0].x, y: hands[0].y } : null;
   if (face) g.parallax.set((face.x - 0.5) * 2.2, -(face.y - 0.45) * 2.2);
   else if (pointer && !g.inside) g.parallax.set(pointer[0], pointer[1]);
   if (!state.hostAwake || g.inside) return;
@@ -611,16 +627,12 @@ function onHands(hs) {
       lastPinchWalk = performance.now();
       tapInside(p.pinchX * 2 - 1, -(p.pinchY * 2 - 1));
     }
-    if (open.length === 2) {                         // two hands apart = zoom in, together = out
+    if (open.length === 2) {                         // two hands: spread = come closer to your animal
       const d = Math.hypot(open[0].x - open[1].x, open[0].y - open[1].y);
-      if (onHands.zd) gallery.zoomBy((d - onHands.zd) * 2.2);
-      onHands.zd = d;
-    } else {
-      onHands.zd = null;
-      if (open.length === 1) {                       // one open hand = look around, like a joystick
-        const h = open[0], dz = v => Math.abs(v) < 0.12 ? 0 : v - Math.sign(v) * 0.12;   // dead zone in the middle
-        gallery.look(dz(h.x - 0.5) * 0.08, -dz(h.y - 0.5) * 0.05);
-      }
+      gallery.zoomTo((d - 0.3) * 1.6);
+    } else if (open.length === 1) {                  // one open hand: the view orbits your animal, following the hand
+      const h = open[0];
+      gallery.lookTo((h.x - 0.5) * 1.3, (0.5 - h.y) * 0.7);
     }
   }
   if (view !== 'view-create' && !(view === 'view-stage' && gallery?.inside)) { $('#hand-cursor').hidden = $('#hand-cursor-2').hidden = true; return; }

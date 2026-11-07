@@ -74,20 +74,20 @@
  "eden-lion": {
   "work": "eden",
   "name": "lion",
-  "w": 238,
-  "h": 259
+  "w": 233,
+  "h": 260
  },
  "eden-horse": {
   "work": "eden",
   "name": "white horse",
-  "w": 162,
-  "h": 207
+  "w": 154,
+  "h": 201
  },
  "eden-deer": {
   "work": "eden",
   "name": "stag",
-  "w": 212,
-  "h": 307
+  "w": 201,
+  "h": 293
  },
  "eden-rabbit": {
   "work": "eden",
@@ -98,25 +98,25 @@
  "eden-dog": {
   "work": "eden",
   "name": "little dog",
-  "w": 188,
-  "h": 211
+  "w": 186,
+  "h": 200
  },
  "eden-peacock": {
   "work": "eden",
   "name": "peacock",
-  "w": 424,
+  "w": 436,
   "h": 524
  },
  "durer-dog": {
   "work": "durer",
   "name": "hound",
-  "w": 821,
+  "w": 878,
   "h": 538
  },
  "durer-horse": {
   "work": "durer",
   "name": "knight\u2019s horse",
-  "w": 792,
+  "w": 791,
   "h": 900
  },
  "marc-deer": {

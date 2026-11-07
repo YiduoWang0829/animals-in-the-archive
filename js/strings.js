@@ -214,6 +214,23 @@ export const STRINGS = {
     insideFriendNo: 'Then they must visit us often.',
     insideLeave: 'I’ll have to go back to my world one day. But I’ll remember this.',
     insideRemember: 'And we will remember the one who moved.',
+
+    // ---- inside: the opening (fixed script, about six lines) ----
+    openShy: 'Oh! Um… hello. Nobody has ever walked in here before.',
+    openSorry: 'Hello! I’m {name}. I’m sorry, I didn’t mean to scare you.',
+    openWhisper: 'Is it… friendly?',
+    openFriendly: 'Very friendly! I just wanted to see your world.',
+    openFollow: 'Then come, I’ll show you around. Follow me!',
+    openOkay: 'Okay, I’m right behind you!',
+    openHere: 'This is my favourite spot. You can see the whole picture from here.',
+    openWow: 'It’s beautiful. Thank you for showing me.',
+    reactions: ['Really? I never knew that.', 'That sounds wonderful.', 'Wow. I’ll remember that.', 'Oh! Tell me more another time.', 'How strange, and how lovely.'],
+    visitorAskYou: [
+      ['Can you see the little animals at the back?', 'I knew you’d spot them!', 'Look behind the big trees. There!'],
+      ['Shall I stay a little longer?', 'Then I will. It’s so nice in here.', 'Just a little, then. I want to see one more thing.'],
+      ['Are you having fun out there?', 'Me too! Thank you for bringing me.', 'Then let’s find something more exciting!'],
+      ['Do I look painted now?', 'I feel very old and very golden.', 'Good. I still want to look like me.'],
+    ],
     welcomeInside: 'Welcome inside, {name}. Stay close to us.',
     insideHint: 'You are inside the painting. Move an open hand to look around, spread two hands to zoom in, pinch to walk there, pinch an animal to call it. Wave and they wave back.',
     insideHintMouse: 'You are inside the painting. Drag to look around, scroll to zoom, click the ground to walk there, click an animal to call it.',
