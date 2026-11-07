@@ -33,21 +33,22 @@ works. The camera only works on `localhost` or `https://`.
    watercolour character. DoodleNet suggests the nearest 3D animal, with its real score.
    Or choose one of 11 rigged 3D animals, shown on a turntable that walks, runs, stands or
    grazes, in a Natural or Storybook (ink outline) look, or one of 13 storybook animals.
-5. **Gallery.** The animal walks in using its own walk or gallop animation, turns to face
-   you and says hello. With the camera on, wave and it waves back; click it to greet it.
-   Two or three painted animals, chosen at random each visit, wake up, step out of their
-   places (the ground behind them was repainted) and talk with the visitor. They ask its
-   name, and one asks you "Do you like this painting?". All talk is one line at a time,
-   in order. Questions to you wait, with everyone turned towards you, until you nod or
-   shake your head (or click Yes or No).
-   On "yes" the animal climbs the steps below the frame and walks into the painting,
-   with the camera following behind it.
+5. **Gallery.** Only your animal and you. The painting hangs still on the wall. The animal
+   walks in with its own walk cycle; the playback speed matches its stride, so the feet
+   stay planted. It turns to you and says hello (wave with the camera on, or click it).
+   It reads the wall label aloud with two facts about the work, looks at the painting,
+   and tells you whether an animal like it is painted there. It asks whether you like the
+   painting, then whether to go in. On yes it walks in one continuous path: up the three
+   steps and across the frame, while the view opens into the picture. All talk is one
+   line at a time, and questions wait for your nod, shake or click.
 6. **Inside the painting.** The camera passes through the frame. The painting becomes a
    depth relief you can explore: zoom in with the scroll wheel or by spreading two hands,
    pan with a drag or an open hand, and parallax follows your head. When you stop
-   steering, the view drifts back to your animal. The painted animals gather in a loose
-   circle round it, run to catch up when it walks, and keep a steady conversation going:
-   they ask it questions, and ask you yes/no questions they wait for. There are about 70
+   steering, the view drifts back to your animal. Two or three painted animals, chosen
+   at random, start as paint, freeze, stare at the newcomer ("…?") and come alive. Then
+   the two worlds compare lives: the visitor describes how its kind lives (18 kinds), and
+   each painted animal describes its life in the picture (10 animals). After that they
+   gather round it and keep talking, with yes/no questions for you that wait. There are about 70
    lines in `js/strings.js`. The visitor takes on the painting's manner.
 7. **Create.** Two options:
    - **Monument (3D):** the painting carved in relief, with the visitor and painted
