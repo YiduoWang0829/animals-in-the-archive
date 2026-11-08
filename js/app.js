@@ -485,7 +485,7 @@ async function insideStory(g, tok) {
   await speak(0, t('insideStartled'));
   await speak(0, t('openShy'));
   await speak('visitor', t('openSorry'));
-  await speak(B, t('openWhisper'));
+  await speak(B, t(H > 1 ? 'openWhisper' : 'openWhisperSolo'));
   await speak('visitor', t('openFriendly'));
   for (let i = 0; i < H; i++) { g.wakeHost(i); await sleep(400); }
   state.hostAwake = true;

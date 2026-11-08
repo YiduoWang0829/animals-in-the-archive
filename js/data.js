@@ -11,6 +11,7 @@ export const WORKS = [
     size: [2400, 1550], realWidth: 2.3,
     hosts: ['eden-lion', 'eden-horse', 'eden-deer', 'eden-rabbit', 'eden-dog', 'eden-peacock'],
     kinds: ['lion', 'tiger', 'horse', 'deer', 'dog', 'cat', 'rabbit', 'cattle', 'bird'],   // animal kinds painted in it
+    ground: [0.2, 0.22],      // where the painted ground is: height (fraction of the picture) at the front, rise with depth
     wall: 0x2a2622,
   },
   {
@@ -21,6 +22,7 @@ export const WORKS = [
     size: [1847, 2400], realWidth: 1.45,
     hosts: ['durer-horse', 'durer-dog'],
     kinds: ['horse', 'dog'],
+    ground: [0.035, 0.08],    // the road runs along the bottom edge
     wall: 0x24231f,
   },
   {
@@ -31,6 +33,7 @@ export const WORKS = [
     size: [2385, 1783], realWidth: 2.4,
     hosts: ['marc-deer', 'marc-boar'],
     kinds: ['deer'],
+    ground: [0.06, 0.14],
     wall: 0x22252a,
   },
 ];

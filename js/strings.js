@@ -219,6 +219,7 @@ export const STRINGS = {
     openShy: 'Oh! Um… hello. Nobody has ever walked in here before.',
     openSorry: 'Hello! I’m {name}. I’m sorry, I didn’t mean to scare you.',
     openWhisper: 'Is it… friendly?',
+    openWhisperSolo: 'Are you… friendly?',
     openFriendly: 'Very friendly! I just wanted to see your world.',
     openFollow: 'Then come, I’ll show you around. Follow me!',
     openOkay: 'Okay, I’m right behind you!',

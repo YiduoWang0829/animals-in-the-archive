@@ -199,11 +199,12 @@ export class Gallery {
       const a = new Character(sprite, { height: hh, headSide: host.faces });
       a.shadow.visible = false;
       this.paintGroup.add(a.group); this.paintGroup.add(a.shadow);
-      const home = this.paintPoint((bx0 + bx1) / 2 / W, 1 - by1 / H, 0.004);
+      const homeUV = [(bx0 + bx1) / 2 / W, 1 - by1 / H];
+      const home = this.paintPoint(homeUV[0], homeUV[1], 0.004);
       a.position.copy(home);
       a.setDir(host.faces === 'right' ? 1 : -1, true);
       a.mesh.renderOrder = 3;
-      this.hosts.push({ actor: a, host, meta, home, awake: false, away: false, next: rand(2, 5), patch: null });
+      this.hosts.push({ actor: a, host, meta, home, homeUV, awake: false, away: false, next: rand(2, 5), patch: null });
     }
 
     // ---- loop --------------------------------------------------------------
@@ -325,7 +326,12 @@ export class Gallery {
     want.y = THREE.MathUtils.clamp(want.y, cy - Math.max(0, this.ph / 2 * 0.92 - halfH), cy + Math.max(0, this.ph / 2 * 0.92 - halfH));
     want.x += px.x * 0.04; want.y += px.y * 0.03;                     // a touch of head parallax
     cam.position.lerp(want, 0.08);
-    this.lookAtPt = (this.lookAtPt || T.clone()).lerp(new THREE.Vector3(T.x, T.y, T.z - 0.15), 0.12);
+    // look at the animal, but never tilt so far that the edge of the picture shows
+    const lyMin = cy - this.ph / 2 + halfH * 0.95, lyMax = cy + this.ph / 2 - halfH * 0.95;
+    const ly = lyMin < lyMax ? THREE.MathUtils.clamp(T.y, lyMin, lyMax) : cy;
+    const lxMin = cx - this.pw / 2 + halfW * 0.95, lxMax = cx + this.pw / 2 - halfW * 0.95;
+    const lx = lxMin < lxMax ? THREE.MathUtils.clamp(T.x, lxMin, lxMax) : cx;
+    this.lookAtPt = (this.lookAtPt || T.clone()).lerp(new THREE.Vector3(lx, ly, T.z - 0.15), 0.12);
     cam.lookAt(this.lookAtPt);
   }
 
@@ -402,6 +408,7 @@ export class Gallery {
     this.revealGround(h);
     h.actor.ground = (x, z) => this.groundY(z);
     h.actor.shadow.visible = true;
+    h.actor.walkTo(this.spot(h.actor.position.x, h.actor.position.z + 0.1, h.actor), 0.35);
   }
   async hostsRefuse() {}
 
@@ -429,7 +436,14 @@ export class Gallery {
     const h0 = v.height, ref = this.hosts.find(h => !h.host.inPlace)?.actor.height ?? this.ph * 0.15;
     const h1 = Math.max(0.1, Math.min(Math.max(ref * 0.9, this.ph * 0.1), this.ph * 0.15));   // the size of the painted animals
     // keep walking forward, into the depth of the picture (away from you)
-    const inside = new THREE.Vector3(-0.1, this.groundY(-0.22), -0.22);
+    // the deepest place the painting lets you reach (measured on the relief as it will be inside)
+    const keep = this.paintU.uDepth.value, hNow = v.height; this.paintU.uDepth.value = depth1; v.setHeight(h1);
+    let inside = null;
+    for (const tx of [-0.1, 0.1, -0.3, 0.3, -0.5, 0.5]) {
+      const sp = this.spot(tx, -0.3, v);
+      if (!inside || sp.z < inside.z - 0.03) inside = sp;
+    }
+    this.paintU.uDepth.value = keep; v.setHeight(hNow);
     v.walkTo(inside, 0.22);
     this.keyLight.intensity = 0;
     await this.tween(3.6, e => {
@@ -439,6 +453,7 @@ export class Gallery {
       this.paintGroup.position.z = -e * recede;
       v.setHeight(h0 + (h1 - h0) * e);
       this.keyLight.intensity = e * 1.6;
+      for (const h of this.hosts) if (!h.awake) h.actor.position.z = this.paintPoint(h.homeUV[0], h.homeUV[1], 0.004).z;
     });
     v.setPaintAll?.(1);
     this.paintU.uWind.value = 1;             // inside, the picture breathes
@@ -447,8 +462,29 @@ export class Gallery {
     await this.wait(1.5);
   }
 
+  // depth of the painted surface (the relief) at a point of the picture, in local units
+  surfaceZ(x, y) {
+    const u = THREE.MathUtils.clamp(x / this.pw + 0.5, 0, 1), v = THREE.MathUtils.clamp(y / this.ph + 0.5, 0, 1);
+    return this.paintPoint(u, v).z;
+  }
+  // a spot where a figure of width w and height h can stand at x, as deep as `zWant`
+  // but always in front of whatever is painted there (never inside the relief)
+  spot(x, zWant, a) {
+    const w = this.widthOf(a), h = a.height;
+    x = THREE.MathUtils.clamp(x, -this.pw / 2 + w / 2 + 0.04, this.pw / 2 - w / 2 - 0.04);
+    let z = zWant;
+    for (let pass = 0; pass < 3; pass++) {
+      const y = this.groundY(z);
+      let front = -1e9;
+      for (const fx of [-0.45, 0, 0.45]) for (const fy of [0.05, 0.5, 0.95]) front = Math.max(front, this.surfaceZ(x + fx * w, y + fy * h));
+      z = Math.max(z, front + 0.05);
+    }
+    z = Math.min(z, 0.45);
+    return new THREE.Vector3(x, this.groundY(z), z);
+  }
+
   // a believable "ground" inside the picture: further back is higher up
-  groundY(z) { return -this.ph / 2 + this.ph * 0.22 + (0.4 - z) * 0.22; }
+  groundY(z) { const [g0, rise] = this.o.work.ground || [0.2, 0.22]; return -this.ph / 2 + this.ph * g0 + (0.4 - z) * rise; }
   randomGround() {
     const z = rand(-this.paintU.uDepth.value * 0.55, 0.4);
     return new THREE.Vector3(rand(-this.pw / 2 + 0.25, this.pw / 2 - 0.25), this.groundY(z), z);
@@ -477,7 +513,7 @@ export class Gallery {
       // side by side on the same ground, just a little in front of / behind in turn (no floating)
       const tz = THREE.MathUtils.clamp(vp.z + (k % 2 ? 0.07 : -0.07), -this.paintU.uDepth.value * 0.6, 0.42);
       tx = THREE.MathUtils.clamp(tx, -this.pw / 2 + w / 2, this.pw / 2 - w / 2);
-      const target = new THREE.Vector3(tx, this.groundY(tz), tz);
+      const target = this.spot(tx, tz, a);
       const d = target.distanceTo(a.position);
       if (d > 0.12 && (!a.target || a.target.distanceTo(target) > 0.18)) { h.placed = false; a.walkTo(target, d > 0.7 ? 0.9 : 0.4, { run: d > 0.7 }).then(() => { h.placed = true; }); }
       else if (!a.target) h.placed = true;
@@ -509,9 +545,8 @@ export class Gallery {
     const v = this.visitor, a = h.actor, vp = v.position.clone();
     const side = Math.sign(a.position.x - vp.x) || 1, gap = (this.widthOf(v) + this.widthOf(a)) / 2 + 0.1;
     const mid = vp.clone().lerp(a.position, 0.35);
-    const vT = new THREE.Vector3(mid.x - side * gap * 0.5, 0, THREE.MathUtils.clamp(mid.z, -this.paintU.uDepth.value * 0.5, 0.42));
-    vT.y = this.groundY(vT.z);
-    const aT = new THREE.Vector3(vT.x + side * gap, 0, vT.z - 0.04); aT.y = this.groundY(aT.z);
+    const vT = this.spot(mid.x - side * gap * 0.5, mid.z, v);
+    const aT = this.spot(vT.x + side * gap, vT.z - 0.04, a);
     h.meeting = true;
     await Promise.all([v.walkTo(vT, 0.35), a.walkTo(aT, 0.35)]);
     a.lastFlip = -9; a.setDir(-side); v.setDir(side);
@@ -527,10 +562,10 @@ export class Gallery {
     const z = THREE.MathUtils.clamp(vp.z - 0.35, -this.paintU.uDepth.value * 0.5, 0.4);
     const x = THREE.MathUtils.clamp(vp.x + (vp.x > 0 ? -0.5 : 0.5), -this.pw / 2 + 0.25, this.pw / 2 - 0.25);
     h.called = true;
-    const dest = new THREE.Vector3(x, this.groundY(z), z);
+    const dest = this.spot(x, z, h.actor);
     const go = h.actor.walkTo(dest, 0.35);
     await this.wait(0.7);
-    const follow = dest.clone(); follow.x += vp.x > x ? 0.3 : -0.3; follow.z += 0.12; follow.y = this.groundY(follow.z);
+    const follow = this.spot(dest.x + (vp.x > x ? 1 : -1) * (this.widthOf(h.actor) + this.widthOf(this.visitor)) / 2 * 1.2, dest.z + 0.08, this.visitor);
     await Promise.all([go, this.visitor.walkTo(follow, 0.35)]);
     h.actor.setDir(Math.sign(this.visitor.position.x - h.actor.position.x) || 1);
     h.called = false;
@@ -556,16 +591,16 @@ export class Gallery {
     const local = this.paintGroup.worldToLocal(hit.clone());
     local.x = THREE.MathUtils.clamp(local.x, -this.pw / 2 + 0.2, this.pw / 2 - 0.2);
     local.z = THREE.MathUtils.clamp(local.z, -this.paintU.uDepth.value * 0.6, 0.45);
-    local.y = this.groundY(local.z);
-    this.visitor.walkTo(local, 0.55, { run: local.distanceTo(this.visitor.position) > 0.8 });
+    const dest = this.spot(local.x, local.z, this.visitor);
+    this.visitor.walkTo(dest, 0.55, { run: dest.distanceTo(this.visitor.position) > 0.8 });
   }
   // call a painted animal: it comes to the visitor
   async callHost(i) {
     const h = this.hosts[i];
     if (!h || h.host.inPlace) { h?.actor.nod(2); return; }
     h.called = true;
-    const p = this.visitor.position.clone();
-    p.x += p.x > 0 ? -0.3 : 0.3; p.y = this.groundY(p.z);
+    const vp0 = this.visitor.position;
+    const p = this.spot(vp0.x + (vp0.x > 0 ? -1 : 1) * (this.widthOf(this.visitor) + this.widthOf(h.actor)) / 2 * 1.2, vp0.z, h.actor);
     await h.actor.walkTo(p, 0.8, { run: true });
     h.actor.setDir(Math.sign(this.visitor.position.x - p.x) || 1);
     h.actor.nod(2);

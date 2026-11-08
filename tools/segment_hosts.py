@@ -63,14 +63,18 @@ HOSTS = {
                       "neg": [[560, 750], [150, 1550], [1450, 950], [1000, 1950], [100, 2100]]},
     "durer-dog":     {"work": "durer", "box": [820, 1730, 1600, 2200], "close": 61,
                       "pos": [[920, 1800], [1080, 1880], [1110, 1990], [975, 2100], [1450, 1980], [1350, 1920]],
-                      "neg": [[910, 2010], [1200, 2000], [1150, 2150], [1330, 2180], [760, 1760]],
+                      "neg": [[910, 2010], [1150, 2150], [1330, 2180], [760, 1760]],
                       # the whole hound, traced by hand: SAM finds the visible fur, LaMa paints the rest inside this
                       "complete": [(853, 1830), (880, 1800), (930, 1768), (990, 1758), (1040, 1775), (1100, 1805), (1180, 1840),
                                    (1260, 1868), (1360, 1878), (1470, 1890), (1580, 1915), (1640, 1960), (1650, 2020), (1630, 2080),
                                    (1610, 2110), (1560, 2115), (1470, 2105), (1410, 2140), (1370, 2130), (1360, 2095), (1290, 2085),
                                    (1200, 2075), (1120, 2050), (1080, 2030), (1000, 2045), (975, 2085), (990, 2150), (975, 2175),
                                    (930, 2175), (925, 2150), (950, 2110), (940, 2050), (970, 2010), (1000, 1985), (980, 1950),
-                                   (950, 1915), (900, 1880), (870, 1858)]},
+                                   (950, 1915), (900, 1880), (870, 1858)],
+                      # the horse's front leg and a hoof lie across the hound: cut them out, repaint fur
+                      "occlude": [[(1222, 1838), (1282, 1852), (1182, 2110), (1122, 2098)]],
+                      # its back half reads as a separate shape to SAM: segment it on its own and join
+                      "parts": [{"box": [1270, 1850, 1680, 2130], "pos": [[1450, 1980], [1560, 2000], [1380, 1930]]}]},
     "marc-deer":     {"work": "marc", "box": [940, 690, 1460, 1720], "close": 15},
     "marc-boar":     {"work": "marc", "box": [60, 1120, 820, 1720], "close": 15},
 }
@@ -180,11 +184,15 @@ for hid in (sys.argv[1:] or HOSTS):
     if "clip" in h:                     # hand-traced outline limits the mask
         poly = np.zeros_like(mask); cv2.fillPoly(poly, [np.array(h["clip"], np.int32)], 255)
         mask = mask & cv2.dilate(poly, np.ones((5, 5), np.uint8))
+    for part in h.get("parts", []):     # animals SAM sees as several shapes: join the pieces
+        mask = mask | segment(img, {**h, "box": part["box"], "pos": part["pos"], "neg": part.get("neg", [])})
     if h.get("gc"): mask = grabcut_refine(arr, mask, h.get("pos", []))
-    # keep the largest blob; close small gaps (occluders) into the body
+    # keep the animal's pieces (an occluder can split it in two), drop small specks
     n, lab, st, _ = cv2.connectedComponentsWithStats(mask, 8)
     if n > 1:
-        big = 1 + np.argmax(st[1:, cv2.CC_STAT_AREA]); mask = np.where(lab == big, 255, 0).astype(np.uint8)
+        big = st[1:, cv2.CC_STAT_AREA].max()
+        keep = [i for i in range(1, n) if st[i, cv2.CC_STAT_AREA] >= big * 0.2]
+        mask = np.where(np.isin(lab, keep), 255, 0).astype(np.uint8)
     k = h["close"]
     closed = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
     closed = cv2.morphologyEx(closed, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
@@ -192,6 +200,9 @@ for hid in (sys.argv[1:] or HOSTS):
     ff = closed.copy(); hh, ww = ff.shape
     cv2.floodFill(ff, np.zeros((hh + 2, ww + 2), np.uint8), (0, 0), 255)
     closed = closed | cv2.bitwise_not(ff)
+    if "occlude" in h:                  # things painted in front of the animal: not part of it
+        for poly in h["occlude"]:
+            cv2.fillPoly(mask, [np.array(poly, np.int32)], 0)
     if "complete" in h:                 # hidden parts: the traced body becomes the outline
         poly = np.zeros_like(closed); cv2.fillPoly(poly, [np.array(h["complete"], np.int32)], 255)
         closed = closed | poly
