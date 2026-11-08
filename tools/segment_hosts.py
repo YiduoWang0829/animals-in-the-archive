@@ -60,7 +60,14 @@ HOSTS = {
                       "clip": [(755, 1020), (1152, 1020), (1152, 1555), (755, 1555)]},
     "durer-horse":   {"work": "durer", "box": [60, 190, 1800, 2380], "close": 15, "in_place": True,
                       "pos": [[900, 1450], [300, 900], [950, 700], [1500, 1700]],
-                      "neg": [[560, 750], [150, 1550], [1450, 950], [1000, 1950], [100, 2100]]},
+                      "neg": [[560, 750], [150, 1550], [1450, 950], [1000, 1950], [100, 2100]],
+                      # the hound is its own animal: leave it out of the horse
+                      "occlude": [[(853, 1830), (880, 1800), (930, 1768), (990, 1758), (1040, 1775), (1100, 1805), (1180, 1840),
+                                   (1260, 1868), (1360, 1878), (1470, 1890), (1580, 1915), (1640, 1960), (1650, 2020), (1630, 2080),
+                                   (1610, 2110), (1560, 2115), (1470, 2105), (1410, 2140), (1370, 2130), (1360, 2095), (1290, 2085),
+                                   (1200, 2075), (1120, 2050), (1080, 2030), (1000, 2045), (975, 2085), (990, 2150), (975, 2175),
+                                   (930, 2175), (925, 2150), (950, 2110), (940, 2050), (970, 2010), (1000, 1985), (980, 1950),
+                                   (950, 1915), (900, 1880), (870, 1858)]]},
     "durer-dog":     {"work": "durer", "box": [820, 1730, 1600, 2200], "close": 61,
                       "pos": [[920, 1800], [1080, 1880], [1110, 1990], [975, 2100], [1450, 1980], [1350, 1920]],
                       "neg": [[910, 2010], [1150, 2150], [1330, 2180], [760, 1760]],
@@ -200,12 +207,16 @@ for hid in (sys.argv[1:] or HOSTS):
     ff = closed.copy(); hh, ww = ff.shape
     cv2.floodFill(ff, np.zeros((hh + 2, ww + 2), np.uint8), (0, 0), 255)
     closed = closed | cv2.bitwise_not(ff)
+    occ = np.zeros_like(mask)
     if "occlude" in h:                  # things painted in front of the animal: not part of it
         for poly in h["occlude"]:
-            cv2.fillPoly(mask, [np.array(poly, np.int32)], 0)
+            cv2.fillPoly(occ, [np.array(poly, np.int32)], 255)
+        mask[occ > 0] = 0
     if "complete" in h:                 # hidden parts: the traced body becomes the outline
         poly = np.zeros_like(closed); cv2.fillPoly(poly, [np.array(h["complete"], np.int32)], 255)
         closed = closed | poly
+    if h.get("in_place"):               # a figure that stays put: shapes left out stay out
+        closed[occ > 0] = 0
     ys, xs = np.where(closed > 0)
     bx0, by0, bx1, by1 = xs.min(), ys.min(), xs.max() + 1, ys.max() + 1
     pad = 40

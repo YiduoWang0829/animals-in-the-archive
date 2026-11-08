@@ -56,7 +56,7 @@ function stylise(material, uniforms) {
         float insideF = step(uFrame.x, vWorldP.x) * step(vWorldP.x, uFrame.y) *
                         step(uFrame.z, vWorldP.y) * step(vWorldP.y, uFrame.w) * step(vWorldP.z, uWallZ);
         float p = max(insideF, uPaintAll);
-        if (uPaintStyle > 0.5 && p > 0.0) gl_FragColor.rgb = mix(gl_FragColor.rgb, paintIt(gl_FragColor.rgb, uPaintStyle, gl_FragCoord.xy), p);`);
+        if (uPaintStyle > 0.5 && p > 0.0) gl_FragColor.rgb = mix(gl_FragColor.rgb, paintIt(gl_FragColor.rgb, uPaintStyle, gl_FragCoord.xy), p * (uPaintStyle > 1.5 && uPaintStyle < 2.5 ? 0.72 : 1.0));   // engraving keeps some body shading`);
   };
   material.customProgramCacheKey = () => 'paint3d';
 }

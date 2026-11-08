@@ -318,8 +318,12 @@ export class Gallery {
     const D = THREE.MathUtils.clamp(base * (1 - v.zoom), vis.height * 3.0, base * 1.3);
     const pitch = 0.16 + v.pitch;
     const want = new THREE.Vector3(T.x + Math.sin(v.yaw) * Math.cos(pitch) * D, T.y + Math.sin(pitch) * D, T.z + Math.cos(v.yaw) * Math.cos(pitch) * D);
-    // keep the picture's edges out of view
-    const planeZ = this.paintGroup.position.z, dPlane = Math.max(0.2, want.z - planeZ);
+    // keep the picture's edges out of view: never so far back that the view is wider or
+    // taller than the picture itself
+    const planeZ = this.paintGroup.position.z, tanV = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
+    const maxBack = Math.min(this.pw * 0.46 / (tanV * cam.aspect), this.ph * 0.46 / tanV);
+    want.z = Math.min(want.z, planeZ + maxBack);
+    const dPlane = Math.max(0.2, want.z - planeZ);
     const halfH = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * dPlane, halfW = halfH * cam.aspect;
     const cx = this.paintGroup.position.x, cy = this.paintGroup.position.y;
     want.x = THREE.MathUtils.clamp(want.x, cx - Math.max(0, this.pw / 2 * 0.92 - halfW), cx + Math.max(0, this.pw / 2 * 0.92 - halfW));
