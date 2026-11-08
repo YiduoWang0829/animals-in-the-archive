@@ -474,7 +474,8 @@ export class Gallery {
       if (side > 0) { tx = vp.x + reachR + 0.08 + w / 2; reachR += w + 0.08; }
       else { tx = vp.x - reachL - 0.08 - w / 2; reachL += w + 0.08; }
       side = -side;
-      const tz = THREE.MathUtils.clamp(vp.z - 0.1 - k * 0.12, -this.paintU.uDepth.value * 0.6, 0.42);
+      // side by side on the same ground, just a little in front of / behind in turn (no floating)
+      const tz = THREE.MathUtils.clamp(vp.z + (k % 2 ? 0.07 : -0.07), -this.paintU.uDepth.value * 0.6, 0.42);
       tx = THREE.MathUtils.clamp(tx, -this.pw / 2 + w / 2, this.pw / 2 - w / 2);
       const target = new THREE.Vector3(tx, this.groundY(tz), tz);
       const d = target.distanceTo(a.position);

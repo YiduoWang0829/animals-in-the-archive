@@ -660,10 +660,10 @@ function onHands(hs) {
       const dx = h.pinchX - ps.last; ps.last = h.pinchX;
       if (Math.abs(h.pinchX - ps.x0) > 0.035) ps.moved = true;
       if (ps.moved) gallery.orbitBy(dx * 3.6);
-      else if (now - ps.t0 > 220) gallery.zoomBy(-dt * 1.1);
+      else if (now - ps.t0 > 220) gallery.zoomBy(-dt * 0.55);
     } else {
       onHands.pinch = null;
-      if (h.open) gallery.zoomBy(dt * 1.1);
+      if (h.open) gallery.zoomBy(dt * 0.55);
     }
   }
   if (view !== 'view-create' && !(view === 'view-stage' && gallery?.inside)) { $('#hand-cursor').hidden = $('#hand-cursor-2').hidden = true; return; }
@@ -906,4 +906,6 @@ document.addEventListener('keydown', e => {
 document.addEventListener('visibilitychange', () => { if (document.hidden && tracker) stopCamera(); });
 
 renderIndex();
-window.__aia = { state, STRINGS, get gallery() { return gallery; } };   // console/debug access only
+window.__aia = { state, STRINGS, get gallery() { return gallery; },
+  // testing only: feed fake camera input (a face, hands, a gesture) without a camera
+  sim: { face: f => { face = f; }, hands: h => { hands = h; onHands(h); }, gesture: x => onGesture(x) } };   // console/debug access only
