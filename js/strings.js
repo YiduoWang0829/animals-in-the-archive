@@ -225,7 +225,10 @@ export const STRINGS = {
     openOkay: 'Okay, I’m right behind you!',
     openHere: 'This is my favourite spot. You can see the whole picture from here.',
     openWow: 'It’s beautiful. Thank you for showing me.',
-    reactions: ['Really? I never knew that.', 'That sounds wonderful.', 'Wow. I’ll remember that.', 'Oh! Tell me more another time.', 'How strange, and how lovely.'],
+    // a painted animal reacting to the visitor's life
+    reactions: ['Really? I never knew that.', 'That sounds wonderful.', 'Oh! Tell me more another time.', 'How strange, and how lovely.', 'I wish I could see that.'],
+    // the visitor reacting to a painted animal's story (some are sad, so nothing cheerful)
+    reactionsToHost: ['Really? I never knew that.', 'I’ll remember that.', 'Thank you for telling me.', 'Oh… I see.', 'I’m glad you told me.'],
     visitorAskYou: [
       ['Can you see the little animals at the back?', 'I knew you’d spot them!', 'Look behind the big trees. There!'],
       ['Shall I stay a little longer?', 'Then I will. It’s so nice in here.', 'Just a little, then. I want to see one more thing.'],

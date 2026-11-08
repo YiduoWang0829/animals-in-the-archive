@@ -519,9 +519,9 @@ async function insideStory(g, tok) {
   for (const [q, ql, a, al] of pairs) {
     if (!alive()) return;
     const hostIdx = q === 'visitor' ? a : q;
-    if (hostIdx !== lastHost) { await g.meet(hostIdx); lastHost = hostIdx; }
+    await g.meet(hostIdx); lastHost = hostIdx;           // (returns at once if they are already together)
     await speak(q, ql); await speak(a, al);
-    if (Math.random() < 0.3) await speak(q, pickLine(t('reactions')));
+    if (Math.random() < 0.3) await speak(q, pickLine(t(q === 'visitor' ? 'reactionsToHost' : 'reactions')));
   }
   const friend = await askUser(0, t('insideAskFriend'));
   if (!alive()) return;
@@ -545,6 +545,8 @@ async function insideLife(g, tok) {
     const kind = ['qa', 'ask', 'chorus', 'qa', 'you', 'ask'][n % 6]; n++;
     if (kind === 'qa' && qa.length) {
       const [q, ans, back] = qa.shift();
+      await g.meet(i);                                // walk up to each other first
+      if (!alive()) break;
       await speak(i, q);
       if (/run fast/i.test(q)) {                      // show, don't tell
         const p0 = g.visitor.position.clone(), p1 = p0.clone(); p1.x += p0.x > 0 ? -0.6 : 0.6;
@@ -559,7 +561,7 @@ async function insideLife(g, tok) {
       const [q, yes, no] = toYou.shift();
       const a = await askUser('visitor', q);
       if (a) await speak('visitor', a === 'yes' ? yes : no);
-    } else if (chorus.length) { await speak(i, chorus.shift()); await speak('visitor', pickLine(t('reactions'))); }
+    } else if (chorus.length) { await speak(i, chorus.shift()); await speak('visitor', pickLine(t('reactionsToHost'))); }
     else if (!qa.length && !ask.length) { await sleep(6000); }
   }
 }

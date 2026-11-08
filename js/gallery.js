@@ -32,12 +32,22 @@ const PAINT_VERT = /* glsl */`
   }
 `;
 const PAINT_FRAG = /* glsl */`
-  uniform sampler2D uMap;
-  uniform float uTime, uWind, uBright;
+  uniform sampler2D uMap, uDepthTex;
+  uniform float uTime, uWind, uBright, uFill;
   varying vec2 vUv;
   varying float vD;
   void main() {
     vec2 st = vUv;
+    // Where the depth jumps (a near figure against far land), the relief is a steep
+    // stretched skirt. Paint it with what lies behind: step from here towards the far side
+    // of the jump and take the colour there. Figures keep a clean edge instead of a smear.
+    if (uFill > 0.0) {
+      float e = 0.004;
+      vec2 gd = vec2(texture2D(uDepthTex, vUv + vec2(e, 0.0)).r - texture2D(uDepthTex, vUv - vec2(e, 0.0)).r,
+                     texture2D(uDepthTex, vUv + vec2(0.0, e)).r - texture2D(uDepthTex, vUv - vec2(0.0, e)).r) / (2.0 * e);
+      float steep = smoothstep(4.0, 10.0, length(gd)) * uFill;
+      if (steep > 0.0) st -= normalize(gd) * 0.022 * steep;
+    }
     float far = 1.0 - vD;
     // the picture breathes: distant foliage and sky sway a little
     st.x += sin(uTime * 1.1 + vUv.y * 18.0 + vUv.x * 9.0) * 0.0011 * far * smoothstep(0.3, 1.0, vUv.y) * uWind;
@@ -101,7 +111,7 @@ export class Gallery {
     this.depthImg = depthImg;
     this.paintU = {
       uMap: { value: map }, uDepthTex: { value: depth },
-      uDepth: { value: pw * 0.16 }, uEdge: { value: 1 }, uTime: { value: 0 }, uWind: { value: 0 }, uBright: { value: 1.0 },
+      uDepth: { value: pw * 0.16 }, uEdge: { value: 1 }, uFill: { value: 0 }, uTime: { value: 0 }, uWind: { value: 0 }, uBright: { value: 1.0 },
     };
     this.paintGroup = new THREE.Group();
     this.paintGroup.position.set(0, cy, 0);
@@ -314,29 +324,83 @@ export class Gallery {
     const vis = this.visitor, T = new THREE.Vector3();
     vis.group.getWorldPosition(T);
     T.y += vis.height * 0.55;
-    const base = Math.max(vis.height * 4.2, (this.viewDist || 2) * 0.72);
-    const D = THREE.MathUtils.clamp(base * (1 - v.zoom), vis.height * 3.0, base * 1.3);
-    const pitch = 0.16 + v.pitch;
-    const want = new THREE.Vector3(T.x + Math.sin(v.yaw) * Math.cos(pitch) * D, T.y + Math.sin(pitch) * D, T.z + Math.cos(v.yaw) * Math.cos(pitch) * D);
-    // keep the picture's edges out of view: never so far back that the view is wider or
-    // taller than the picture itself
-    const planeZ = this.paintGroup.position.z, tanV = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
-    const maxBack = Math.min(this.pw * 0.46 / (tanV * cam.aspect), this.ph * 0.46 / tanV);
-    want.z = Math.min(want.z, planeZ + maxBack);
-    const dPlane = Math.max(0.2, want.z - planeZ);
-    const halfH = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * dPlane, halfW = halfH * cam.aspect;
-    const cx = this.paintGroup.position.x, cy = this.paintGroup.position.y;
-    want.x = THREE.MathUtils.clamp(want.x, cx - Math.max(0, this.pw / 2 * 0.92 - halfW), cx + Math.max(0, this.pw / 2 * 0.92 - halfW));
-    want.y = THREE.MathUtils.clamp(want.y, cy - Math.max(0, this.ph / 2 * 0.92 - halfH), cy + Math.max(0, this.ph / 2 * 0.92 - halfH));
+    const base = Math.max(vis.height * 3.6, (this.viewDist || 2) * 0.6);
+    let D = THREE.MathUtils.clamp(base * (1 - v.zoom), vis.height * 2.0, base * 1.3);
+    // in a conversation, frame both: aim between your animal and the one talking with it,
+    // and step back just enough to see the two of them
+    const gh = typeof this.gazeHost === 'number' ? this.hosts[this.gazeHost] : null;
+    let pairW = 0;
+    if (gh && gh.awake && !gh.host.inPlace) {
+      const hp = gh.actor.group.getWorldPosition(new THREE.Vector3());
+      const dx = hp.x - T.x;
+      if (Math.abs(dx) < 1.6) {
+        pairW = 1;
+        const tanV = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
+        const need = (Math.abs(dx) / 2 + this.widthOf(gh.actor) / 2 + this.widthOf(vis) / 2 + 0.08) / (tanV * cam.aspect) + Math.abs(hp.z - T.z) * 0.5;
+        this.pairT = (this.pairT || T.clone()).lerp(new THREE.Vector3(T.x + dx * 0.5, T.y + (hp.y + gh.actor.height * 0.5 - T.y) * 0.3, (T.z + hp.z) / 2), 0.06);
+        this.pairD = THREE.MathUtils.lerp(this.pairD || D, Math.max(D, Math.min(need, base * 1.7)), 0.06);
+      }
+    }
+    this.pairK = THREE.MathUtils.lerp(this.pairK || 0, pairW, 0.04);
+    if (this.pairK > 0.01 && this.pairT) { T.lerp(this.pairT, this.pairK); D = THREE.MathUtils.lerp(D, this.pairD, this.pairK); }
+    // The camera's direction comes from the view angles (not from aiming at the animal),
+    // so moving it never changes where it points. It sits behind and above your animal,
+    // which stays in the middle of the view.
+    // near the bottom of the picture look more level, or the foot of the picture would
+    // push the view up and the animal out of it
+    const low = THREE.MathUtils.smoothstep(T.y - (this.paintGroup.position.y - this.ph / 2), 0.15, 0.6);
+    const pitch = THREE.MathUtils.clamp(0.02 + 0.1 * low + v.pitch, 0.0, 0.3);   // steeper would look past the picture's foot
+    const yaw = THREE.MathUtils.clamp(v.yaw, -0.4, 0.4);
+    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-pitch, yaw, 0, 'YXZ'));
+    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(q);
+    const want = T.clone().addScaledVector(fwd, -D);
     want.x += px.x * 0.04; want.y += px.y * 0.03;                     // a touch of head parallax
-    cam.position.lerp(want, 0.08);
-    // look at the animal, but never tilt so far that the edge of the picture shows
-    const lyMin = cy - this.ph / 2 + halfH * 0.95, lyMax = cy + this.ph / 2 - halfH * 0.95;
-    const ly = lyMin < lyMax ? THREE.MathUtils.clamp(T.y, lyMin, lyMax) : cy;
-    const lxMin = cx - this.pw / 2 + halfW * 0.95, lxMax = cx + this.pw / 2 - halfW * 0.95;
-    const lx = lxMin < lxMax ? THREE.MathUtils.clamp(T.x, lxMin, lxMax) : cx;
-    this.lookAtPt = (this.lookAtPt || T.clone()).lerp(new THREE.Vector3(lx, ly, T.z - 0.15), 0.12);
-    cam.lookAt(this.lookAtPt);
+    // catch up faster when the animal nears the edge of the view
+    const off = Math.max(Math.abs(T.clone().project(cam).x), 0);
+    cam.position.lerp(want, 0.08 + 0.3 * THREE.MathUtils.smoothstep(off, 0.45, 0.9));
+    cam.quaternion.slerp(q, 0.1);
+    this.keepFrameOut();
+    // if the picture's edge holds the camera back so far that your animal drifts out of
+    // view, the orbit gives way (the view swings back behind the animal)
+    const sx = T.clone().project(cam).x;
+    if (Math.abs(sx) > 0.55) { v.ty *= 0.9; v.yaw *= 0.9; }
+    // the same when the foot of the picture lifts the view so far that the animal's feet
+    // would leave it: come closer instead (a smaller view fits the strip of ground)
+    const feet = vis.group.getWorldPosition(new THREE.Vector3()).project(cam).y;
+    if (feet < -0.8) { const k = (feet + 0.8) * -0.25; v.tz = Math.min(0.6, v.tz + k); v.zoom = Math.min(0.6, v.zoom + k); v.ty *= 0.92; v.yaw *= 0.92; if (this.pairD) this.pairD *= 0.97; }
+  }
+
+  // Final guarantee that the black beyond the picture never shows: cast rays through the
+  // four corners of the view onto the picture plane (where the relief's edges lie) and,
+  // if any lands outside the picture, slide the camera back in; if the view is wider than
+  // the picture, move closer. Translating keeps the camera's direction, so it doesn't jolt.
+  keepFrameOut() {
+    const cam = this.camera, pg = this.paintGroup;
+    if (!this._kf) this._kf = { ray: new THREE.Raycaster(), plane: new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), hit: new THREE.Vector3(), ndc: new THREE.Vector2(), fwd: new THREE.Vector3() };
+    const K = this._kf, mx = this.pw / 2 * 0.97, my = this.ph / 2 * 0.97;   // the scans have a thin paper margin
+    const pz = pg.position.z - 0.03; K.plane.constant = -pz;
+    for (let it = 0; it < 4; it++) {
+      cam.updateMatrixWorld(true);
+      let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, miss = false;
+      for (const [nx, ny] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        K.ndc.set(nx, ny); K.ray.setFromCamera(K.ndc, cam);
+        if (!K.ray.ray.intersectPlane(K.plane, K.hit)) { miss = true; break; }
+        const lx = K.hit.x - pg.position.x, ly = K.hit.y - pg.position.y;
+        x0 = Math.min(x0, lx); x1 = Math.max(x1, lx); y0 = Math.min(y0, ly); y1 = Math.max(y1, ly);
+      }
+      if (miss) { cam.position.z = Math.max(pz + 0.2, cam.position.z - 0.08); continue; }
+      const tooWide = Math.max((x1 - x0) / (2 * mx), (y1 - y0) / (2 * my));
+      if (tooWide > 1) {                       // move closer until the view fits
+        const d = cam.position.z - pz;
+        cam.position.z = Math.max(pz + 0.2, cam.position.z - Math.min(0.5, d * (1 - 1 / tooWide) * 1.05));
+        continue;
+      }
+      let sx = 0, sy = 0;
+      if (x0 < -mx) sx = -mx - x0; else if (x1 > mx) sx = mx - x1;
+      if (y0 < -my) sy = -my - y0; else if (y1 > my) sy = my - y1;
+      if (!sx && !sy) break;
+      cam.position.x += THREE.MathUtils.clamp(sx, -0.5, 0.5); cam.position.y += THREE.MathUtils.clamp(sy, -0.5, 0.5);
+    }
   }
 
   // ---- VR-style controls inside the painting (mouse drag, wheel, head, hands)
@@ -451,7 +515,7 @@ export class Gallery {
     v.walkTo(inside, 0.22);
     this.keyLight.intensity = 0;
     await this.tween(3.6, e => {
-      this.paintU.uDepth.value = depth0 + (depth1 - depth0) * e;
+      this.paintU.uDepth.value = depth0 + (depth1 - depth0) * e; this.paintU.uFill.value = e;
       this.camBase.lerpVectors(camFrom, camTo, e);
       this.camLook.lerpVectors(lookFrom, lookTo, e);
       this.paintGroup.position.z = -e * recede;
@@ -531,11 +595,15 @@ export class Gallery {
       const ov = Math.min(A.position.x + wa / 2, B.position.x + wb / 2) - Math.max(A.position.x - wa / 2, B.position.x - wb / 2);
       if (ov <= 0.1 * Math.min(wa, wb) || Math.abs(A.position.z - B.position.z) > 0.14) continue;
       const mover = B, sgn = Math.sign(B.position.x - A.position.x) || 1;
-      mover.position.x = THREE.MathUtils.clamp(mover.position.x + sgn * Math.min(ov, 0.02), -this.pw / 2 + wb / 2, this.pw / 2 - wb / 2);
-      mover.position.z = Math.max(-this.paintU.uDepth.value * 0.6, mover.position.z - 0.006);
+      // two walkers crossing: the one behind steps further back, so it clearly passes behind
+      const push = (A.target || B.target) ? 0.05 : 0.02;          // someone walking past: make room quickly
+      mover.position.x = THREE.MathUtils.clamp(mover.position.x + sgn * Math.min(ov, push), -this.pw / 2 + wb / 2, this.pw / 2 - wb / 2);
+      mover.position.z = Math.max(-this.paintU.uDepth.value * 0.6, mover.position.z - push * 0.4);
       mover.position.y = this.groundY(mover.position.z);
-      if (mover.target) { mover.target.x += sgn * Math.min(ov, 0.02); }
+      if (mover.target) mover.target.x = THREE.MathUtils.clamp(mover.target.x + sgn * Math.min(ov, push), -this.pw / 2 + wb / 2, this.pw / 2 - wb / 2);
     }
+    // nobody ever stands outside the picture
+    for (const a of crowd) { const w = this.widthOf(a); a.position.x = THREE.MathUtils.clamp(a.position.x, -this.pw / 2 + w / 2, this.pw / 2 - w / 2); }
     // draw order follows depth: nearer figures are drawn last (no flicker)
     const all = [v, ...this.hosts.map(h => h.actor)];
     const wp = new THREE.Vector3();
@@ -548,6 +616,10 @@ export class Gallery {
     if (!h || !h.awake || h.host.inPlace) return;
     const v = this.visitor, a = h.actor, vp = v.position.clone();
     const side = Math.sign(a.position.x - vp.x) || 1, gap = (this.widthOf(v) + this.widthOf(a)) / 2 + 0.1;
+    const dx = Math.abs(a.position.x - vp.x);
+    if (dx > gap * 0.85 && dx < gap * 1.5 && Math.abs(a.position.z - vp.z) < 0.15) {   // already together
+      a.setDir(-side); v.setDir?.(side); return;
+    }
     const mid = vp.clone().lerp(a.position, 0.35);
     const vT = this.spot(mid.x - side * gap * 0.5, mid.z, v);
     const aT = this.spot(vT.x + side * gap, vT.z - 0.04, a);

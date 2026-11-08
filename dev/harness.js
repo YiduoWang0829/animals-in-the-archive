@@ -25,6 +25,11 @@ export async function setup({ work = 'eden', role = 'passer', pick = ['3d', 'sta
   const g = window.__aia.gallery;
   g.renderer.setAnimationLoop(null);
   if (autoYes) window.__auto = setInterval(() => q('[data-action="answer"][data-answer="yes"]')?.click(), 400);
+  window.__said = [];
+  new MutationObserver(() => document.querySelectorAll('.bubble').forEach(b => {
+    const t = b.innerText.replace(/\n/, ': ');
+    if (t && b.style.visibility !== 'hidden' && window.__said.at(-1) !== t) window.__said.push(t);
+  })).observe(document.getElementById('bubble-layer'), { subtree: true, childList: true, characterData: true, attributes: true });
   window.__H = { g, log: [], last: '', vis: 0, overlap: 0, insideFrames: 0, back: 0, walkFrames: 0, flips: {}, idleWalk: 0 };
   return g;
 }
@@ -54,7 +59,10 @@ export async function pump(until = () => false, ms = 40000) {
       for (let i = 0; i < acts.length; i++) for (let j = i + 1; j < acts.length; j++) {
         const a = acts[i], b = acts[j];
         const ov = Math.min(a.position.x + W(a) / 2, b.position.x + W(b) / 2) - Math.max(a.position.x - W(a) / 2, b.position.x - W(b) / 2);
-        if (ov > 0.4 * Math.min(W(a), W(b)) && Math.abs(a.position.z - b.position.z) < 0.05) H.overlap++;
+        if (ov > 0.4 * Math.min(W(a), W(b)) && Math.abs(a.position.z - b.position.z) < 0.05) {
+          H.overlap++;
+          if ((H.ovl ||= []).length < 12) H.ovl.push({ i, j, x: [+a.position.x.toFixed(2), +b.position.x.toFixed(2)], z: [+a.position.z.toFixed(2), +b.position.z.toFixed(2)], line: H.last.slice(0, 40), walking: [!!a.walking || !!a.target, !!b.walking || !!b.target] });
+        }
       }
     }
     const vis = [...document.querySelectorAll('.bubble')].filter(b => b.style.visibility !== 'hidden' && b.classList.contains('show'));

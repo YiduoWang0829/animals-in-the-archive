@@ -15,22 +15,37 @@ const STYLE_ID = { eden: 1, durer: 2, marc: 3, storybook: 4 };
 
 // GLSL injected into the standard material: repaint after lighting
 const PAINT_HEAD = /* glsl */`
-  uniform float uPaintStyle, uPaintAll, uWallZ;
+  uniform float uPaintStyle, uPaintAll, uWallZ, uHatchF;
+  uniform vec3 uAnchor;
+  float gRim = 0.0;
   uniform vec4 uFrame;
   varying vec3 vWorldP;
   float lumA(vec3 c) { return dot(c, vec3(0.3, 0.59, 0.11)); }
+  float engLine(float u, float w) {           // 1 on an engraved line of relative width w, antialiased
+    if (w <= 0.0) return 0.0;
+    float d = abs(fract(u) - 0.5) * 2.0, fw = fwidth(u) * 2.0;
+    float line = smoothstep(1.0 - w - fw, 1.0 - w + fw, d);     // d = 1 at the line's centre
+    return mix(line, clamp(w, 0.0, 1.0), smoothstep(0.5, 1.0, fw));   // too fine to draw: average tone
+  }
   vec3 paintIt(vec3 c, float style, vec2 sc) {
     float l = lumA(c);
     if (style < 1.5) {                         // Flemish oil: amber varnish, deep warm shadows
       c = mix(vec3(l), c, 1.1) * vec3(1.06, 0.96, 0.78);
       return mix(vec3(0.12, 0.09, 0.05), c, 0.65 + 0.35 * l);
-    } else if (style < 2.5) {                  // engraving: tone becomes line
-      float t = pow(l, 0.8);
-      float a = abs(fract((sc.x + sc.y) / 4.5) - 0.5) * 2.0;
-      float b = abs(fract((sc.x - sc.y) / 5.2) - 0.5) * 2.0;
-      float ink = step(0.3 + t * 0.7, a);
-      ink = max(ink, step(0.42 + t * 1.2, b) * step(t, 0.5));
-      return mix(vec3(0.88, 0.84, 0.75), vec3(0.11, 0.09, 0.08), ink);
+    } else if (style < 2.5) {                  // engraving: tone becomes cut line
+      // Lines are fixed to the animal in space (not to the screen), so they travel with it
+      // like a burin's lines on a form instead of shimmering. Light areas: thin, sparse
+      // strokes; mid-tones: thicker; shadows: a cross-hatch; deepest: a third set.
+      float t = smoothstep(0.2, 0.62, l);  // the body's real (sRGB) range in the low gallery light
+      vec3 P = (vWorldP - uAnchor) * uHatchF;    // anchored to the animal, so they move with it
+      float u1 = P.y * 0.82 + P.x * 0.45 + P.z * 0.36;
+      float u2 = P.y * 0.55 - P.x * 0.62 + P.z * 0.55;
+      float u3 = P.x * 0.7 + P.z * 0.7;
+      float ink = engLine(u1, (1.0 - t) * 0.42 + 0.08);
+      ink = max(ink, engLine(u2 * 1.08, (0.42 - t) * 0.6));
+      ink = max(ink, engLine(u3 * 1.2, (0.22 - t) * 1.2));
+      ink = max(ink, smoothstep(0.62, 0.8, gRim));      // the engraver's contour
+      return mix(vec3(0.8, 0.75, 0.63), vec3(0.1, 0.085, 0.07), ink * 0.92);
     } else if (style < 3.5) {                  // Marc: flattened prismatic planes
       float warm = c.r - c.b;
       vec3 k = l > 0.7 ? vec3(0.93) : (warm > 0.12 && l > 0.25) ? (l > 0.45 ? vec3(0.88, 0.42, 0.16) : vec3(0.7, 0.17, 0.12))
@@ -56,7 +71,8 @@ function stylise(material, uniforms) {
         float insideF = step(uFrame.x, vWorldP.x) * step(vWorldP.x, uFrame.y) *
                         step(uFrame.z, vWorldP.y) * step(vWorldP.y, uFrame.w) * step(vWorldP.z, uWallZ);
         float p = max(insideF, uPaintAll);
-        if (uPaintStyle > 0.5 && p > 0.0) gl_FragColor.rgb = mix(gl_FragColor.rgb, paintIt(gl_FragColor.rgb, uPaintStyle, gl_FragCoord.xy), p * (uPaintStyle > 1.5 && uPaintStyle < 2.5 ? 0.72 : 1.0));   // engraving keeps some body shading`);
+        gRim = 1.0 - abs(normalize(normal).z);
+        if (uPaintStyle > 0.5 && p > 0.0) gl_FragColor.rgb = mix(gl_FragColor.rgb, paintIt(gl_FragColor.rgb, uPaintStyle, gl_FragCoord.xy), p);`);
   };
   material.customProgramCacheKey = () => 'paint3d';
 }
@@ -103,7 +119,7 @@ export class Animal3D {
     this.group.add(this.inner);
     this.inner.add(this.root);
     this.uniforms = {
-      uPaintStyle: { value: look === 'storybook' ? STYLE_ID.storybook : 0 }, uPaintAll: { value: look === 'storybook' ? 1 : 0 },
+      uPaintStyle: { value: look === 'storybook' ? STYLE_ID.storybook : 0 }, uPaintAll: { value: look === 'storybook' ? 1 : 0 }, uHatchF: { value: 200 }, uAnchor: { value: new THREE.Vector3() },
       uWallZ: { value: -1e9 }, uFrame: { value: new THREE.Vector4(1e9, -1e9, 1e9, -1e9) }, uOutline: { value: 0 },
     };
     this.look = look;
@@ -203,7 +219,7 @@ export class Animal3D {
   // ---- actor interface (shared with character.js) ----
   get position() { return this.group.position; }
   get height() { return this._h; }
-  setHeight(h) { this._h = h; this.inner.scale.setScalar(h); this.shadow.scale.set(h * this.length * 0.9, h * 0.6, 1); }
+  setHeight(h) { this._h = h; this.inner.scale.setScalar(h); if (this.uniforms) this.uniforms.uHatchF.value = 52 / Math.max(0.05, h); this.shadow.scale.set(h * this.length * 0.9, h * 0.6, 1); }
   addTo(scene) { scene.add(this.group); scene.add(this.shadow); return this; }
   setDir(d) { this.dir = d; }
   // turn to face the person in front of the screen (+z), slightly towards where they are
@@ -242,6 +258,7 @@ export class Animal3D {
   nod(times = 2) { this.nodT = 0; this.nodN = times; }
 
   update(dt, t) {
+    if (this.uniforms) this.group.getWorldPosition(this.uniforms.uAnchor.value);
     const p = this.group.position;
     let moving = false, heading = null;
     // ground speed follows the animation: at most ~1.5× the gait's natural pace, so
