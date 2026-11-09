@@ -10,6 +10,14 @@ src, out = args[0], args[1]
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=src)
 sc = bpy.context.scene
+# pose: only the standing idle clip (every other track muted), a few frames in
+idle = next((a for a in bpy.data.actions if a.name.split('|')[-1] in ('Idle', 'Idle_A')), None)
+for o in sc.objects:
+    if o.type == 'ARMATURE' and o.animation_data:
+        for t in o.animation_data.nla_tracks: t.mute = True
+        if idle: o.animation_data.action = idle
+sc.frame_set(8)
+bpy.context.view_layer.update()
 sc.render.engine = 'BLENDER_EEVEE_NEXT' if 'BLENDER_EEVEE_NEXT' in [e.identifier for e in bpy.types.RenderSettings.bl_rna.properties['engine'].enum_items] else 'BLENDER_EEVEE'
 sc.render.resolution_x, sc.render.resolution_y = 520, 400
 w = bpy.data.worlds.new('w'); sc.world = w; w.use_nodes = True

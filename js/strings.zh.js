@@ -391,6 +391,7 @@ export default {
   cardCredits: '来源',
   cardPhotoCredit: '参观者：{file}，摄影者待确认',
   cardDrawingCredit: '参观者：由参观者亲手绘制',
+  card3dRealCredit: '参观者：《{title}》，作者 {author}，{licence}（Sketchfab），本项目有改动',
   card3dCredit: '参观者：3D {name}，作者 Quaternius（CC0）',
   cardHosts: '画中动物',
   cardFooter: '档案馆里的动物 · Yiduo Wang',
@@ -483,7 +484,7 @@ export default {
   creditsHeading: '署名与来源',
   credits: {
     paintings: '画作', photos: '动物照片', models3d: '3D 动物',
-    modelsNote: '带骨骼和动画的低多边形动物，作者 Quaternius，以 CC0 1.0（公有领域）发布于 poly.pizza；授权已于 2026-11-06 在每个模型页面上核对。着色、描边和绘画效果是本项目自己的处理。',
+    modelsNote: '写实的、带骨骼和动画的动物来自 Sketchfab，每个都按下载时附带的授权文件（CC BY 4.0 或 CC BY-NC 4.0）在下表中署名；本项目去掉了道具（如马鞍）、删减了用不到的动画、缩小了贴图，并加上了绘画效果。其余低多边形动物的作者是 Quaternius，以 CC0 1.0 发布于 poly.pizza（授权已于 2026-11-06 在每个模型页面上核对）。',
     model: '模型', hosts: '画中动物', software: '软件、模型与字体',
     work: '作品', author: '画家', date: '年代', collection: '收藏地', source: '图片来源', licence: '授权状态',
     file: '源文件', species: '物种', record: '来源记录', photographer: '摄影者',

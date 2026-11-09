@@ -643,7 +643,8 @@ async function insideStory(g, tok) {
   await g.startle();
   await speak(0, t('insideStartled'));
   await speak(0, t('openShy'));
-  g.visitor.hopOnce?.(0.05 * (g.visitor.height || 0.3) / 0.3); g.visitor.nod?.(2);   // it jumps a little: a painting just spoke!
+  // it starts: a painting just spoke! (a realistic model calls out with its own voice clip)
+  if (!g.visitor.gesture?.('call')) { g.visitor.hopOnce?.(0.05 * (g.visitor.height || 0.3) / 0.3); g.visitor.nod?.(2); }
   await speak('visitor', t('openAmazed'));
   await speak('visitor', t('openSorry'));
   await speak(B, t(H > 1 ? 'openWhisper' : 'openWhisperSolo'));
@@ -1036,7 +1037,9 @@ async function openCard() {
     work: w, workText: x, roleName: t(`roles.${state.role}.name`),
     speciesName: `${state.name}, ${v.kind === 'species' ? `${t(`species.${v.species.id}`)} (${t(`speciesLatin.${v.species.id}`)})` : visitorKind()}`,
     hostName: state.hosts.map(h => t(`hostNames.${h.id}`)).join(', '), mood: t(`moods.${state.role}.${state.answer || 'yes'}`), made: state.made,
-    photoCredit: v.kind === 'drawing' ? t('cardDrawingCredit') : v.kind === 'animal3d' ? t('card3dCredit', { name: t(`animals3d.${v.id}`) })
+    photoCredit: v.kind === 'drawing' ? t('cardDrawingCredit') : v.kind === 'animal3d' ? (animal3dById(v.id).real
+        ? t('card3dRealCredit', { title: animal3dById(v.id).real.title, author: animal3dById(v.id).real.author, licence: animal3dById(v.id).real.licence })
+        : t('card3dCredit', { name: t(`animals3d.${v.id}`) }))
       : t('cardPhotoCredit', { file: v.species.file + '.png' }),
     figure: composing,
     told: [(state.talk || []).find(e => e.side === 'in'), (state.talk || []).find(e => e.side === 'out')].filter(Boolean)
@@ -1089,7 +1092,8 @@ function renderCredits() {
     </table></div>
     <h2>${L('models3d')}</h2><p class="note">${L('modelsNote')}</p><div class="scroll"><table>
       <tr><th>${L('file')}</th><th>${L('model')}</th><th>${L('source')}</th><th>${L('licence')}</th></tr>
-      ${c.models3d.map(m => `<tr><td>${esc(m.file)}</td><td>${esc(m.name)} · Quaternius</td><td>${link(m.source)}</td><td>CC0 1.0</td></tr>`).join('')}
+      ${ANIMALS3D.filter(a => a.real).map(a => `<tr><td>${esc(a.glb.split('/').pop())}</td><td>${esc(a.real.title)} · ${esc(a.real.author)}</td><td>${link(a.real.url)}</td><td>${esc(a.real.licence)}</td></tr>`).join('')}
+      ${c.models3d.filter(m => !animal3dById(m.file.replace('.glb', ''))?.real).map(m => `<tr><td>${esc(m.file)}</td><td>${esc(m.name)} · Quaternius</td><td>${link(m.source)}</td><td>CC0 1.0</td></tr>`).join('')}
     </table></div>
     <h2>${L('software')}</h2><div class="scroll"><table>
       <tr><th>${L('item')}</th><th>${L('version')}</th><th>${L('use')}</th><th>${L('licence')}</th></tr>

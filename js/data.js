@@ -94,12 +94,17 @@ export const ANIMALS3D = [
   { id: 'deer', kind: 'deer',        height: 0.56, doodle: ['kangaroo'] },
   { id: 'stag', kind: 'deer',        height: 0.66, doodle: [] },
   { id: 'alpaca', kind: 'alpaca',      height: 0.64, doodle: ['camel', 'giraffe'] },
-  { id: 'donkey', kind: 'donkey',      height: 0.6,  doodle: [] },
+  { id: 'donkey', kind: 'donkey',      height: 0.6,  doodle: [],
+    real: { title: 'Realistic Animated Donkey 3D Model', author: 'WildMesh 3D', licence: 'CC BY 4.0',
+            url: 'https://sketchfab.com/3d-models/realistic-animated-donkey-3d-model-2b4086035df94d9e88fd0f18d34b3872' } },
   { id: 'white_horse', kind: 'horse', height: 0.8,  doodle: ['horse'] },
   { id: 'zebra', kind: 'zebra',       height: 0.74, doodle: ['zebra'] },
   { id: 'cow', kind: 'cattle',         height: 0.7,  doodle: ['cow'] },
   { id: 'bull', kind: 'cattle',        height: 0.76, doodle: [] },
-].map(a => ({ ...a, glb: `assets/animals/3d/${a.id}.glb`, thumb: `assets/animals/3d/thumbs/${a.id}.webp` }));
+].map(a => ({ ...a,
+  // realistic models (Sketchfab, see `real` for the credit) live in assets/animals/3d/real/
+  glb: a.real ? `assets/animals/3d/real/${a.id}.glb` : `assets/animals/3d/${a.id}.glb`,
+  thumb: a.real ? `assets/animals/3d/real/thumbs/${a.id}.webp` : `assets/animals/3d/thumbs/${a.id}.webp` }));
 
 export const workById = id => WORKS.find(w => w.id === id);
 export const animal3dById = id => ANIMALS3D.find(a => a.id === id);

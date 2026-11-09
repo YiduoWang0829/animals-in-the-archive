@@ -391,6 +391,7 @@ export default {
   cardCredits: '출처',
   cardPhotoCredit: '방문자: {file}, 사진가 확인 필요',
   cardDrawingCredit: '방문자: 방문자가 직접 그림',
+  card3dRealCredit: '방문자: “{title}”, {author} 제작, {licence} (Sketchfab), 이 프로젝트에서 수정',
   card3dCredit: '방문자: 3D {name}, Quaternius 제작 (CC0)',
   cardHosts: '그림 속 동물',
   cardFooter: '아카이브 속 동물들 · Yiduo Wang',
@@ -483,7 +484,7 @@ export default {
   creditsHeading: '출처',
   credits: {
     paintings: '그림', photos: '동물 사진', models3d: '3D 동물',
-    modelsNote: 'Quaternius가 만든, 뼈대와 애니메이션이 있는 로우폴리 동물들로, poly.pizza에서 CC0 1.0(퍼블릭 도메인)으로 공개되었습니다. 라이선스는 2026-11-06에 각 모델 페이지에서 확인했습니다. 셰이딩, 윤곽선, 회화적 표현은 이 프로젝트가 직접 만든 것입니다.',
+    modelsNote: '사실적인, 뼈대와 애니메이션이 있는 동물들은 Sketchfab에서 왔으며, 각각 내려받을 때 함께 온 라이선스 파일(CC BY 4.0 또는 CC BY-NC 4.0)에 따라 아래 표에 저작자를 표시했습니다. 이 프로젝트에서는 소품(안장 등)을 없애고, 쓰지 않는 애니메이션을 빼고, 텍스처를 줄이고, 회화적인 셰이딩을 더했습니다. 나머지 로우폴리 동물은 Quaternius가 만들었고 poly.pizza에서 CC0 1.0으로 공개되었습니다(2026-11-06에 각 모델 페이지에서 라이선스 확인).',
     model: '모델', hosts: '그림 속 동물', software: '소프트웨어, 모델, 글꼴',
     work: '작품', author: '작가', date: '연도', collection: '소장처', source: '이미지 출처', licence: '라이선스 상태',
     file: '원본 파일', species: '종', record: '출처 기록', photographer: '사진가',

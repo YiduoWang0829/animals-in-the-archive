@@ -87,3 +87,14 @@ these photos by `tools/storybook.py`.
 Tools used offline (not shipped): Blender 5.2.3 LTS, rembg 2.0.87 (isnet-general-use),
 PyTorch, Hugging Face transformers, Depth Anything V2, Segment Anything, LaMa, OpenCV,
 Pillow, NumPy, SciPy.
+
+## Realistic 3D animals (Sketchfab)
+
+Each model keeps the licence file that came with its download next to the `.glb` in
+`assets/animals/3d/real/`. For this project the props were removed, unused animations
+dropped, textures reduced (`tools/import_model.py`, `blender/import_sketchfab.py`) and the
+shading made painterly in the browser.
+
+| File | Model | Author | Source | Licence |
+|---|---|---|---|---|
+| donkey.glb | Realistic Animated Donkey 3D Model (saddle removed) | WildMesh 3D | [Sketchfab](https://sketchfab.com/3d-models/realistic-animated-donkey-3d-model-2b4086035df94d9e88fd0f18d34b3872) | CC BY 4.0 |

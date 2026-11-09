@@ -426,6 +426,7 @@ export const STRINGS = {
     cardCredits: 'Credits',
     cardPhotoCredit: 'Visitor: {file}, photographer to be confirmed',
     cardDrawingCredit: 'Visitor: drawn by the visitor',
+    card3dRealCredit: 'Visitor: “{title}” by {author}, {licence} (Sketchfab), changed for this project',
     card3dCredit: 'Visitor: 3D {name} by Quaternius (CC0)',
     cardHosts: 'Painted animals',
     cardFooter: 'Animals in the Archive · Yiduo Wang',
@@ -519,7 +520,7 @@ export const STRINGS = {
 
     creditsHeading: 'Credits',
     credits: {
-      paintings: 'Paintings', photos: 'Animal photographs', models3d: '3D animals', modelsNote: 'Rigged and animated low-poly animals by Quaternius, released under CC0 1.0 (public domain) on poly.pizza; licence checked on each model page on 2026-11-06. Shading, outline and painterly treatment are this project’s own.', model: 'Model', hosts: 'Painted animals', software: 'Software, models and fonts',
+      paintings: 'Paintings', photos: 'Animal photographs', models3d: '3D animals', modelsNote: 'Realistic rigged and animated animals from Sketchfab, each credited below under the licence stated in the licence file that came with its download (CC BY 4.0 or CC BY-NC 4.0); for this project the props (such as a saddle) were removed, unused animations dropped, textures reduced and the shading made painterly. The remaining low-poly animals are by Quaternius, released under CC0 1.0 on poly.pizza (licence checked on each model page on 2026-11-06).', model: 'Model', hosts: 'Painted animals', software: 'Software, models and fonts',
       work: 'Work', author: 'Artist', date: 'Date', collection: 'Collection', source: 'Image source', licence: 'Licence status',
       file: 'Source file', species: 'Species', record: 'Source record', photographer: 'Photographer',
       recorded: 'Licence as recorded', via: 'Obtained from', item: 'Item', version: 'Version', use: 'Used for',

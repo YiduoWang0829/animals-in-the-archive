@@ -106,6 +106,22 @@ function blobShadow() {
 
 const clipName = c => c.name.split('|').pop();
 
+// Some clips carry "root motion": the whole body travels forward during the cycle and
+// jumps back when it loops. Here the actor moves itself, so on the root and hip bones the
+// steady drift is taken out (the sway and bob stay).
+function stripRootMotion(clip) {
+  for (const tr of clip.tracks) {
+    if (!/\.position$/.test(tr.name) || !/^(_?root|root|cg|hips|pelvis|armature)/i.test(tr.name.split('.')[0].replace(/^.*\//, ''))) continue;
+    const v = tr.values, t = tr.times, n = t.length, T = t[n - 1] - t[0];
+    if (n < 3 || T <= 0) continue;
+    for (let k = 0; k < 3; k++) {
+      const d = v[(n - 1) * 3 + k] - v[k];
+      for (let i = 0; i < n; i++) v[i * 3 + k] -= d * (t[i] - t[0]) / T;
+    }
+  }
+  return clip;
+}
+
 export async function loadAnimal3D(url, opts = {}) {
   const gltf = await new GLTFLoader().loadAsync(url);
   return new Animal3D(gltf, opts);
@@ -127,13 +143,18 @@ export class Animal3D {
     this.root.traverse(o => {
       if (!o.isMesh) return;
       o.castShadow = false;
-      // smooth the faceted low-poly shading so the animal reads as a soft body
-      const g = o.geometry;
-      g.deleteAttribute('normal');
-      o.geometry = mergeVertices(g, 1e-4);
-      o.geometry.computeVertexNormals();
+      // a realistic, textured model keeps its own normals (recomputing them would show
+      // the UV seams); a faceted low-poly one is smoothed so it reads as a soft body
+      const textured = [].concat(o.material).some(m => m.map);
+      if (!textured) {
+        const g = o.geometry;
+        g.deleteAttribute('normal');
+        o.geometry = mergeVertices(g, 1e-4);
+        o.geometry.computeVertexNormals();
+      }
+      o.frustumCulled = false;                    // skinned bounds lag behind the pose
       const mats = [].concat(o.material).map(m => {
-        const n = m.clone(); n.flatShading = false; n.roughness = 0.82; n.metalness = 0;
+        const n = m.clone(); n.flatShading = false; n.roughness = textured ? 0.9 : 0.82; n.metalness = 0;
         stylise(n, this.uniforms); return n;
       });
       o.material = Array.isArray(o.material) ? mats : mats[0];
@@ -148,19 +169,35 @@ export class Animal3D {
       o.parent.add(line);
       (this.outlines ||= []).push(line);
     }
-    // normalise size: the model's height becomes `height` metres, feet at y = 0
+    // face forward (+z): some models are authored facing sideways. The head bone and
+    // the hips/tail tell which way the animal points.
+    const allBones = []; this.root.traverse(o => { if (o.isBone) allBones.push(o); });
+    const headB = allBones.find(b => /^head(_?\d+)?$/i.test(b.name));
+    const backB = allBones.find(b => /^(pelvis|hips|cg)(_?\d+)?$/i.test(b.name)) || allBones.find(b => /^tail/i.test(b.name));
+    if (headB && backB) {
+      this.root.updateMatrixWorld(true);
+      const hp = headB.getWorldPosition(new THREE.Vector3()), bp = backB.getWorldPosition(new THREE.Vector3());
+      const ang = Math.atan2(hp.x - bp.x, hp.z - bp.z);
+      if (Math.abs(ang) > 0.35) this.root.rotation.y = -ang;
+    }
+    // normalise size: the model's height becomes `height` metres, feet at y = 0, centred.
+    // The bounds come from the skinned (posed) vertices, not the raw mesh, since a rig can
+    // sit away from the mesh's own origin.
     this.root.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(this.root);
+    const box = new THREE.Box3().setFromObject(this.root, true);
     const s = 1 / (box.max.y - box.min.y);
-    this.root.scale.setScalar(s);
-    this.root.position.y = -box.min.y * s;
+    this.root.scale.multiplyScalar(s);
+    this.root.position.set(-(box.min.x + box.max.x) / 2 * s, -box.min.y * s, -(box.min.z + box.max.z) / 2 * s);
     this.length = (box.max.z - box.min.z) * s;
     this.uniforms.uOutline.value = 0.0035;        // outline thickness (fraction of the screen)
     // neck and head bones, with the direction each one "faces" in the rest pose
     // (the model faces +z), so the head can be aimed at a point anatomically
-    const byName = n => { let b = null; this.root.traverse(o => { if (!b && o.isBone && o.name === n) b = o; }); return b; };
-    this.head = byName('Head');
-    this.neck = ['Neck2', 'Neck3', 'Neck'].map(byName).filter(Boolean);
+    // bones are found by name pattern: "Head", "Head_023", "Neck2", "Neck1_021" …
+    const bones = []; this.root.traverse(o => { if (o.isBone) bones.push(o); });
+    const byName = n => bones.find(b => b.name === n) || null;
+    this.head = byName('Head') || bones.find(b => /^head(_?\d+)?$/i.test(b.name)) || null;
+    const necks = bones.filter(b => /^neck\d*(_\d+)?$/i.test(b.name));
+    this.neck = byName('Neck2') ? ['Neck2', 'Neck3', 'Neck'].map(byName).filter(Boolean) : necks.slice(-2).reverse();
     this.aimChain = [...this.neck.map(b => ({ b, share: 0.25, limit: 0.16 })), ...(this.head ? [{ b: this.head, share: 1, limit: 0.5 }] : [])];
     this.root.updateMatrixWorld(true);
     const qw = new THREE.Quaternion();
@@ -169,11 +206,12 @@ export class Animal3D {
     // animations
     this.mixer = new THREE.AnimationMixer(this.root);
     this.clips = {};
-    for (const c of gltf.animations) { const n = clipName(c); if (!this.clips[n]) this.clips[n] = c; }
+    for (const c of gltf.animations) { const n = clipName(c); if (!this.clips[n]) this.clips[n] = stripRootMotion(c); }
     const pick = (...names) => names.map(n => this.clips[n]).find(Boolean);
     this.anim = {
       idle: pick('Idle'), idle2: pick('Idle_2', 'Idle_Headlow', 'Idle_2_HeadLow'), eat: pick('Eating', 'Idle_Eating'),
       walk: pick('Walk'), run: pick('Gallop', 'Run'), jump: pick('Gallop_Jump', 'Jump_toIdle', 'Jump_ToIdle', 'Run_Jump'),
+      shake: pick('Shake'), call: pick('Call'), sleepEnd: pick('Sleep_End'),
     };
     this.actions = {};
     for (const [k, c] of Object.entries(this.anim)) if (c) this.actions[k] = this.mixer.clipAction(c);
@@ -194,6 +232,7 @@ export class Animal3D {
     if (!clip) return 0;
     let foot = null;
     this.root.traverse(o => { if (!foot && /^FrontLowerLeg\.?L(_end)?$/.test(o.name) && (o.name.endsWith('_end') || !o.children.length)) foot = o; });
+    if (!foot) this.root.traverse(o => { if (!foot && o.isBone && /^L_(Hand|Finger0|Foot)(_?\d+)?$/i.test(o.name) && /Hand|Finger/i.test(o.name)) foot = o; });
     if (!foot) return 0;
     const act = this.mixer.clipAction(clip); act.reset().play();
     const p = new THREE.Vector3(); let zMin = 1e9, zMax = -1e9;
@@ -255,6 +294,16 @@ export class Animal3D {
   face(yaw) { this.faceYaw = yaw; }
   stop() { this.target = null; this._arrive?.(); this._arrive = null; }
   hopOnce(h = 0.1) { this.hopT = 0; this.hopH = h; }
+  // a one-off movement from the model's own clips (a head shake, a call), then back to idle
+  gesture(name) {
+    const a = this.actions[name];
+    if (!a || this.target) return false;
+    a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = false;
+    this.current = null; this.play(name, 0.25);
+    clearTimeout(this._gT);
+    this._gT = setTimeout(() => { if (this.current === a && !this.target) this.play('idle', 0.45); }, Math.max(300, a.getClip().duration * 1000 - 400));
+    return true;
+  }
   nod(times = 2) { this.nodT = 0; this.nodN = times; }
 
   update(dt, t) {
