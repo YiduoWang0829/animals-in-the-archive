@@ -12,7 +12,7 @@
 // The visitor is an "actor": either a 2D Character (drawing / storybook) or a
 // 3D animated animal. Both expose the same small interface (see character.js).
 
-import * as THREE from 'three';
+import * as THREE from '../vendor/three-0.170.0/build/three.module.js';
 import { Character } from './character.js';
 import { wrapLines } from './util.js';
 

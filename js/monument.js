@@ -7,8 +7,8 @@
 // statue to carry it, two hands apart/together to zoom, swipe to change material.
 // Export: the whole monument as .glb (opens in Blender).
 
-import * as THREE from 'three';
-import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+import * as THREE from '../vendor/three-0.170.0/build/three.module.js';
+import { GLTFExporter } from '../vendor/three-0.170.0/examples/jsm/exporters/GLTFExporter.js';
 import { loadAnimal3D } from './animal3d.js';
 
 export const MATERIALS = ['marble', 'bronze', 'clay', 'painted'];

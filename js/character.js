@@ -5,7 +5,7 @@
 // instead of sliding. A fragment shader can "paint" the animal in the style of
 // the painting, but only where it is inside the picture frame.
 
-import * as THREE from 'three';
+import * as THREE from '../vendor/three-0.170.0/build/three.module.js';
 import { autoRig } from './rig.js';
 import { boxBlurAlpha } from './util.js';
 

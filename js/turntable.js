@@ -1,7 +1,7 @@
 // Character studio turntable: the chosen 3D animal on a lit plinth, moving in
 // place (walk, run, stand, graze). Drag to turn it; it also turns slowly by itself.
 
-import * as THREE from 'three';
+import * as THREE from '../vendor/three-0.170.0/build/three.module.js';
 import { loadAnimal3D } from './animal3d.js';
 
 export class Turntable {

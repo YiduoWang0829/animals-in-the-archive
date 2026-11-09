@@ -7,9 +7,9 @@
 //
 // Models: Quaternius "Ultimate Animated Animals" (CC0), see CREDITS.md.
 
-import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import * as THREE from '../vendor/three-0.170.0/build/three.module.js';
+import { GLTFLoader } from '../vendor/three-0.170.0/examples/jsm/loaders/GLTFLoader.js';
+import { mergeVertices } from '../vendor/three-0.170.0/examples/jsm/utils/BufferGeometryUtils.js';
 
 const STYLE_ID = { eden: 1, hicks: 1, durer: 2, marc: 3, storybook: 4 };
 

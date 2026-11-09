@@ -29,7 +29,7 @@ works. The camera only works on `localhost` or `https://`.
 1. **Collection index.** Three works side by side, with catalogue metadata and generated
    accession numbers: *The Garden of Eden with the Fall of Man* (Brueghel and Rubens, c. 1615),
    *Peaceable Kingdom* (Edward Hicks, c. 1834) and *Fate of the Animals* (Franz Marc, 1913).
-   The switch at the top right of this page changes the language: English, 中文, 한국어.
+   The switch at the top right of this page changes the language: English, 中文, Français, 한국어.
 2. **Record and role.** Author, Guard or Passer-by. The role changes what the animals say
    and how the painted animals react to you (they turn to you, or turn away).
 3. **Camera (optional).** An unchecked consent box, then face and hand tracking
@@ -177,15 +177,19 @@ The site is about 100 MB including history. The largest file is the MediaPipe wa
 
 ## Languages
 
-English is in `js/strings.js`, Simplified Chinese in `js/strings.zh.js` and Korean in
-`js/strings.ko.js`, key for key (any missing key falls back to English). The language
-follows `?lang=en|zh|ko`, set by the switch at the top right of the first page. The credits
+English is in `js/strings.js`, Simplified Chinese in `js/strings.zh.js`, French in
+`js/strings.fr.js` and Korean in `js/strings.ko.js`, key for key (any missing key falls back to English). The language
+follows `?lang=en|zh|fr|ko`, set by the switch at the top right of the first page. The credits
 table stays in English: it is the original record of sources and licences. Korean
 particles after a name (이/가, 을/를, 은/는, 와/과, (으)로) are chosen at run time by
 `localize()` in `strings.js`, because names are only known then. The web fonts are Latin
 only; Chinese and Korean use the system's serif and sans faces (Songti, Myeongjo, PingFang,
-Apple SD Gothic Neo, or the Noto equivalents). The Korean text has not yet been read by a
-native speaker; please have it checked before publication.
+Apple SD Gothic Neo, or the Noto equivalents). French typography (a narrow no-break space before ? ! ; : and inside « ») is applied
+in `strings.fr.js`. The Korean and French texts have not yet been read by native
+speakers; please have them checked before publication.
+
+No import map is needed: every module imports three.js by a relative path, so the site
+also runs in Safari 15 and 16 (import maps only arrived in Safari 16.4).
 
 ## Credits
 

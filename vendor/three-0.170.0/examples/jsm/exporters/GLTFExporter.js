@@ -25,7 +25,7 @@ import {
 	Vector3,
 	Quaternion,
 	REVISION
-} from 'three';
+} from '../../../build/three.module.js';
 
 /**
  * The KHR_mesh_quantization extension allows these extra attribute component types

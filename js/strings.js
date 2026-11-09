@@ -1,8 +1,9 @@
 // All user-facing text lives here (English), with Simplified Chinese in strings.zh.js and
-// Korean in strings.ko.js. The language follows ?lang=en|zh|ko (the switch in the header).
+// French in strings.fr.js, Korean in strings.ko.js. The language follows ?lang=en|zh|fr|ko (the switch in the header).
 // Placeholders in {braces} are filled at runtime by t(key, vars).
 import zh from './strings.zh.js';
 import ko from './strings.ko.js';
+import fr from './strings.fr.js';
 
 export const STRINGS = {
   en: {
@@ -657,7 +658,8 @@ export const STRINGS = {
 
 STRINGS.zh = zh;
 STRINGS.ko = ko;
-export const LANGS = [['en', 'EN'], ['zh', '中文'], ['ko', '한국어']];
+STRINGS.fr = fr;
+export const LANGS = [['en', 'EN'], ['zh', '中文'], ['fr', 'FR'], ['ko', '한국어']];
 export const LANG = new URLSearchParams(location.search).get('lang') in STRINGS
   ? new URLSearchParams(location.search).get('lang') : 'en';
 
