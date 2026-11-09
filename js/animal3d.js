@@ -174,32 +174,53 @@ export class Animal3D {
     const allBones = []; this.root.traverse(o => { if (o.isBone) allBones.push(o); });
     const isHead = b => /head/i.test(b.name) && !/(nub|end|correct|be_head|ponytail|ik|dyn)/i.test(b.name);
     const isBack = b => /(pelvis|hips)/i.test(b.name);
-    const isFoot = b => /(ankle|foot|toe|hoof|hand|digit|metatars|paw)/i.test(b.name) && !/(nub|end|twist|correct|ik|dyn)/i.test(b.name);
+    const isFoot = b => /(ankle|foot|toe|hoof|hand|digit|finger|metatars|carpus|paw)/i.test(b.name) && !/(nub|end|twist|correct|ik|dyn|rein|slider)/i.test(b.name);
     const headB = allBones.find(isHead), backB = allBones.find(isBack) || allBones.find(b => /spine|^cg/i.test(b.name)) || allBones.find(b => /^tail/i.test(b.name));
     const feet = allBones.filter(isFoot);
     // measure in a real pose (the first frame of its idle or walk): some rigs keep a rest
     // pose turned differently from how every animation holds the body
     const poseMixer = new THREE.AnimationMixer(this.root);
     const poseClip = gltf.animations.find(c => /^walk$/i.test(clipName(c))) || gltf.animations.find(c => /walk/i.test(clipName(c))) || gltf.animations.find(c => /idle|stand|breath/i.test(clipName(c))) || gltf.animations[0];
-    if (poseClip) { poseMixer.clipAction(poseClip).play(); poseMixer.setTime(0); }
+    const poseAct = poseClip ? poseMixer.clipAction(poseClip) : null;
+    if (poseAct) { poseAct.play(); poseMixer.setTime(0); }
     this.root.updateMatrixWorld(true);
     const wp = b => b.getWorldPosition(new THREE.Vector3());
     if (headB && backB) {
-      const fwd = wp(headB).sub(wp(backB));
-      let up = new THREE.Vector3(0, 1, 0);
-      if (feet.length >= 2) {                     // up: from the feet towards the hips
-        const fa = feet.reduce((acc, f) => acc.add(wp(f)), new THREE.Vector3()).multiplyScalar(1 / feet.length);
-        up = wp(backB).sub(fa);
+      // over one whole walk cycle: where the feet touch, where the hips and head are
+      const pts = [], head = new THREE.Vector3(), back = new THREE.Vector3(); let n = 0;
+      const T = poseClip ? poseClip.duration : 0;
+      for (let k = 0; k < 8; k++) {
+        if (poseAct) { poseMixer.setTime(T * k / 8); this.root.updateMatrixWorld(true); }
+        feet.forEach(f => pts.push(wp(f))); head.add(wp(headB)); back.add(wp(backB)); n++;
       }
-      // up comes first (feet → hips); forward is the head direction made level with it, so a
-      // head held higher than the hips never tips the whole body nose-up or tail-up
-      up.normalize(); fwd.addScaledVector(up, -fwd.dot(up)).normalize();
-      if (up.lengthSq() > 0.5) {
+      head.multiplyScalar(1 / n); back.multiplyScalar(1 / n);
+      // forward = from the hind feet to the front feet, which both stand on the ground, so it
+      // is level whatever the head and hips do; up = from the feet to the hips, with any
+      // forward lean taken out. (Feet are split into front and hind along the body axis.)
+      let up = new THREE.Vector3(0, 1, 0), level = null;
+      if (pts.length >= 4) {
+        const axis = head.clone().sub(back).normalize();
+        const proj = pts.map(p => p.dot(axis)).sort((x, y) => x - y), mid = proj[Math.floor(proj.length / 2)];
+        const fr = pts.filter(p => p.dot(axis) > mid), hi = pts.filter(p => p.dot(axis) <= mid);
+        const avg = arr => arr.reduce((acc, p) => acc.add(p), new THREE.Vector3()).multiplyScalar(1 / arr.length);
+        if (fr.length && hi.length) {
+          const g = avg(fr).sub(avg(hi));
+          if (g.length() > 0.15 * head.distanceTo(back)) {
+            level = g.normalize();
+            const fc = avg(pts);
+            up = back.clone().sub(fc); up.addScaledVector(level, -up.dot(level)).normalize();
+          }
+        }
+      }
+      const fwd = level || head.clone().sub(back);
+      fwd.addScaledVector(up, -fwd.dot(up)).normalize();
+      if (fwd.lengthSq() > 0.5) {
         const right = new THREE.Vector3().crossVectors(up, fwd);
         const basis = new THREE.Matrix4().makeBasis(right, up, fwd);
         const q = new THREE.Quaternion().setFromRotationMatrix(basis).invert();
-        if (q.angleTo(new THREE.Quaternion()) > 0.3) this.root.quaternion.premultiply(q);
+        this.root.quaternion.premultiply(q);
       }
+      if (poseAct) { poseMixer.setTime(0); this.root.updateMatrixWorld(true); }
     }
     // normalise size: the model's height becomes `height` metres, feet at y = 0, centred.
     // The bounds come from the skinned (posed) vertices, not the raw mesh, since a rig can
@@ -272,7 +293,7 @@ export class Animal3D {
     this.current = null;
     // measure how far one cycle of each gait carries the animal (in body heights),
     // so playback speed can match ground speed: the feet plant instead of sliding
-    const fromTravel = k => this.travel[k] > 0.08 ? { len: this.travel[k], dur: this.clips[k].duration } : null;
+    const fromTravel = k => this.travel[k] > 0.08 && this.clips[k] ? { len: this.travel[k], dur: this.clips[k].duration } : null;
     // a foot sweep that is implausibly short (an odd foot bone) falls back to body length
     const sane = (m, k, clip) => m && m.len > 0.3 ? m : clip ? { len: this.length * k, dur: clip.duration } : null;
     this.stride = {
