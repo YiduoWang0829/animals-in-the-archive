@@ -234,7 +234,7 @@ function choose(c) {
     const r = animal3dById(c.id)?.real;
     name.innerHTML = `<div class="n">${esc(label)}</div><div class="s">3D · ${esc(r ? `${r.author} · ${r.licence}` : 'Quaternius · CC0')}</div>`;
     tools.innerHTML = `
-      <div class="segmented" role="group">${['walk', 'idle', 'eat'].map(k => `<button data-action="tt-anim" data-anim="${k}" aria-pressed="${(turntable.anim || 'walk') === k}">${esc(t({ walk: 'animWalk', run: 'animRun', idle: 'animIdle', eat: 'animEat' }[k]))}</button>`).join('')}</div>
+      <div class="segmented" role="group">${['walk'].map(k => `<button data-action="tt-anim" data-anim="${k}" aria-pressed="${(turntable.anim || 'walk') === k}">${esc(t({ walk: 'animWalk', run: 'animRun', idle: 'animIdle', eat: 'animEat' }[k]))}</button>`).join('')}</div>
       <div class="segmented" role="group">
         <button data-action="tt-look" data-look="real" aria-pressed="${c.look !== 'storybook'}">${esc(t('lookNatural'))}</button>
         <button data-action="tt-look" data-look="storybook" aria-pressed="${c.look === 'storybook'}">${esc(t('lookStorybookShort'))}</button>
