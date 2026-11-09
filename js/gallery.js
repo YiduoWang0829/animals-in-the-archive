@@ -398,12 +398,15 @@ export class Gallery {
       else if (this.gazeHost != null) look = hostTop(this.gazeHost);
     }
     if (v.aimChain) {
-      if (look) {
+      if (look && v.aimChain.length) {             // a neck to turn: the eyes glide to the new target
         this.gazeS ??= (v.lastLook || look).clone();
         this.gazeS.lerp(look, 1 - Math.exp(-dt * 4.5));
         v.gazeAt = this.gazeS;
-      } else { v.gazeAt = null; this.gazeS = null; }
+      } else {                                     // the body turns itself (eased): aim it at the real target
+        v.gazeAt = look; this.gazeS = null;
+      }
       v.gazeBody = body;
+      v.gazeIsYou = !!look && !body && (v.attending || !!this.userGaze?.active);
     } else if (body && this.inside) {
       // a flat figure turns its whole body to whoever it is talking with
       const hp = this.hosts[other].actor.position, d = hp.x - v.position.x;

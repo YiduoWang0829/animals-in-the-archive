@@ -146,6 +146,7 @@ export class Animal3D {
       // a realistic, textured model keeps its own normals (recomputing them would show
       // the UV seams); a faceted low-poly one is smoothed so it reads as a soft body
       const textured = [].concat(o.material).some(m => m.map);
+      if (textured) this.realistic = true;
       if (!textured) {
         const g = o.geometry;
         g.deleteAttribute('normal');
@@ -242,7 +243,9 @@ export class Animal3D {
     const necks = bones.filter(b => /neck/i.test(b.name) && !/(fix|off|correct|end|nub|ik)/i.test(b.name));
     this.neck = byName('Neck2') ? ['Neck2', 'Neck3', 'Neck'].map(byName).filter(Boolean) : necks.slice(-2).reverse();
     this.feet = feet; this.backBone = backB;
-    this.aimChain = [...this.neck.map(b => ({ b, share: 0.25, limit: 0.16 })), ...(this.head ? [{ b: this.head, share: 1, limit: 0.5 }] : [])];
+    // a realistic model keeps its own neck: its rest pose is often posed differently from its
+    // animations, so bending bones from it would twist the neck. It turns its whole body.
+    this.aimChain = this.realistic ? [] : [...this.neck.map(b => ({ b, share: 0.25, limit: 0.16 })), ...(this.head ? [{ b: this.head, share: 1, limit: 0.5 }] : [])];
     this.root.updateMatrixWorld(true);
     const qw = new THREE.Quaternion();
     for (const c of this.aimChain) c.fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(c.b.getWorldQuaternion(qw).invert());
@@ -438,19 +441,37 @@ export class Animal3D {
     this.mixer.update(dt);
     // facing: travel heading while moving, else side-on (dir), plus a turn towards the viewer
     let want = (heading ?? (this.dir > 0 ? Math.PI / 2 : -Math.PI / 2)) + this.lookA * 1.8 * this.dir;
-    if (!moving && this.faceYaw !== undefined && this.faceYaw !== null) want = this.faceYaw;
+    if (!moving && this.faceYaw !== undefined && this.faceYaw !== null) {
+      want = this.faceYaw;
+      if (!this.aimChain.length) {                 // no neck: look over at it, three-quarter, not fully away
+        const sideOn = Math.sin(this.yaw) >= 0 ? Math.PI / 2 : -Math.PI / 2;
+        const d0 = THREE.MathUtils.clamp(Math.atan2(Math.sin(this.faceYaw - sideOn), Math.cos(this.faceYaw - sideOn)), -0.8, 0.8);
+        want = this.yaw + Math.atan2(Math.sin(sideOn + d0 - this.yaw), Math.cos(sideOn + d0 - this.yaw));
+      }
+    }
     if (!moving && this.gazeAt) {
       const lp = this.group.parent ? this.group.parent.worldToLocal(this.gazeAt.clone()) : this.gazeAt;
       const toward = Math.atan2(lp.x - p.x, lp.z - p.z);
       let off = toward - this.yaw; off = Math.atan2(Math.sin(off), Math.cos(off));
       // like a real animal: the body turns only until the head can reach (≤ ~50°).
       // In a conversation it turns properly towards the other one, head a little ahead.
-      const reach = this.gazeBody ? 0.3 : 0.85;
+      const reach = !this.aimChain.length ? 0.1 : this.gazeBody ? 0.3 : 0.85;   // no neck to turn: the body faces it
       if (Math.abs(off) > reach) want = this.yaw + off - Math.sign(off) * reach; else want = this.yaw;
+      // looking at you without a neck to turn: a three-quarter view, mostly side-on, the way an
+      // animal glances at someone, never swinging its whole body round to face the screen
+      if (this.gazeIsYou && !this.aimChain.length) {
+        const sideOn = Math.sin(this.yaw) >= 0 ? Math.PI / 2 : -Math.PI / 2;
+        let tgt = toward, d0 = Math.atan2(Math.sin(tgt - sideOn), Math.cos(tgt - sideOn));
+        d0 = THREE.MathUtils.clamp(d0, -0.75, 0.75);
+        want = this.yaw + Math.atan2(Math.sin(sideOn + d0 - this.yaw), Math.cos(sideOn + d0 - this.yaw));
+      }
     }
     // turning: a smooth start and a soft landing (critically damped), never a snap
     let dy = want - this.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
-    const k = moving ? 9 : 5.5;
+    // a turn under way keeps its direction: with the target right behind, the short way
+    // round would flip from side to side (a spin back and forth)
+    if (Math.abs(dy) > 2.9 && Math.abs(this.yawV || 0) > 0.25 && Math.sign(dy) !== Math.sign(this.yawV)) dy += Math.sign(this.yawV) * Math.PI * 2;
+    const k = moving ? 9 : 4.5;
     this.yawV = ((this.yawV || 0) + (dy * k * k - 2 * k * (this.yawV || 0)) * dt);
     this.yawV = THREE.MathUtils.clamp(this.yawV, -4, 4);
     this.yaw += this.yawV * dt;
@@ -465,7 +486,7 @@ export class Animal3D {
     this.aimW = (this.aimW || 0) + ((this.gazeAt ? 1 : 0) - (this.aimW || 0)) * Math.min(1, dt * 3.2);
     if (this.aimW > 0.01 && this.aimChain.length) this.aim(this.gazeAt || this.lastLook, this.aimW);
     if (this.gazeAt) this.lastLook = this.gazeAt.clone();
-    if (this.nodT !== undefined && this.head) {
+    if (this.nodT !== undefined && this.head && !this.realistic) {
       this.nodT += dt * 4;
       this.tilt(this.head, Math.sin(this.nodT * Math.PI) * 0.3);
       if (this.nodT >= this.nodN) this.nodT = undefined;
