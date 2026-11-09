@@ -9,6 +9,7 @@ import { WORKS, SPECIES, HOSTS, ANIMALS3D, workById, speciesById, animal3dById }
 import { loadClassifier, createPad, classify, matchSpecies, drawingToCharacter } from './sketch.js';
 import { makeCard, recordNumber } from './card.js';
 import { paintify, loadImage } from './paint.js';
+import { tagsOf, isPainted, isSolid, motifsOf, FRAGMENTS, drawnPiece, drawnCutout, fragmentPiece, quoteSlip } from './exchange.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -304,7 +305,7 @@ async function visitorImage() {
 }
 
 async function enterStage(visitor) {
-  state.visitor = visitor; state.answer = null; state.inside = false; state.hostAwake = false;
+  state.visitor = visitor; state.answer = null; state.inside = false; state.hostAwake = false; state.talk = [];
   storyToken++; giveAnswer(null); speechLock = Promise.resolve();
   closeModal(); show('stage');
   status(`<span class="loading"></span>${esc(t('loadingRoom'))}`); controls('');
@@ -361,14 +362,20 @@ const speakerName = who => who === 'visitor' ? state.name : hostNameOf(who);
 const shuffled = arr => [...arr].sort(() => Math.random() - 0.5);
 
 // say a line after whoever is speaking now has finished; resolves when it has been read
-function speak(who, text, { pause = 350 } = {}) {
+function speak(who, text, { pause = 350, tags = null, q = '' } = {}) {
   const tok = storyToken;
   const run = speechLock.then(async () => {
     if (tok !== storyToken || !gallery) return;
-    gallery.actorOf(who)?.nod?.(1);
-    if (who !== 'visitor') gallery.gazeHost = who;         // the visitor turns its head to the speaker
+    const g = gallery, dur = 1500 + fill(text).length * 48;
+    g.actorOf(who)?.nod?.(1);
+    // whoever speaks and whoever listens turn to each other (the visitor looks at the
+    // painted animal talking to it, not at you, not at the room)
+    const listener = who === 'visitor' ? (g.partner ?? null) : 'visitor';
+    g.convo = { speaker: who, listener, t: performance.now(), dur };
+    if (who !== 'visitor') g.gazeHost = who; else if (listener !== null) g.gazeHost = listener;
     say(who, speakerName(who), fill(text), 0);
-    await sleep(1500 + fill(text).length * 48);
+    if (tags) state.talk.push({ who, name: speakerName(who), text: fill(text), side: who === 'visitor' ? 'out' : 'in', tags, q: fill(q) });
+    await sleep(dur);
     bubbles.get(who)?.classList.remove('show');
     await sleep(pause);
   });
@@ -462,13 +469,117 @@ async function stepIn(g = gallery) {
   g.entering = true;
   const tok = storyToken, alive = () => g === gallery && tok === storyToken;
   controls(''); clearBubbles(); g.talkToYou(false);
-  await g.enter();
+  // the visitor sets off towards the picture; the light closes around it, and while the
+  // screen is dark a title card says what is about to happen. The walk through the frame
+  // (and the moment the relief opens up) happens behind the card.
+  const entering = g.enter();
+  await sleep(1100);
+  if (!alive()) return;
+  const x = W(state.work.id);
+  await crossing(g, [
+    t(`crossTime.${state.work.id}`),
+    t('crossStill'),
+    fill(t(kindOf() === 'drawing' ? 'crossOutDrawing' : 'crossOut')),
+    fill(t('crossTrade')),
+    { text: t('crossListen'), small: true },
+  ], entering, alive, x.title);
   if (!alive()) return;
   state.inside = true;
   status(esc(tracker ? t('insideHint') : t('insideHintMouse')));
   setTimeout(() => { if (gallery === g) status(''); }, 9000);
   controls(`<button class="btn primary cta" data-action="to-create">${esc(t('create'))}</button>`);
   insideStory(g, tok);
+}
+
+// ---- the crossing: a black title card, faded in around the picture ----------------
+// The dark closes like an iris on the painting (so it reads as "going in", not as a
+// cut), the lines appear one at a time, and the card waits for the walk to finish.
+async function crossing(g, lines, entering, alive, title) {
+  const el = document.createElement('div');
+  el.className = 'crossing';
+  el.innerHTML = `<div class="crossing-text"><p class="kicker">${esc(t('crossKicker'))}<em>${esc(title)}</em></p>
+    ${lines.map(l => typeof l === 'string' ? `<p class="line">${esc(l)}</p>` : `<p class="line small">${esc(l.text)}</p>`).join('')}</div>
+    <p class="crossing-skip">${esc(t('crossSkip'))}</p>`;
+  document.body.appendChild(el);
+  let hurry = false;
+  el.addEventListener('click', () => { hurry = true; });
+  // the iris closes on the centre of the painting
+  const c = g.project(g.paintGroup.getWorldPosition(new (g.paintGroup.position.constructor)()));
+  el.style.setProperty('--cx', `${(c.x / innerWidth * 100).toFixed(1)}%`);
+  el.style.setProperty('--cy', `${(c.y / innerHeight * 100).toFixed(1)}%`);
+  const R0 = Math.hypot(innerWidth, innerHeight) * 0.75;
+  await animate(2300, k => el.style.setProperty('--r', `${(R0 * (1 - k)).toFixed(1)}px`), k => k * k * (3 - 2 * k));
+  el.classList.add('dark');
+  if (!alive()) { el.remove(); return; }
+  const ps = [...el.querySelectorAll('.line')];
+  await sleep(500);
+  for (const p of ps) {
+    p.classList.add('show');
+    const read = 1300 + p.textContent.length * 46;
+    for (let w = 0; w < read && !hurry; w += 100) await sleep(100);
+    if (!alive()) { el.remove(); return; }
+  }
+  el.classList.add('can-skip');
+  // hold until the walk-in is done (and a moment longer, unless they click)
+  let done = false; entering.then(() => { done = true; });
+  for (let w = 0; (!done || (w < 2600 && !hurry)) && alive(); w += 100) await sleep(100);
+  // the words go first, then the dark lifts onto the inside of the picture
+  el.classList.add('leaving');
+  await sleep(900);
+  el.classList.add('lift');
+  setTimeout(() => el.remove(), 2200);
+}
+function animate(ms, fn, ease = k => k) {
+  return new Promise(res => {
+    const t0 = performance.now();
+    const f = () => { const k = Math.min(1, (performance.now() - t0) / ms); fn(ease(k)); k < 1 ? requestAnimationFrame(f) : res(); };
+    requestAnimationFrame(f);
+  });
+}
+
+// ---- the ledger: what each world told the other, then the way into the finale ------
+const firstSentence = s => {
+  const parts = s.match(/[^.!?…]+[.!?…]+[”’]?/g) || [s];
+  let out = parts[0].trim();
+  if (out.length < 30 && parts[1]) out += ' ' + parts[1].trim();
+  return out;
+};
+function showLedger(g = gallery) {
+  if (!g || $('.ledger')) return;
+  const talk = state.talk || [];
+  const col = side => talk.filter(e => e.side === side).slice(0, 4)
+    .map(e => `<li>${e.q ? `<span class="asked">${esc(e.q)}</span>` : ''}<span class="who">${esc(e.name)}</span><span class="said">${esc(firstSentence(e.text))}</span></li>`).join('');
+  const el = document.createElement('div');
+  el.className = 'ledger';
+  el.innerHTML = `<div class="ledger-panel">
+    <p class="kicker">${esc(t('ledgerKicker'))}</p>
+    <div class="ledger-cols">
+      <section><h3>${esc(t('ledgerIn'))}</h3><ul>${col('in')}</ul></section>
+      <section><h3>${esc(t('ledgerOut'))}</h3><ul>${col('out')}</ul></section>
+    </div>
+    <p class="ledger-note">${esc(t('ledgerNote'))}</p>
+    <div class="ledger-actions">
+      <button class="btn ghost" data-action="ledger-close">${esc(t('ledgerStay'))}</button>
+      <button class="btn" data-action="finale" data-mode="sculpt">${esc(t('ledgerMonument'))}</button>
+      <button class="btn primary cta" data-action="finale" data-mode="compose">${esc(t('ledgerCollage'))}</button>
+    </div></div>`;
+  document.body.appendChild(el);
+  state.ledgerOpen = true;
+  requestAnimationFrame(() => el.classList.add('show'));
+  // the lines arrive one by one, alternating between the two worlds
+  const [inL, outL] = [...el.querySelectorAll('section')].map(s => [...s.querySelectorAll('li')]);
+  const order = [];
+  for (let i = 0; i < Math.max(inL.length, outL.length); i++) { if (inL[i]) order.push(inL[i]); if (outL[i]) order.push(outL[i]); }
+  order.forEach((li, k) => setTimeout(() => li.classList.add('show'), 700 + k * 420));
+  controls(`<button class="btn" data-action="ledger-open">${esc(t('ledgerOpen'))}</button>
+    <button class="btn primary cta" data-action="to-create">${esc(t('create'))}</button>`);
+}
+function closeLedger() {
+  const el = $('.ledger');
+  state.ledgerOpen = false;
+  if (!el) return;
+  el.classList.remove('show');
+  setTimeout(() => el.remove(), 700);
 }
 
 // ---- part 2: inside. The painted animals were only paint. They freeze, stare at
@@ -506,28 +617,34 @@ async function insideStory(g, tok) {
   const vQ = shuffled([0, 1, 2, 3, 4, 5, 6, 7]).slice(0, 3), hQ = shuffled([0, 1, 2, 3, 4, 5, 6, 7]).slice(0, 3);
   const free = [...Array(H).keys()].filter(i => !state.hosts[i].inPlace);
   const asker = n => free.length ? free[n % free.length] : 0;
+  // each answer carries the things it talks about (exchange.js): the finale is made of them
   const pairs = [
-    [asker(0), t('insideAskOut'), 'visitor', life[0]],
-    ['visitor', t('insideAskIn'), asker(0), host(asker(0))[0]],
+    [asker(0), t('insideAskOut'), 'visitor', life[0], `life.${kind}.0`],
+    ['visitor', t('insideAskIn'), asker(0), host(asker(0))[0], `hostLife.${hid(asker(0))}.0`],
     ...vQ.flatMap((qi, n) => [
-      [asker(n + 1), t('askVisitor')[qi], 'visitor', t(`answerVisitor.${cat}`)[qi]],
-      ['visitor', t('askHost')[hQ[n]], asker(n), t(`answerHost.${state.work.id}`)[hQ[n]]],
+      [asker(n + 1), t('askVisitor')[qi], 'visitor', t(`answerVisitor.${cat}`)[qi], `answerVisitor.${cat}.${qi}`],
+      ['visitor', t('askHost')[hQ[n]], asker(n), t(`answerHost.${state.work.id}`)[hQ[n]], `answerHost.${state.work.id}.${hQ[n]}`],
     ]),
-    ['visitor', t('insideAskDay'), asker(1), host(asker(1))[1]],
+    ['visitor', t('insideAskDay'), asker(1), host(asker(1))[1], `hostLife.${hid(asker(1))}.1`],
   ];
-  let lastHost = null;
-  for (const [q, ql, a, al] of pairs) {
+  for (const [q, ql, a, al, path] of pairs) {
     if (!alive()) return;
     const hostIdx = q === 'visitor' ? a : q;
-    await g.meet(hostIdx); lastHost = hostIdx;           // (returns at once if they are already together)
-    await speak(q, ql); await speak(a, al);
+    g.partner = hostIdx;
+    await g.meet(hostIdx);                                  // (returns at once if they are already together)
+    await speak(q, ql); await speak(a, al, { tags: tagsOf(path), q: ql });
     if (Math.random() < 0.3) await speak(q, pickLine(t(q === 'visitor' ? 'reactionsToHost' : 'reactions')));
   }
+  g.partner = 0;
   const friend = await askUser(0, t('insideAskFriend'));
   if (!alive()) return;
   if (friend) await speak(0, friend === 'yes' ? t('insideFriendYes') : t('insideFriendNo'));
   await speak('visitor', t('insideLeave'));
   await speak(B, t('insideRemember'));
+  if (!alive()) return;
+  await sleep(900);
+  if (!alive()) return;
+  showLedger(g);                                            // what they told each other → make something of it
   insideLife(g, tok);
 }
 
@@ -540,8 +657,10 @@ async function insideLife(g, tok) {
   let n = 0;
   while (alive()) {
     await sleep(2200 + Math.random() * 2200);
+    while (state.ledgerOpen && alive()) await sleep(400);      // quiet while the ledger is open
     if (!alive()) break;
     const hs = awake(), i = hs[n % hs.length];
+    g.partner = i;
     const kind = ['qa', 'ask', 'chorus', 'qa', 'you', 'ask'][n % 6]; n++;
     if (kind === 'qa' && qa.length) {
       const [q, ans, back] = qa.shift();
@@ -577,7 +696,7 @@ function stageFrame(g) {
   const src = hands[0] || face;
   g.userGaze = src && now - (stageFrame.moved || 0) < 3000 ? { x: src.x, y: src.y, active: true } : null;
   if (g.visitor) g.visitor.calm = g.inside;
-  if (g.inside && g.userGaze && state.hostAwake) {            // painted animals turn towards your side
+  if (g.inside && g.userGaze && state.hostAwake && !g.talking()) {   // painted animals turn towards your side (not mid-conversation)
     const you = g.userGaze.x * innerWidth;
     g.hosts.forEach((h, i) => { if (h.awake && !h.actor.target) h.actor.setDir(Math.sign(you - g.project(g.anchor(i)).x) || 1); });
   }
@@ -681,6 +800,11 @@ function onHands(hs) {
 }
 
 // ---------------------------------------------------------------- 7 · create
+function goCreate(mode) {
+  closeLedger();
+  storyToken++; giveAnswer(null); gallery?.dispose(); gallery = null; clearBubbles(); status(''); controls('');
+  enterCreate(mode);
+}
 async function enterCreate(mode = 'sculpt') {
   show('create');
   $('#create-modes').innerHTML = ['sculpt', 'compose'].map(m =>
@@ -691,7 +815,7 @@ async function enterCreate(mode = 'sculpt') {
 async function openSculpt() {
   $('#compose-wrap').hidden = true; $('#sculpt-canvas').hidden = false;
   if ($('#collage-shelf')) $('#collage-shelf').hidden = true;
-  createStatus(t('monumentHint') + (tracker ? ' ' + t('monumentHands') : ''));
+  createStatus(t('monumentTalk') + ' ' + t('monumentHint') + (tracker ? ' ' + t('monumentHands') : ''));
   $('#create-tools').innerHTML = `
     <div class="segmented" role="group" id="form-group">${['stele', 'cube', 'drum', 'chalice', 'medallion'].map(f =>
       `<button data-action="form" data-form="${f}" aria-pressed="${f === (sculpt?.form || 'stele')}">${esc(t(`forms.${f}`))}</button>`).join('')}</div>
@@ -705,8 +829,15 @@ async function openSculpt() {
   if (v.kind === 'animal3d') { const a = animal3dById(v.id); visitorStatue = { kind: 'animal3d', glb: a.glb, height: a.height }; }
   else visitorStatue = { kind: 'slab', src: v.kind === 'drawing' ? v.canvas : v.species.storybook, height: 0.55 };
   const { createMonument } = await import('./monument.js');
+  await document.fonts.ready;
+  const tp = await talkPieces();
   sculpt = await createMonument($('#sculpt-canvas'), {
     work: state.work, visitor: visitorStatue,
+    objects: tp.real.filter(isSolid).slice(0, 3).map(drawnCutout),
+    inscription: {
+      head: fill(t('inscriptionHead', { title: W(state.work.id).title })),
+      lines: (state.talk || []).map(e => `“${firstSentence(e.text)}” — ${e.name}`).filter(l => l.length < 100).slice(0, 5),
+    },
     statues: state.hosts.map(h => ({ kind: 'slab', src: h.sprite, height: Math.min(0.75, Math.max(0.3, (hostMeta[h.id].box[3] - hostMeta[h.id].box[1]) / state.work.size[1] * 2.2)), flip: h.faces === 'left' })),
   });
   window.__aia.sculpt = sculpt;          // console/debug access only
@@ -719,6 +850,8 @@ function syncMaterial() {
 }
 function createStatus(text, append = false) {
   const el = $('#create-status');
+  el.classList.remove('folded'); clearTimeout(createStatus.t);
+  createStatus.t = setTimeout(() => el.classList.add('folded'), 9000);
   if (!append) el.innerHTML = `<strong>${esc(t('createHeading'))}</strong>`;
   el.insertAdjacentHTML('beforeend', `<div>${esc(text)}</div>`);
 }
@@ -726,42 +859,101 @@ function createStatus(text, append = false) {
 let collage = null;
 async function openCompose() {
   $('#sculpt-canvas').hidden = true; $('#compose-wrap').hidden = false;
-  createStatus(t('composeHint') + (tracker ? ' ' + t('composeHands') : ''));
+  createStatus(t('composeTalkHint') + (tracker ? ' ' + t('composeHands') : ''));
   const { Composer, VARIANTS, SEASONS } = await import('./compose.js');
   collage ??= await (await fetch('assets/collage/collage.json')).json();
   $('#create-tools').innerHTML = `
+    <label class="check"><input type="checkbox" id="meet-toggle" checked> ${esc(t('twoWorlds'))}</label>
     <label>${esc(t('background'))}<select id="bg-select">${WORKS.map(w => `<option value="${w.id}" ${w.id === state.work.id ? 'selected' : ''}>${esc(W(w.id).title)}</option>`).join('')}</select></label>
     <label>${esc(t('season'))}<select id="season-select">${SEASONS.map(v => `<option value="${v}">${esc(t(`seasons.${v}`))}</option>`).join('')}</select></label>
     <label>${esc(t('variant'))}<select id="variant-select">${VARIANTS.map(v => `<option value="${v}">${esc(t(`variants.${v}`))}</option>`).join('')}</select></label>
+    <button class="btn small ghost" data-action="shuffle-layout">${esc(t('shuffleLayout'))}</button>
     <button class="btn small ghost" data-action="remove-sel">${esc(t('removeSel'))}</button>
     <button class="btn primary cta" data-action="card">${esc(t('makeCard'))}</button>`;
-  // a shelf of every animal cut from the three paintings, plus your visitor
+  await document.fonts.ready;
+  const tp = await talkPieces();
+  // the shelf: first everything this conversation mentioned, then every animal in the collection
   let shelf = $('#collage-shelf');
   if (!shelf) { shelf = document.createElement('div'); shelf.id = 'collage-shelf'; shelf.className = 'collage-shelf glass'; $('#view-create').appendChild(shelf); }
   shelf.hidden = false;
-  shelf.innerHTML = `<h3>${esc(t('addAnimals'))}</h3><div class="shelf-row">${Object.entries(collage).map(([id, c]) =>
+  const thumb = c => { const k = 120 / Math.max(c.width, c.height), d = document.createElement('canvas'); d.width = c.width * k; d.height = c.height * k; d.getContext('2d').drawImage(c, 0, 0, d.width, d.height); return d.toDataURL(); };
+  shelf.innerHTML = `<h3>${esc(t('fromTalk'))}</h3><div class="shelf-row">${tp.all.map((p, i) =>
+    `<button class="pick piece" data-action="add-piece" data-i="${i}"><img src="${thumb(p.img)}" alt=""><span>${esc(p.label)}</span></button>`).join('')}</div>
+    <h3 style="margin-top:16px">${esc(t('addAnimals'))}</h3><div class="shelf-row">${Object.entries(collage).map(([id, c]) =>
     `<button class="pick" data-action="add-collage" data-id="${id}"><img src="assets/collage/${id}.webp" alt=""><span>${esc(c.name)}</span></button>`).join('')}</div>`;
   if (!composer) {
     const v = state.visitor;
-    let vimg;
-    if (v.kind === 'animal3d') vimg = await loadImage(animal3dById(v.id).thumb);
-    else if (v.kind === 'drawing') vimg = v.canvas;
-    else vimg = await loadImage(v.species.storybook);
-    const items = [{ img: vimg, x: 0.36, y: 0.9, s: 0.24, r: 0, flip: false }];
-    for (const [k, h] of state.hosts.entries()) {
+    let vimg, vflip = false;
+    if (v.kind === 'animal3d') vimg = await loadImage(animal3dById(v.id).thumb);          // thumbnails face left
+    else if (v.kind === 'drawing') { vimg = v.canvas; vflip = v.facing === 'right'; }
+    else { vimg = await loadImage(v.species.storybook); vflip = v.species.faces === 'right'; }
+    // they meet at the tear: the painted animal on the painting, the visitor on the page
+    const A = workById(state.work.id).size[0] / workById(state.work.id).size[1], sz = A < 1 ? 0.19 : 0.26;
+    const items = [{ img: vimg, x: 0.76, y: 0.95, s: sz, r: 0, flip: vflip }];
+    let k = 0;
+    for (const h of state.hosts) {
       if (!collage[h.id]) continue;
-      items.push({ img: await loadImage(`assets/collage/${h.id}.webp`), x: 0.56 + k * 0.14, y: 0.9, s: 0.24, r: 0, flip: h.faces === 'right' });
+      items.push({ img: await loadImage(`assets/collage/${h.id}.webp`), x: 0.48 - k * 0.15, y: 0.95 - k * 0.04, s: sz - k * 0.03, r: 0, flip: h.faces === 'left' });
+      k++;
     }
     composer = new Composer($('#compose-canvas'), { items });
     window.__aia.composer = composer;
+    composer.meet = true;
     await setComposeBackground(state.work.id);
+    layoutTalk(tp);
     addEventListener('resize', () => composer?.resize());
   }
+  $('#meet-toggle').checked = composer.meet;
+  $('#meet-toggle').addEventListener('change', e => composer.setMeet(e.target.checked));
   $('#bg-select').addEventListener('change', e => setComposeBackground(e.target.value));
   $('#variant-select').addEventListener('change', e => composer.setVariant(e.target.value));
   $('#season-select').addEventListener('change', e => composer.setSeason(e.target.value));
   composer.onChange = syncVariant;
   syncVariant();
+}
+
+// what this visit's conversation was about: things from each world, and lines to quote
+let talkCache = null;
+async function talkPieces() {
+  if (talkCache?.talk === state.talk) return talkCache;
+  const talk = state.talk || [];
+  let ids = motifsOf(talk);
+  if (!ids.length) {           // they went straight to making something: use what each side would have said
+    const kind = kindOf();
+    ids = [...new Set([0, 1].flatMap(n => [...tagsOf(`life.${kind}.${n}`), ...state.hosts.flatMap(h => tagsOf(`hostLife.${h.id}.${n}`))]))];
+  }
+  const real = ids.filter(id => !isPainted(id)), painted = ids.filter(id => isPainted(id) && FRAGMENTS[id].work === state.work.id);
+  const pick = side => { const c = talk.filter(e => e.side === side).map(e => ({ ...e, line: firstSentence(e.text) })).filter(e => e.line.length < 95); return c[Math.floor(Math.random() * c.length)]; };
+  const quotes = [pick('in'), pick('out')].filter(Boolean);
+  const all = [
+    ...await Promise.all(painted.map(async id => ({ id, kind: 'painted', label: t(`fragments.${id}`), img: await fragmentPiece(id, state.work, t(`fragments.${id}`)) }))),
+    ...real.map(id => ({ id, kind: 'real', label: t(`pieces.${id}`), img: drawnPiece(id, t(`pieces.${id}`)) })),
+    ...quotes.map(q => ({ id: 'q:' + q.line, kind: q.side === 'in' ? 'qin' : 'qout', label: q.line, img: quoteSlip(q.line, q.name, q.side === 'in') })),
+  ];
+  talkCache = { talk: state.talk, all, real, painted, quotes };
+  return talkCache;
+}
+
+// arrange the pieces: torn fragments on the painting, drawings on the notebook page, the two
+// quotes pinned over the tear. Animals stay where they are. Random each time, never piled up.
+function layoutTalk(tp) {
+  const A = composer.base.width / composer.base.height;
+  const k = A < 1 ? 1.5 : 1;                    // a tall picture is narrow: pieces take more of its width
+  composer.items = composer.items.filter(it => !it.flat);
+  const jit = (v, a) => v + (Math.random() - 0.5) * a;
+  const place = (p, x, y, wf, rot) => composer.items.push({ img: p.img, x: jit(x, 0.02), y: jit(y, 0.025), s: Math.min(0.3, wf * k * A / (p.img.width / p.img.height)), r: jit(0, rot), flip: false, flat: true, piece: p.id });
+  const S = arr => [...arr].sort(() => Math.random() - 0.5);
+  const paintedSlots = S([[0.12, 0.36], [0.33, 0.31], [0.12, 0.68], [0.34, 0.63]]);
+  const realSlots = S([[0.75, 0.36], [0.9, 0.33], [0.74, 0.66], [0.91, 0.64]]);
+  tp.all.filter(p => p.kind === 'painted').slice(0, 4).forEach((p, i) => place(p, ...paintedSlots[i], 0.17, 0.16));
+  tp.all.filter(p => p.kind === 'real').slice(0, 4).forEach((p, i) => place(p, ...realSlots[i], 0.115, 0.26));
+  const qin = tp.all.find(p => p.kind === 'qin'), qout = tp.all.find(p => p.kind === 'qout');
+  if (qin) place(qin, 0.42, 0.13, 0.25, 0.07);
+  if (qout) place(qout, 0.8, 0.12, 0.25, 0.07);
+  // drawn on top of the background, under the animals
+  const animals = composer.items.filter(it => !it.flat);
+  composer.items = [...composer.items.filter(it => it.flat), ...animals];
+  composer.render();
 }
 async function setComposeBackground(id) {
   const w = workById(id);
@@ -794,6 +986,8 @@ async function openCard() {
     photoCredit: v.kind === 'drawing' ? t('cardDrawingCredit') : v.kind === 'animal3d' ? t('card3dCredit', { name: t(`animals3d.${v.id}`) })
       : t('cardPhotoCredit', { file: v.species.file + '.png' }),
     figure: composing,
+    told: [(state.talk || []).find(e => e.side === 'in'), (state.talk || []).find(e => e.side === 'out')].filter(Boolean)
+      .map(e => `“${firstSentence(e.text)}” (${e.name})`).join('  ·  '),
   });
   if (cardUrl) URL.revokeObjectURL(cardUrl);
   cardUrl = URL.createObjectURL(blob);
@@ -809,6 +1003,7 @@ async function openCard() {
 }
 
 function teardown() {
+  closeLedger(); document.querySelectorAll('.crossing').forEach(e => e.remove());
   storyToken++; giveAnswer(null); speechLock = Promise.resolve();
   gallery?.dispose(); gallery = null;
   sculpt?.dispose(); sculpt = null;
@@ -889,12 +1084,20 @@ document.addEventListener('click', e => {
     case 'walk-in': state.name = $('#vname').value.trim().slice(0, 16) || pickLine(t('names')); enterStage({ ...state.choice }); break;
     case 'answer': giveAnswer(el.dataset.answer); break;
     case 'step-in': stepIn(); break;
-    case 'to-create': storyToken++; giveAnswer(null); gallery?.dispose(); gallery = null; clearBubbles(); status(''); controls(''); enterCreate('sculpt'); break;
+    case 'to-create':
+      if (gallery?.inside && state.talk?.length && !$('.ledger')) { showLedger(); break; }
+      goCreate('compose'); break;
+    case 'finale': goCreate(el.dataset.mode); break;
+    case 'ledger-close': closeLedger(); break;
+    case 'ledger-open': showLedger(); break;
     case 'create-mode':
       $('#create-modes').querySelectorAll('button').forEach(b => b.setAttribute('aria-selected', b === el));
       if (el.dataset.mode === 'sculpt') openSculpt(); else openCompose(); break;
     case 'material': pressGroup(el); sculpt?.setMaterial(el.dataset.mat); break;
     case 'form': pressGroup(el); sculpt?.setForm(el.dataset.form); break;
+    case 'add-piece': talkPieces().then(tp => { const p = tp.all[+el.dataset.i]; const A = composer.base.width / composer.base.height;
+      composer?.addItem(p.img, 0.2 + Math.random() * 0.6, 0.3 + Math.random() * 0.5, (p.kind[0] === 'q' ? 0.25 : p.kind === 'real' ? 0.12 : 0.17) * A / (p.img.width / p.img.height), { flat: true, piece: p.id, r: (Math.random() - 0.5) * 0.2 }); }); break;
+    case 'shuffle-layout': talkPieces().then(layoutTalk); break;
     case 'add-collage': loadImage(`assets/collage/${el.dataset.id}.webp`).then(img => composer?.addItem(img, 0.12 + Math.random() * 0.76, 0.7 + Math.random() * 0.25, 0.14 + Math.random() * 0.1)); break;
     case 'remove-sel': composer?.removeSelected(); break;
     case 'export-glb': exportGLB(); break;

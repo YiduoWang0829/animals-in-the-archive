@@ -22,9 +22,9 @@ function wrap(ctx, text, x, y, maxW, lh) {
   return y + lh;
 }
 
-export async function makeCard({ screenshot, record, date, work, workText, roleName, speciesName, hostName, mood, made, photoCredit, figure }) {
+export async function makeCard({ screenshot, record, date, work, workText, roleName, speciesName, hostName, mood, made, photoCredit, figure, told }) {
   await document.fonts.ready;
-  const W = 1200, H = 1720, M = 84;
+  const W = 1200, H = 1720 + (told ? 130 : 0), M = 84;
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
   const c = cv.getContext('2d');
   const paper = '#eee8db', ink = '#1d1a16', muted = '#7b7266', rule = 'rgba(29,26,22,.22)';
@@ -65,6 +65,7 @@ export async function makeCard({ screenshot, record, date, work, workText, roleN
     [t('cardHost'), hostName],
     [t('cardMood'), mood],
     [t('cardMade'), made],
+    ...(told ? [[t('cardTold'), told]] : []),
     [t('cardDate'), date],
   ];
   let y = boxY + boxH + 92;

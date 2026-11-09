@@ -22,7 +22,7 @@ export const WORKS = [
     size: [1847, 2400], realWidth: 1.45,
     hosts: ['durer-horse', 'durer-dog'],
     kinds: ['horse', 'dog'],
-    ground: [0.035, 0.08],    // the road runs along the bottom edge
+    ground: [0.1, 0.1],       // the road along the bottom (a little above the edge, so the view can breathe)
     wall: 0x24231f,
   },
   {

@@ -71,14 +71,35 @@ const FRAG = /* glsl */`
     c = c * vec3(1.04, 0.97, 0.83) + vec3(0.02, 0.012, 0.0);      // amber varnish
     return clamp(mix(vec3(0.12, 0.1, 0.05), c, 0.7 + 0.3 * l), 0.0, 1.0);
   }
-  vec3 durer(vec3 c) {                     // engraving: tones become hatched lines
-    float l = pow(lum(c), 0.85);
-    vec2 q = vUv / uTexel / 3.2;
-    float a = abs(fract((q.x + q.y) * 0.5) - 0.5) * 2.0;
-    float b = abs(fract((q.x - q.y) * 0.45) - 0.5) * 2.0;
-    float ink = step(0.35 + l * 0.65, a);
-    ink = max(ink, step(0.45 + l * 1.1, b) * step(l, 0.45));
-    return mix(vec3(0.89, 0.85, 0.76), vec3(0.12, 0.1, 0.09), ink);
+  // one family of engraved lines: w = how much of each line is ink (0..1). Antialiased at
+  // any size; where the lines would be finer than a pixel, the average tone is shown.
+  float engLine(float u, float w) {
+    float d = abs(fract(u) - 0.5) * 2.0, fw = fwidth(u) * 2.0;
+    float k = smoothstep(1.0 - w - fw, 1.0 - w + fw, d);
+    return mix(k, w, smoothstep(0.35, 0.75, fw));
+  }
+  vec3 durer(vec3 c) {                     // engraving: the animal's own light and dark, cut as lines
+    // tone = the picture's own light and dark, plus a soft volume (a rounded body lit from
+    // the upper left), so the lines model the form instead of lying flat on it
+    vec3 n = texture2D(uNormal, vUv).xyz * 2.0 - 1.0; n.x *= uFlip;
+    float vol = clamp(dot(normalize(n), normalize(vec3(-0.45, 0.65, 0.62))), 0.0, 1.0);
+    float t = clamp(smoothstep(0.06, 0.78, lum(c)) * 0.6 + vol * 0.75 - 0.18, 0.0, 1.0);
+    float aspect = uTexel.y / uTexel.x;
+    vec2 q = vec2(vUv.x * aspect, vUv.y) * 80.0;                 // about 80 lines over its height
+    float bend = sin(vUv.y * 9.0) * 0.6;                         // the burin follows the body a little
+    float a = engLine((q.x + q.y + bend) * 0.7071, 0.1 + (1.0 - t) * 0.72);
+    float b = engLine((q.x - q.y - bend) * 0.7071 * 1.12, max(0.0, 0.62 - t) * 1.25);
+    float ink = max(a, b);
+    // a contour where the body ends, like Dürer's outline
+    float e = 0.0;
+    for (int i = 0; i < 4; i++) {
+      vec2 o = vec2(i == 0 ? 2.5 : i == 1 ? -2.5 : 0.0, i == 2 ? 2.5 : i == 3 ? -2.5 : 0.0) * uTexel;
+      e = max(e, 1.0 - texture2D(uMap, vUv + o).a);
+    }
+    ink = max(ink, smoothstep(0.35, 0.9, e) * 0.9);
+    vec3 paper = vec3(0.89, 0.85, 0.76), inkc = vec3(0.11, 0.095, 0.08);
+    vec3 ground = mix(inkc, paper, 0.45 + 0.5 * t);              // a tone under the lines
+    return mix(ground, inkc, ink);
   }
   vec3 marc(vec3 c) {                      // prismatic expressionist palette
     float l = lum(c); float warm = c.r - c.b;
@@ -175,7 +196,7 @@ export class Character {
     tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4; tex.needsUpdate = true;
     const legs = this.rig.legs;
     this.uniforms = {
-      uMap: { value: tex }, uNormal: { value: lit ? pillowNormals(image) : null },
+      uMap: { value: tex }, uNormal: { value: pillowNormals(image) },     // (also gives the engraving its volume)
       uLit: { value: lit ? 1 : 0 }, uPhase: { value: 0 }, uWalk: { value: 0 },
       uPivot: { value: this.rig.pivotV }, uHeadU: { value: this.rig.headU }, uNod: { value: 0 },
       uLegs: { value: new THREE.Vector4(legs[0]?.u0 ?? 0, legs[0]?.u1 ?? 0, legs[1]?.u0 ?? 0, legs[1]?.u1 ?? 0) },
@@ -282,7 +303,8 @@ export class Character {
     // turning round: an eased half-turn that never fully collapses, with a little lift
     const want = this.dir * (this.headSide === 'right' ? 1 : -1);
     const dTurn = want - this.turn;
-    this.turn += Math.sign(dTurn) * Math.min(Math.abs(dTurn), dt * 4.2);
+    // eased: quick in the middle of the turn, slowing as it lands (no hard stop)
+    this.turn += Math.sign(dTurn) * Math.min(Math.abs(dTurn), dt * (1.3 + 3.6 * Math.min(1, Math.abs(dTurn))));
     u.uFlip.value = Math.sign(this.turn) || 1;
     const turning = Math.abs(this.turn) < 0.95;
     const mag = 0.28 + 0.72 * Math.abs(this.turn);                       // narrowest point is 28%, not a sliver

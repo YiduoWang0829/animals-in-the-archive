@@ -113,7 +113,7 @@ export class Composer {
     this.cv = canvas; this.ctx = canvas.getContext('2d');
     this.items = items;                 // [{img, name, x, y, s, r, flip}] x,y in 0..1 of the picture (feet)
     this.onChange = onChange;
-    this.variant = 'original'; this.season = 'none';
+    this.variant = 'original'; this.season = 'none'; this.meet = false; this.meetX = 0.62;
     this.cache = {};
     this.sel = null;
     this.bindPointer();
@@ -142,8 +142,8 @@ export class Composer {
     if (!this.cache[key]) this.cache[key] = FX[this.variant](seasonFX(this.base, this.season));
     this.render();
   }
-  addItem(img, x = 0.5, y = 0.85, s = 0.22) {
-    const it = { img, x, y, s, r: 0, flip: false };
+  addItem(img, x = 0.5, y = 0.85, s = 0.22, extra = {}) {
+    const it = { img, x, y, s, r: 0, flip: false, ...extra };
     this.items.push(it); this.sel = it; this.render(); return it;
   }
   removeSelected() { if (this.sel) { this.items.splice(this.items.indexOf(this.sel), 1); this.sel = null; this.render(); } }
@@ -174,17 +174,51 @@ export class Composer {
     if (!this.base) return;
     const c = this.ctx, W = this.cv.width, H = this.cv.height;
     c.drawImage(this.cache[this.variant + '|' + this.season] || this.base, 0, 0, W, H);
+    if (this.meet) c.drawImage(this.paper(), 0, 0, W, H);       // the real world: a notebook page
     for (const it of this.items) {
       const r = this.rect(it);
-      // soft ground shadow
-      c.save(); c.globalAlpha = 0.35; c.fillStyle = '#000';
-      c.beginPath(); c.ellipse(r.cx, it.y * H, r.w * 0.42, r.h * 0.06, 0, 0, Math.PI * 2); c.fill(); c.restore();
       c.save();
+      if (it.flat) {                                            // paper lies on the picture: a soft drop shadow
+        c.shadowColor = 'rgba(0,0,0,.45)'; c.shadowBlur = W * 0.012; c.shadowOffsetX = W * 0.003; c.shadowOffsetY = W * 0.005;
+      } else {                                                  // animals stand on it: a ground shadow
+        c.globalAlpha = 0.35; c.fillStyle = '#000';
+        c.beginPath(); c.ellipse(r.cx, it.y * H, r.w * 0.42, r.h * 0.06, 0, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1;
+      }
       c.translate(r.cx, r.cy); c.rotate(it.r); c.scale(it.flip ? -1 : 1, 1);
       c.drawImage(it.img, -r.w / 2, -r.h / 2, r.w, r.h);
+      c.shadowColor = 'transparent';
       if (it === this.sel) { c.strokeStyle = 'rgba(227,207,159,.8)'; c.setLineDash([6, 6]); c.lineWidth = 2; c.strokeRect(-r.w / 2, -r.h / 2, r.w, r.h); }
       c.restore();
     }
+  }
+
+  // "two worlds": the right part of the painting is torn away and a field-notebook page
+  // shows through. Drawn once per size, over whichever version of the painting is shown.
+  setMeet(on) { this.meet = on; this.render(); }
+  paper() {
+    const W = this.cv.width, H = this.cv.height, key = W + 'x' + H;
+    if (this._paper?.key === key) return this._paper.c;
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const x = c.getContext('2d');
+    let k = 11; const rnd = () => (k = k * 16807 % 2147483647) / 2147483647;
+    const edge = [], x0 = this.meetX * W;
+    for (let y = -10; y <= H + 10; y += H / 90) edge.push([x0 + Math.sin(y / H * 5.3) * W * 0.012 + (rnd() - 0.5) * W * 0.008, y]);
+    const tear = new Path2D(); tear.moveTo(W + 10, -10); edge.forEach(([px, py]) => tear.lineTo(px, py)); tear.lineTo(W + 10, H + 10); tear.closePath();
+    // the painting's torn lip throws a little shadow onto the page
+    x.save(); x.shadowColor = 'rgba(0,0,0,.55)'; x.shadowBlur = W * 0.01; x.shadowOffsetX = -W * 0.003;
+    x.fillStyle = '#f3ecdc'; x.fill(tear); x.restore();
+    x.save(); x.clip(tear);
+    x.strokeStyle = 'rgba(80,110,150,.16)'; x.lineWidth = Math.max(1, W / 1400);
+    const step = H / 26;
+    for (let y = step; y < H; y += step) { x.beginPath(); x.moveTo(0, y); x.lineTo(W, y); x.stroke(); }
+    x.strokeStyle = 'rgba(190,80,70,.22)'; x.beginPath(); x.moveTo(x0 + W * 0.05, 0); x.lineTo(x0 + W * 0.05, H); x.stroke();
+    for (let i = 0; i < W * H / 900; i++) { x.fillStyle = `rgba(70,55,35,${rnd() * 0.05})`; x.fillRect(rnd() * W, rnd() * H, 1.5, 1.5); }
+    x.restore();
+    // a white fibrous rim along the tear, like real torn paper
+    x.strokeStyle = 'rgba(250,246,236,.9)'; x.lineWidth = Math.max(1.5, W / 700);
+    x.beginPath(); edge.forEach(([px, py], i) => i ? x.lineTo(px, py) : x.moveTo(px, py)); x.stroke();
+    this._paper = { key, c };
+    return c;
   }
 
   hit(px, py) {

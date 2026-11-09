@@ -309,11 +309,17 @@ export class Animal3D {
       const lp = this.group.parent ? this.group.parent.worldToLocal(this.gazeAt.clone()) : this.gazeAt;
       const toward = Math.atan2(lp.x - p.x, lp.z - p.z);
       let off = toward - this.yaw; off = Math.atan2(Math.sin(off), Math.cos(off));
-      // like a real animal: the body turns only until the head can reach (≤ ~50°)
-      if (Math.abs(off) > 0.85) want = this.yaw + off - Math.sign(off) * 0.85; else want = this.yaw;
+      // like a real animal: the body turns only until the head can reach (≤ ~50°).
+      // In a conversation it turns properly towards the other one, head a little ahead.
+      const reach = this.gazeBody ? 0.3 : 0.85;
+      if (Math.abs(off) > reach) want = this.yaw + off - Math.sign(off) * reach; else want = this.yaw;
     }
+    // turning: a smooth start and a soft landing (critically damped), never a snap
     let dy = want - this.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
-    this.yaw += dy * Math.min(1, dt * (moving ? 7 : 5));
+    const k = moving ? 9 : 5.5;
+    this.yawV = ((this.yawV || 0) + (dy * k * k - 2 * k * (this.yawV || 0)) * dt);
+    this.yawV = THREE.MathUtils.clamp(this.yawV, -4, 4);
+    this.yaw += this.yawV * dt;
     this.inner.rotation.y = this.yaw;
     // hop arc
     if (this.hopT >= 0) {
@@ -322,7 +328,7 @@ export class Animal3D {
     }
     this.inner.position.y = this.hop;
     // head: aim at the look target on top of the animation, then nod
-    this.aimW = (this.aimW || 0) + ((this.gazeAt ? 1 : 0) - (this.aimW || 0)) * Math.min(1, dt * 5);
+    this.aimW = (this.aimW || 0) + ((this.gazeAt ? 1 : 0) - (this.aimW || 0)) * Math.min(1, dt * 3.2);
     if (this.aimW > 0.01 && this.aimChain.length) this.aim(this.gazeAt || this.lastLook, this.aimW);
     if (this.gazeAt) this.lastLook = this.gazeAt.clone();
     if (this.nodT !== undefined && this.head) {

@@ -281,23 +281,46 @@ export class Gallery {
       for (const a of [this.visitor, ...this.hosts.map(h => h.actor)]) { a.group.getWorldPosition(p); a.setSpot?.(p); }
       this.liveInside(dt);
     }
-    // where the visitor looks: at you when you move your head or raise a hand, or when it
-    // talks to you; otherwise at whoever is speaking. The point follows your head/hand.
-    const v = this.visitor;
+    // where the visitor looks. While it talks with a painted animal: at that animal (the
+    // one speaking to it, or the one it is answering), whatever else is going on. When you
+    // ask it something, or when you move your head or raise a hand: at you. Otherwise at
+    // whoever spoke last. The eyes travel smoothly from one to the next.
+    const v = this.visitor, talk = this.talking() ? this.convo : null;
+    // (a painted animal can speak before it steps out of its place: look at it there too)
+    const hostTop = i => (typeof i === 'number' && this.hosts[i]) ? this.hosts[i].actor.topWorld() : null;
+    const other = talk ? (talk.speaker === 'visitor' ? talk.listener : talk.speaker) : null;
+    let look = null, body = false;
+    if (!v.target) {
+      if (v.attending) look = this.youPoint();
+      else if (talk && hostTop(other)) { look = hostTop(other); body = true; }
+      else if (this.userGaze?.active) look = this.youPoint();
+      else if (this.gazeHost != null) look = hostTop(this.gazeHost);
+    }
     if (v.aimChain) {
-      const c = this.camera, u = this.userGaze;
-      const atYou = v.attending || (u && u.active);
-      if (atYou && !v.target) {
-        const g = c.position.clone();
-        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(c.quaternion), up = new THREE.Vector3(0, 1, 0).applyQuaternion(c.quaternion);
-        if (u) g.addScaledVector(right, (u.x - 0.5) * 2.6).addScaledVector(up, (0.5 - u.y) * 1.2);
-        v.gazeAt = g;
-      } else if (!v.target && this.gazeHost != null && this.hosts[this.gazeHost]?.awake) v.gazeAt = this.hosts[this.gazeHost].actor.topWorld();
-      else v.gazeAt = null;
+      if (look) {
+        this.gazeS ??= (v.lastLook || look).clone();
+        this.gazeS.lerp(look, 1 - Math.exp(-dt * 4.5));
+        v.gazeAt = this.gazeS;
+      } else { v.gazeAt = null; this.gazeS = null; }
+      v.gazeBody = body;
+    } else if (body && this.inside) {
+      // a flat figure turns its whole body to whoever it is talking with
+      const hp = this.hosts[other].actor.position, d = hp.x - v.position.x;
+      if (Math.abs(d) > 0.05) v.setDir(Math.sign(d));
     }
     this.visitor.update(dt, t);
     for (const h of this.hosts) h.actor.update(dt, t);
     this.updateCamera();
+  }
+
+  // two animals are talking right now (a line is on screen, or was a moment ago)
+  talking() { const c = this.convo; return !!c && performance.now() - c.t < c.dur + 2500; }
+  // a point in front of the screen where the person is (their head or hand, if tracked)
+  youPoint() {
+    const c = this.camera, u = this.userGaze, g = c.position.clone();
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(c.quaternion), up = new THREE.Vector3(0, 1, 0).applyQuaternion(c.quaternion);
+    if (u) g.addScaledVector(right, (u.x - 0.5) * 2.6).addScaledVector(up, (0.5 - u.y) * 1.2);
+    return g;
   }
 
   updateCamera() {
@@ -594,13 +617,20 @@ export class Gallery {
       const A = crowd[i], B = crowd[j], wa = this.widthOf(A), wb = this.widthOf(B);
       const ov = Math.min(A.position.x + wa / 2, B.position.x + wb / 2) - Math.max(A.position.x - wa / 2, B.position.x - wb / 2);
       if (ov <= 0.1 * Math.min(wa, wb) || Math.abs(A.position.z - B.position.z) > 0.14) continue;
-      const mover = B, sgn = Math.sign(B.position.x - A.position.x) || 1;
-      // two walkers crossing: the one behind steps further back, so it clearly passes behind
+      // who steps aside: never the visitor, never the one on its way to talk; otherwise the later one
+      const busy = a => a === v || this.hosts.some(h => h.actor === a && (h.meeting || h.called));
+      let mover = busy(B) && !busy(A) ? A : B;
+      if (mover === v) mover = A === v ? B : A;                   // the visitor itself never gets shoved
+      const still = mover === A ? B : A;
+      const wm = this.widthOf(mover), sgn = Math.sign(mover.position.x - still.position.x) || 1;
       const push = (A.target || B.target) ? 0.05 : 0.02;          // someone walking past: make room quickly
-      mover.position.x = THREE.MathUtils.clamp(mover.position.x + sgn * Math.min(ov, push), -this.pw / 2 + wb / 2, this.pw / 2 - wb / 2);
-      mover.position.z = Math.max(-this.paintU.uDepth.value * 0.6, mover.position.z - push * 0.4);
+      const dx = sgn * Math.min(ov, push), dz = -push * 0.4;
+      const zMin = -this.paintU.uDepth.value * 0.6, cx = x => THREE.MathUtils.clamp(x, -this.pw / 2 + wm / 2, this.pw / 2 - wm / 2);
+      mover.position.x = cx(mover.position.x + dx);
+      mover.position.z = Math.max(zMin, mover.position.z + dz);
       mover.position.y = this.groundY(mover.position.z);
-      if (mover.target) mover.target.x = THREE.MathUtils.clamp(mover.target.x + sgn * Math.min(ov, push), -this.pw / 2 + wb / 2, this.pw / 2 - wb / 2);
+      // its destination moves with it, so it never walks straight back into the same spot
+      if (mover.target) { mover.target.x = cx(mover.target.x + dx); mover.target.z = Math.max(zMin, mover.target.z + dz); mover.target.y = this.groundY(mover.target.z); }
     }
     // nobody ever stands outside the picture
     for (const a of crowd) { const w = this.widthOf(a); a.position.x = THREE.MathUtils.clamp(a.position.x, -this.pw / 2 + w / 2, this.pw / 2 - w / 2); }
@@ -609,6 +639,13 @@ export class Gallery {
     const wp = new THREE.Vector3();
     all.map(a => { a.group.getWorldPosition(wp); return [a, wp.z]; }).sort((x, y) => x[1] - y[1])
       .forEach(([a], i) => a.group.traverse(o => { if (o.isMesh) o.renderOrder = 10 + i; }));
+  }
+  // wait for walkers to arrive, but never for ever: after a while they simply stop where
+  // they are (a blocked path must not hold up the conversation)
+  async arrive(walks, actors, sec = 7) {
+    let late = false;
+    await Promise.race([Promise.all(walks), this.wait(sec).then(() => { late = true; })]);
+    if (late) actors.forEach(a => a.stop?.());
   }
   // before talking, the visitor and a painted animal walk towards each other
   async meet(i) {
@@ -624,7 +661,7 @@ export class Gallery {
     const vT = this.spot(mid.x - side * gap * 0.5, mid.z, v);
     const aT = this.spot(vT.x + side * gap, vT.z - 0.04, a);
     h.meeting = true;
-    await Promise.all([v.walkTo(vT, 0.35), a.walkTo(aT, 0.35)]);
+    await this.arrive([v.walkTo(vT, 0.35), a.walkTo(aT, 0.35)], [v, a]);
     a.lastFlip = -9; a.setDir(-side); v.setDir(side);
     h.meeting = false;
     this.formAnchor = v.position.clone();       // everyone else stays where they are
@@ -642,7 +679,7 @@ export class Gallery {
     const go = h.actor.walkTo(dest, 0.35);
     await this.wait(0.7);
     const follow = this.spot(dest.x + (vp.x > x ? 1 : -1) * (this.widthOf(h.actor) + this.widthOf(this.visitor)) / 2 * 1.2, dest.z + 0.08, this.visitor);
-    await Promise.all([go, this.visitor.walkTo(follow, 0.35)]);
+    await this.arrive([go, this.visitor.walkTo(follow, 0.35)], [h.actor, this.visitor]);
     h.actor.setDir(Math.sign(this.visitor.position.x - h.actor.position.x) || 1);
     h.called = false;
   }

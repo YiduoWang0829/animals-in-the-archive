@@ -57,7 +57,7 @@ async function slabStatue(src, height) {
   return g;
 }
 
-export async function createMonument(container, { work, visitor, statues }) {
+export async function createMonument(container, { work, visitor, statues, objects = [], inscription = null }) {
   const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
   r.setPixelRatio(Math.min(devicePixelRatio, 2));
   r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping;
@@ -175,7 +175,9 @@ export async function createMonument(container, { work, visitor, statues }) {
   // ---- statues on top ----
   const actors = [];                 // 3D animals keep their pose; we freeze them mid-stride
   const statueGroups = [];
+  // the animals, with the things they talked about standing between them
   const all = [{ ...visitor, isVisitor: true }, ...statues];
+  objects.forEach((o, i) => all.splice(Math.min(all.length, 1 + i * 2), 0, { kind: 'slab', src: o, height: 0.36, object: true }));
   for (const [k, s] of all.entries()) {
     let g;
     if (s.kind === 'animal3d') {
@@ -185,13 +187,34 @@ export async function createMonument(container, { work, visitor, statues }) {
       g = a.group; actors.push(a);
       g.traverse(o => { if (o.isMesh) o.userData.map = [].concat(o.material)[0].map; });
     } else {
-      g = await slabStatue(s.src, Math.max(0.45, s.height * 1.2));
+      g = await slabStatue(s.src, s.object ? s.height : Math.max(0.45, s.height * 1.2));
       if (s.flip) g.scale.x *= -1;
     }
     const x = (k - (all.length - 1) / 2) * Math.min(0.85, form.spread / all.length);
     g.position.set(x, form.topY, form.z);
     g.userData.statue = true;
     sculpture.add(g); statueGroups.push(g);
+  }
+
+  // ---- the inscription: a low stone in front, with their words cut into it ----
+  if (inscription) {
+    const tc = document.createElement('canvas'); tc.width = 2048; tc.height = 640;
+    const x = tc.getContext('2d');
+    x.fillStyle = '#fff'; x.fillRect(0, 0, tc.width, tc.height);
+    x.fillStyle = '#34302a'; x.textAlign = 'center';
+    x.font = '500 50px "Cormorant Garamond", Georgia, serif';
+    x.fillText(inscription.head.toUpperCase(), tc.width / 2, 92, tc.width - 120);
+    x.strokeStyle = '#6d675d'; x.lineWidth = 4; x.beginPath(); x.moveTo(560, 128); x.lineTo(tc.width - 560, 128); x.stroke();
+    x.font = 'italic 400 66px "Cormorant Garamond", Georgia, serif';
+    inscription.lines.slice(0, 5).forEach((l, i) => x.fillText(l, tc.width / 2, 212 + i * 88, tc.width - 100));
+    const tex = new THREE.CanvasTexture(tc); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+    const stone = new THREE.Group();
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.14, 0.86)); slab.userData.map = null; slab.position.y = 0.07;
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.81)); face.rotation.x = -Math.PI / 2; face.position.y = 0.1405;
+    face.userData.inscription = tex;
+    stone.add(slab, face);
+    stone.position.set(0, 0, 1.55); stone.rotation.x = 0.16;
+    sculpture.add(stone);
   }
 
   // ---- materials ----
@@ -202,6 +225,10 @@ export async function createMonument(container, { work, visitor, statues }) {
       if (!o.isMesh) return;
       const old = o.material;
       o.material = makeMaterial(kind, o.userData.map === undefined ? map : o.userData.map);
+      if (o.userData.inscription) {                 // the letters are cut: darker, in any material
+        o.material = makeMaterial(kind === 'painted' ? 'clay' : kind, null);
+        o.material.map = o.userData.inscription; o.material.bumpMap = o.userData.inscription; o.material.bumpScale = -3;
+      }
       if (o.isSkinnedMesh) o.material.skinning = true;
       [].concat(old).forEach(m => m.dispose?.());
     });
@@ -209,8 +236,10 @@ export async function createMonument(container, { work, visitor, statues }) {
   setMaterial('marble');
 
   // ---- camera / controls ----
-  const view = { yaw: -0.4, pitch: 0.2, dist: 7.6, ty: -0.4, tp: 0.2, td: 7.6 };
-  const target = new THREE.Vector3(0, form.height * 0.55, 0.2);
+  // a little from above, so the carved stone in front can be read too
+  const d0 = 6.4 + form.height * 0.95;          // far enough back for the whole form, statues to stone
+  const view = { yaw: -0.35, pitch: 0.36, dist: d0, ty: -0.35, tp: 0.36, td: d0 };
+  const target = new THREE.Vector3(0, form.height * 0.42, inscription ? 0.55 : 0.2);
   const resize = () => { const w = container.clientWidth, h = container.clientHeight; r.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); };
   const ro = new ResizeObserver(resize); ro.observe(container); resize();
 
@@ -250,7 +279,7 @@ export async function createMonument(container, { work, visitor, statues }) {
     drag.x = e.clientX; drag.y = e.clientY;
   });
   el.addEventListener('pointerup', () => { drag = null; });
-  el.addEventListener('wheel', e => { e.preventDefault(); view.td = THREE.MathUtils.clamp(view.td + e.deltaY * 0.004, 2.6, 11); }, { passive: false });
+  el.addEventListener('wheel', e => { e.preventDefault(); view.td = THREE.MathUtils.clamp(view.td + e.deltaY * 0.004, 2.6, 13); }, { passive: false });
   el.addEventListener('dblclick', e => { const s = statueAt(e.clientX, e.clientY); if (s) s.rotation.y += Math.PI / 2; });
 
   // ---- hands ----
@@ -266,7 +295,7 @@ export async function createMonument(container, { work, visitor, statues }) {
     } else { handGrab = null; prevPinch = null; }
     if (open.length === 2) {
       const d = Math.hypot(open[0].x - open[1].x, open[0].y - open[1].y);
-      if (zoom0) view.td = THREE.MathUtils.clamp(view.td - (d - zoom0) * 9, 2.6, 9);
+      if (zoom0) view.td = THREE.MathUtils.clamp(view.td - (d - zoom0) * 9, 2.6, 13);
       zoom0 = d;
     } else zoom0 = null;
   };
@@ -292,7 +321,7 @@ export async function createMonument(container, { work, visitor, statues }) {
     setForm(name) {
       buildForm(name); setTopPlane(); setMaterial(current);
       statueGroups.forEach((g, k) => { g.position.set((k - (statueGroups.length - 1) / 2) * Math.min(0.85, form.spread / statueGroups.length), form.topY, form.z); });
-      target.y = form.height * 0.55; view.td = 5.2 + form.height * 0.9;
+      target.y = form.height * 0.42; view.td = 6.4 + form.height * 0.95;
     },
     nextForm(step = 1) { const f = Object.keys(FORMS); this.setForm(f[(f.indexOf(formName) + step + f.length) % f.length]); },
     nextMaterial(step = 1) { setMaterial(MATERIALS[(MATERIALS.indexOf(current) + step + MATERIALS.length) % MATERIALS.length]); },

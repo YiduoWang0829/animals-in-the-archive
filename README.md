@@ -3,8 +3,10 @@
 An interactive digital collection by Yiduo Wang (University of London).
 Choose one of three paintings and a role, then draw an animal or choose a living 3D
 one. It walks through a gallery, looks back at you, and the animals painted in the
-picture wake up and talk to it. Step inside the painting to explore it in depth,
-then carve a monument or make a new painting from all the animals in the collection.
+picture wake up and talk to it. Step inside: the painted animals show it how they live
+in the picture, and it tells them how animals live out in the world. Everything they
+mention becomes the material of the finale: a collage or a monument made of this one
+conversation.
 
 Plain static site: HTML, CSS and ES-module JavaScript. No build step, no server code,
 no CDN. Every library and model is vendored in `vendor/`, and all paths are relative.
@@ -38,9 +40,13 @@ works. The camera only works on `localhost` or `https://`.
    stay planted. It turns to you and says hello (wave with the camera on, or click it).
    It reads the wall label aloud with two facts about the work, looks at the painting,
    and tells you whether an animal like it is painted there. It asks whether you like the
-   painting, then whether to go in. On yes it walks in one continuous path: up the three
-   steps and across the frame, while the view opens into the picture. All talk is one
-   line at a time, and questions wait for your nod, shake or click.
+   painting, then whether to go in. On yes it sets off towards the picture and the light
+   closes around the painting like an iris. On the black title card that follows, white
+   lines fade in one by one: the painted animals have lived one unchanging moment for
+   centuries; the visitor comes from a world of weather, homes and nights; today each will
+   show the other how it lives. The walk up the steps and through the frame happens behind
+   the card, then the dark lifts onto the inside of the picture. All talk is one line at a
+   time, and questions wait for your nod, shake or click.
 6. **Inside the painting.** The camera passes through the frame, then follows your animal
    from just behind and above. Zoom moves closer to or further from the animal, and
    looking around orbits it, so you never lose it. 3D animals turn their neck and head
@@ -59,18 +65,33 @@ works. The camera only works on `localhost` or `https://`.
    the two worlds compare lives: the visitor describes how its kind lives (18 kinds), and
    each painted animal describes its life in the picture (10 animals). After that they
    gather round it and keep talking, with yes/no questions for you that wait. There are about 70
-   lines in `js/strings.js`. The visitor takes on the painting's manner.
-7. **Create.** Two options:
+   lines in `js/strings.js`. The visitor takes on the painting's manner. Whoever talks,
+   the visitor turns to that animal: 3D animals turn body, neck and head, 2D ones turn
+   round, and the eyes travel smoothly from one speaker to the next.
+7. **What they told each other.** When the conversation ends, a ledger opens over the
+   picture: on one side what the painted animals said about life inside it, on the other
+   what the visitor said about life outside, each under its question. From there you
+   choose a collage or a monument (or stay a little longer).
+8. **Create.** Both are built from this visit's conversation. Every answer is tagged in
+   `js/exchange.js` with the things it mentions; things from the painted world are torn
+   out of the painting itself (the snake, Death's hourglass, the falling trees: 22
+   fragments), things from the real world are drawn in ink on notebook paper (a bowl, rain,
+   a sofa, snow: 25 drawings).
+   - **New painting (2D):** "Two worlds": the painting is torn open on the right and a
+     field-notebook page shows through. The painted animal stands on the painting, your
+     animal on the page, facing each other across the tear. The fragments lie on the
+     painting, the drawings on the page, and two of the lines they said are pinned over
+     the top as paper slips. The shelf holds everything the conversation mentioned plus
+     22 animals cut from all three works. Move, scale, turn, flip, rearrange; change the
+     season (spring blossom, summer, autumn leaves, winter snow) and the picture (night,
+     engraving, prism, storybook), or turn "Two worlds" off.
    - **Monument (3D):** the painting carved in relief, with the visitor and painted
-     animals as statues. There are five forms: stele, cube, drum (the painting wrapped
-     round it), chalice and medallion. There are four materials: marble, bronze, clay
-     and painted. Swipe a hand to change the form.
+     animals as statues and the real-world things they talked about as small statues
+     between them. Their words are carved into a low stone in front. There are five
+     forms: stele, cube, drum (the painting wrapped round it), chalice and medallion, and
+     four materials: marble, bronze, clay and painted. Swipe a hand to change the form.
      Turn it by dragging or pinching, carry statues, and export it as `.glb` for Blender.
-   - **New painting (2D):** a collage on any of the three paintings, using 22 animals cut
-     from all three works plus your visitor. Move, scale, turn and flip them, change the
-     season (spring blossom, summer, autumn leaves, winter snow) and the picture
-     (night, engraving, prism, storybook).
-8. **Archive card.** A catalogue-style PNG of your visit, then Play again.
+9. **Archive card.** A catalogue-style PNG of your visit, with one line from each side, then Play again.
 
 Privacy: nothing is uploaded or stored. No analytics, cookies or localStorage. The camera
 stops on "Turn camera off", when the tab is hidden, or when the page is closed.
@@ -89,7 +110,8 @@ js/character.js       2D character actor (auto-rig + walk shader) for drawings a
 js/rig.js             finds the legs in a side-view silhouette
 js/turntable.js       character studio stage
 js/monument.js        relief plinth + statues, materials, hands, GLB export
-js/compose.js         collage, seasons and picture variations
+js/compose.js         collage ("two worlds" page), seasons and picture variations
+js/exchange.js        what each line talks about; torn painting fragments, ink drawings, quote slips
 js/tracking.js        MediaPipe face + hand tracking, gestures (nod, shake, wave, swipe)
 js/sketch.js          drawing pad, DoodleNet, drawing → watercolour character
 js/card.js, paint.js, util.js

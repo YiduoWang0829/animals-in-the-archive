@@ -437,3 +437,56 @@ body.in-studio .footer { display: none; }
 @media (max-width: 760px) { .studio-cta { flex-wrap: wrap; } .name-field { order: -1; width: 100%; justify-content: center; } }
 
 .hand-cursor { transition: left .07s linear, top .07s linear, background .15s, transform .15s; }
+
+/* ---- the crossing: the light closes on the picture, a title card, then the inside ---- */
+.crossing { position: fixed; inset: 0; z-index: 45; cursor: pointer; --r: 200vmax; --cx: 50%; --cy: 45%;
+  background: radial-gradient(circle at var(--cx) var(--cy), transparent var(--r), rgba(4,4,3,.6) calc(var(--r) + 6vmax), #050504 calc(var(--r) + 22vmax));
+  display: grid; place-items: center; padding: 24px var(--gutter); transition: opacity 1.9s var(--ease); }
+.crossing.dark { background: #050504; }
+.crossing.lift { opacity: 0; pointer-events: none; }
+.crossing-text { max-width: 34em; text-align: center; transition: opacity .9s ease; }
+.crossing.leaving .crossing-text, .crossing.leaving .crossing-skip { opacity: 0; }
+.crossing .kicker { font-family: var(--mono); font-size: 11px; letter-spacing: .22em; text-transform: uppercase; color: var(--muted);
+  margin: 0 0 34px; opacity: 0; transition: opacity 1.6s ease .2s; }
+.crossing .kicker em { display: block; margin-top: 10px; font-family: var(--serif); font-style: italic; letter-spacing: .02em; text-transform: none; font-size: 17px; color: var(--ink-2); }
+.crossing.dark .kicker { opacity: 1; }
+.crossing .line { font-family: var(--serif); font-size: clamp(21px, 2.5vw, 33px); line-height: 1.32; color: #f1ece2; margin: 0 0 .7em;
+  opacity: 0; transform: translateY(10px); filter: blur(3px); transition: opacity 1.7s ease, transform 1.9s var(--ease), filter 1.7s ease; }
+.crossing .line.small { font-style: italic; font-size: clamp(16px, 1.6vw, 21px); color: var(--accent-2); margin-top: 1.4em; }
+.crossing .line.show { opacity: 1; transform: none; filter: none; }
+.crossing-skip { position: absolute; left: 0; right: 0; bottom: 28px; margin: 0; text-align: center; font-family: var(--mono); font-size: 10.5px;
+  letter-spacing: .2em; text-transform: uppercase; color: var(--muted); opacity: 0; transition: opacity 1.2s ease; }
+.crossing.can-skip .crossing-skip { opacity: .7; }
+
+/* ---- the ledger: what the two worlds told each other ---- */
+.ledger { position: fixed; inset: 0; z-index: 44; display: grid; place-items: center; padding: 20px var(--gutter);
+  background: rgba(6,6,5,.0); backdrop-filter: blur(0); -webkit-backdrop-filter: blur(0); transition: background 1.2s ease, backdrop-filter 1.2s ease; }
+.ledger.show { background: rgba(6,6,5,.82); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.ledger-panel { width: min(980px, 100%); max-height: calc(100vh - 40px); overflow: auto; opacity: 0; transform: translateY(14px); transition: opacity 1.1s ease .2s, transform 1.3s var(--ease) .2s; }
+.ledger.show .ledger-panel { opacity: 1; transform: none; }
+.ledger .kicker { font-family: var(--mono); font-size: 11px; letter-spacing: .22em; text-transform: uppercase; color: var(--muted); text-align: center; margin: 0 0 18px; }
+.ledger-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-top: 1px solid var(--line-2); }
+.ledger-cols section { padding: 18px clamp(14px, 3vw, 36px) 4px; }
+.ledger-cols section + section { border-left: 1px solid var(--line-2); }
+.ledger-cols h3 { font-family: var(--serif); font-weight: 400; font-style: italic; font-size: clamp(22px, 2.2vw, 28px); color: var(--accent-2); margin: 0 0 12px; }
+.ledger-cols ul { list-style: none; margin: 0; padding: 0; }
+.ledger-cols li { margin: 0 0 13px; opacity: 0; transform: translateY(6px); transition: opacity 1s ease, transform 1.2s var(--ease); }
+.ledger-cols li.show { opacity: 1; transform: none; }
+.ledger-cols .who { display: block; font-family: var(--mono); font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+.ledger-cols .said { font-family: var(--serif); font-size: clamp(16px, 1.45vw, 20px); line-height: 1.3; color: var(--ink); }
+.ledger-note { text-align: center; font-family: var(--serif); font-style: italic; font-size: clamp(16px, 1.5vw, 20px); color: var(--ink-2); max-width: 38em; margin: 14px auto 16px; line-height: 1.35; }
+.ledger-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+@media (max-width: 640px) {
+  .ledger-cols { grid-template-columns: 1fr; }
+  .ledger-cols section + section { border-left: 0; border-top: 1px solid var(--line-2); }
+}
+.collage-shelf h4 { font-family: var(--mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 14px 0 8px; font-weight: 400; }
+.collage-shelf .pick.piece img { background: transparent; object-fit: contain; }
+
+.ledger-cols .asked { display: block; font-family: var(--serif); font-style: italic; font-size: 15px; color: var(--muted); margin-bottom: 6px; }
+/* the create instructions fold down to their heading after a while, so the artwork is clear */
+#create-status > div { max-height: 240px; overflow: hidden; transition: max-height .8s var(--ease), opacity .6s ease; }
+#create-status.folded > div { max-height: 0; opacity: 0; }
+#create-status.folded:hover > div { max-height: 240px; opacity: 1; }
+label.check { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+label.check input { accent-color: var(--accent); }
