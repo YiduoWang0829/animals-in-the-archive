@@ -11,7 +11,7 @@ checked on each Commons file page on 2026-11-06.
 | Work | Artist | Date | Collection | Source | Licence status |
 |---|---|---|---|---|---|
 | *The Garden of Eden with the Fall of Man* | Jan Brueghel the Elder and Peter Paul Rubens | 1615 per Commons; the site shows "c. 1615" | Mauritshuis, The Hague, inv. 253 | [Commons](https://commons.wikimedia.org/wiki/File:Jan_Brueghel_de_Oude_en_Peter_Paul_Rubens_-_Het_aards_paradijs_met_de_zondeval_van_Adam_en_Eva.jpg) | Public domain; CC Public Domain Mark 1.0 |
-| *Knight, Death and the Devil* | Albrecht Dürer | 1513, engraving | Commons cites the National Gallery of Art, Washington (1943.3.3519 / 1941.1.20). **Impression to be verified** | [Commons](https://commons.wikimedia.org/wiki/File:Albrecht_D%C3%BCrer_-_Knight,_Death_and_the_Devil.jpg) | Public domain; CC Public Domain Mark 1.0 |
+| *Peaceable Kingdom* | Edward Hicks | c. 1834, oil on canvas, 74.5 × 90.1 cm | National Gallery of Art, Washington, accession 1980.62.15, gift of Edgar William and Bernice Chrysler Garbisch | [Commons](https://commons.wikimedia.org/wiki/File:Edward_Hicks,_Peaceable_Kingdom,_c._1834,_NGA_59908.jpg) (NGA Open Access) | CC0 1.0 |
 | *Fate of the Animals* (Tierschicksale) | Franz Marc | 1913, oil on canvas. **Not stated on Commons; to be verified** | Kunstmuseum Basel per Wikipedia. **Inventory number and dimensions to be verified** | [Commons](https://commons.wikimedia.org/wiki/File:Marc_tierschicksale.jpg) | Public domain; CC Public Domain Mark 1.0 |
 
 ### Derived from the paintings (this project's own processing)
@@ -19,7 +19,7 @@ checked on each Commons file page on 2026-11-06.
 - **Depth maps** (`assets/paintings/depth/`): estimated with Depth Anything V2 Small
   (`depth-anything/Depth-Anything-V2-Small-hf`, Apache-2.0), then smoothed.
 - **Painted animals that come alive** (`assets/hosts/`): Eden lion, white horse, stag,
-  white rabbit, little dog and peacock; Dürer's hound and the knight's horse; Marc's blue
+  white rabbit, little dog and peacock; Hicks's lion, bear cub, calf, goat and leopard; Marc's blue
   deer and red boars. Cut out with Segment Anything (`facebook/sam-vit-base`,
   Apache-2.0), using hand-placed boxes, points and two hand-traced outlines. Hidden parts
   and the ground behind each animal were repainted with LaMa (big-lama via

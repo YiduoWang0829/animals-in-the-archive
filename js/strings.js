@@ -1,6 +1,8 @@
-// All user-facing text lives here. To add Chinese, copy `en` to `zh`, translate
-// the values, and open the site with ?lang=zh.
+// All user-facing text lives here (English), with Simplified Chinese in strings.zh.js and
+// Korean in strings.ko.js. The language follows ?lang=en|zh|ko (the switch in the header).
 // Placeholders in {braces} are filled at runtime by t(key, vars).
+import zh from './strings.zh.js';
+import ko from './strings.ko.js';
 
 export const STRINGS = {
   en: {
@@ -150,6 +152,7 @@ export const STRINGS = {
     ],
 
     // ---- the gallery tour: just your animal and you ----
+    switchArrive: ['This one now. Let’s have a look.', 'Another painting! Come, let’s see who lives in this one.', 'Ooh, this one. Stay close.'],
     tourArrive: ['Oh, a gallery. It’s so quiet. Come, let’s have a look.', 'A real painting! Stay with me, I want to read the label.'],
     tourLabel: 'The label says: “{title}”, by {artist}, {date}.',
     tourSee: 'I can see {animals} in there.',
@@ -196,8 +199,11 @@ export const STRINGS = {
       'eden-rabbit': ['I am the little white rabbit near Eve’s feet. Most people never notice me.', 'I keep very still and count the people who walk past. Thousands and thousands.'],
       'eden-dog': ['I am the little white dog. In 1615 dogs like me lived in palaces.', 'I stay by Eve. In a painting you don’t get bored; you just keep being.'],
       'eden-peacock': ['I am the peacock. Every one of my feathers has its own little eye painted on.', 'I show off my tail. It is the same tail every day, but it is still a very good tail.'],
-      'durer-horse': ['I am the knight’s horse. Dürer cut me into copper in 1513, line by line.', 'I walk. I have been walking up this road for five hundred years and never arrived.'],
-      'durer-dog': ['I am the hound. My fur is thousands of tiny engraved lines.', 'I run beside the horse and never get tired. Copper doesn’t get tired.'],
+      'hicks-lion': ['I am the lion. The prophecy says I will eat straw like the ox, so here I sit, looking very serious about straw.', 'I sit in the middle and keep my claws to myself. Mr Hicks painted me again and again, more than sixty times.'],
+      'hicks-cub': ['I am the bear cub. In the prophecy the cow and the bear feed together, and their young lie down side by side.', 'I sleep curled up next to the calf. Nobody in here has ever been hungry enough to mind.'],
+      'hicks-calf': ['I am the calf. A lion sits right above me, and I have never once been afraid.', 'I lie on the warm brown earth and listen to the children. They never stop chattering.'],
+      'hicks-goat': ['I am the goat. The leopard is supposed to lie down with the young goat, and here we all are.', 'I keep my horns tidy and watch the river. Over there, people are making a promise of peace.'],
+      'hicks-leopard': ['I am the leopard. A little child is touching my face, and I am letting it.', 'I lie very still. In this picture nobody hunts and nobody runs away.'],
       'marc-deer': ['I am the blue deer. Franz Marc painted me in 1913, the year before the war.', 'I stretch up towards the light while the forest falls around me. It is beautiful, and it is frightening.'],
       'marc-boar': ['We are the red boars, down in the corner. Marc made us out of red and fire.', 'We hold on to each other. In here everything is always breaking.'],
     },
@@ -217,6 +223,7 @@ export const STRINGS = {
 
     // ---- inside: the opening (fixed script, about six lines) ----
     openShy: 'Oh! Um… hello. Nobody has ever walked in here before.',
+    openAmazed: 'Wait… you can talk? A painted animal, and you can really talk!',
     openSorry: 'Hello! I’m {name}. I’m sorry, I didn’t mean to scare you.',
     openWhisper: 'Is it… friendly?',
     openWhisperSolo: 'Are you… friendly?',
@@ -291,15 +298,15 @@ export const STRINGS = {
         'People in The Hague lean in close and try to count us. They always miss the rabbit.',
         'Not really. The varnish gets a little more golden, that’s all. Like honey.',
       ],
-      durer: [
-        'Play? The knight never stops riding. Running beside the horse is my game.',
-        'Copper doesn’t eat. Ink, perhaps: every print of us is pulled with fresh ink.',
-        'In a drawer, between sheets of soft paper, in the dark. It’s quite cosy.',
-        'Black and white, always. Dürer cut every cloud with a little steel tool.',
-        'Death is right there with his hourglass. I try very hard not to look.',
-        'We go back into our drawer. Prints don’t like too much light.',
-        'Students with magnifying glasses. They count my fur lines and gasp.',
-        'The paper turns a little browner. The lines stay sharp as the day they were cut.',
+      hicks: [
+        'The children. They lead us, the prophecy says. Mostly they lead us round in circles.',
+        'Straw, they say, even the lion. The black bear has an ear of corn. Nobody eats anybody.',
+        'Right here, all together, in one warm heap. Wolf next to lamb, cub next to calf.',
+        'It is always early autumn in here: golden leaves and a soft sky over the river.',
+        'Not in here. That is the whole point of this picture: nobody is afraid of anybody.',
+        'We stay just as we are. Peace doesn’t need the lights on.',
+        'People in Washington. They count the animals, then they look for the tiny treaty by the river.',
+        'The paint has cracked into a fine web. That is our only wrinkle.',
       ],
       marc: [
         'We used to play with the light, before the trees started falling.',
@@ -316,7 +323,7 @@ export const STRINGS = {
     crossKicker: 'Into the picture',
     crossTime: {
       eden: 'In this garden it has been the same golden afternoon since 1615.',
-      durer: 'On this copper road it has been the same grey morning since 1513.',
+      hicks: 'In this kingdom it has been the same peaceful autumn afternoon since 1834.',
       marc: 'In this forest the trees have been falling since 1913, and have never landed.',
     },
     crossStill: 'The animals in here have never felt rain. They have never been hungry, never slept, never grown old.',
@@ -349,8 +356,9 @@ export const STRINGS = {
       'eden-light': 'the same golden light', 'eden-rabbit': 'the rabbit nobody notices', 'eden-dog': 'the little white dog',
       'eden-peacock': 'a tail full of eyes', 'eden-lion': 'the lion who never blinks', 'eden-whitehorse': 'the white horse in the soft light',
       'eden-stag': 'the stag under the trees',
-      'durer-death': 'Death and his hourglass', 'durer-castle': 'the castle at the end of the road', 'durer-signature': 'cut in copper, 1513',
-      'durer-hound': 'fur made of lines', 'durer-road': 'the road that never arrives', 'durer-horsehead': 'the knight’s horse',
+      'hicks-treaty': 'a promise of peace by the river', 'hicks-river': 'the river far away', 'hicks-children': 'the children who lead them',
+      'hicks-lionface': 'a lion who eats straw', 'hicks-oxface': 'the ox, side by side with the lion', 'hicks-leopards': 'the leopard lies down with the kid',
+      'hicks-tree': 'golden autumn leaves', 'hicks-bearcorn': 'a bear with an ear of corn', 'hicks-wolflamb': 'the wolf with the lamb',
       'marc-beams': 'the falling trees', 'marc-deer': 'the blue deer', 'marc-boars': 'the red boars', 'marc-light': 'yellow lightning',
       'marc-storm': 'a storm of colour', 'marc-klee': 'the part that burned, painted back',
     },
@@ -441,7 +449,7 @@ export const STRINGS = {
     },
     hostNames: {
       'eden-lion': 'lion', 'eden-horse': 'white horse', 'eden-deer': 'stag', 'eden-rabbit': 'white rabbit',
-      'eden-dog': 'little dog', 'eden-peacock': 'peacock', 'durer-horse': 'knight’s horse', 'durer-dog': 'hound',
+      'eden-dog': 'little dog', 'eden-peacock': 'peacock', 'hicks-lion': 'lion', 'hicks-cub': 'bear cub', 'hicks-calf': 'calf', 'hicks-goat': 'goat', 'hicks-leopard': 'leopard',
       'marc-deer': 'blue deer', 'marc-boar': 'red boar',
     },
 
@@ -467,25 +475,25 @@ export const STRINGS = {
         yes: 'Then come in. There is room under the trees, and nobody has eaten the apple yet.',
         no: 'Fair. It is crowded, and the parrots never stop talking.',
       },
-      durer: {
-        title: 'Knight, Death and the Devil',
-        artist: 'Albrecht Dürer',
-        date: '1513',
-        style: 'Northern Renaissance · engraving',
-        animals: 'horse, dog, lizard',
-        collection: 'Impression reproduced from the National Gallery of Art, Washington (per Wikimedia Commons)',
-        blurb: 'One of Dürer’s three “master engravings”. Every tone is cut as a line: the dog’s fur, the horse’s muscle, the rot on Death’s face.',
-        welcome: 'A visitor in the engraving. Hello, {visitor}.',
+      hicks: {
+        title: 'Peaceable Kingdom',
+        artist: 'Edward Hicks',
+        date: 'c. 1834',
+        style: 'American folk painting · oil on canvas',
+        animals: 'lion, leopards, wolf, lamb, goats, ox, cows, bears, calf',
+        collection: 'National Gallery of Art, Washington (1980.62.15)',
+        blurb: 'Hicks, a Quaker preacher in Pennsylvania, painted this vision from the Book of Isaiah more than sixty times: wild and tame animals resting together, led by a little child. Far off by the river, William Penn makes his treaty with the Lenape.',
+        welcome: 'A visitor in the kingdom. Welcome, {visitor}.',
         greet: {
-          author: 'Master! You cut every line of me with a burin.',
-          guard: 'We only follow the road. We are no threat to anyone.',
-          passer: 'Keep pace with us. The knight never stops.',
+          author: 'Mr Hicks? You painted us so many times. We always come out a little different.',
+          guard: 'There is nothing to guard here. Nobody hurts anybody.',
+          passer: 'Sit with us a while. Everyone is welcome in this kingdom.',
         },
-        chorus: ['Quiet. The knight is listening.', 'The road goes up to the castle. It always does.', 'Don’t look at Death’s hourglass too long.'],
-        facts: ['It’s an engraving: every shadow is made of tiny lines cut into copper.', 'The knight rides past Death and the Devil and doesn’t even look at them.'],
-        see: 'a horse, a dog and a little lizard',
-        yes: 'Then walk beside us. Black and white is warmer than it looks.',
-        no: 'Understandable. Death is standing right there.',
+        chorus: ['Shh, the lion is thinking about straw again.', 'The children are coming this way. Be gentle.', 'Can you see the treaty by the river? Tiny people, a very big promise.', 'Wolf and lamb, side by side. It took a while to get used to.'],
+        facts: ['Edward Hicks was a Quaker preacher, and he painted this scene more than sixty times.', 'It shows a prophecy from the Bible: the wolf lies down with the lamb, and a little child leads them all.'],
+        see: 'a lion, leopards, a wolf, a lamb, goats, an ox, bears and a calf',
+        yes: 'Then come in quietly. In here, nobody is afraid of anybody.',
+        no: 'That is all right. Peace can wait for you.',
       },
       marc: {
         title: 'Fate of the Animals (Tierschicksale)',
@@ -525,10 +533,10 @@ export const STRINGS = {
           collection: 'Mauritshuis, The Hague, inv. 253',
           source: 'https://commons.wikimedia.org/wiki/File:Jan_Brueghel_de_Oude_en_Peter_Paul_Rubens_-_Het_aards_paradijs_met_de_zondeval_van_Adam_en_Eva.jpg',
           licence: 'Public domain (Wikimedia Commons; reproduction marked CC Public Domain Mark 1.0)' },
-        { work: 'Knight, Death and the Devil', author: 'Albrecht Dürer', date: '1513',
-          collection: 'Commons cites the National Gallery of Art, Washington (accession 1943.3.3519 / 1941.1.20); exact impression to be verified',
-          source: 'https://commons.wikimedia.org/wiki/File:Albrecht_D%C3%BCrer_-_Knight,_Death_and_the_Devil.jpg',
-          licence: 'Public domain (Wikimedia Commons; CC Public Domain Mark 1.0)' },
+        { work: 'Peaceable Kingdom', author: 'Edward Hicks', date: 'c. 1834',
+          collection: 'National Gallery of Art, Washington, accession 1980.62.15, gift of Edgar William and Bernice Chrysler Garbisch (oil on canvas, 74.5 × 90.1 cm)',
+          source: 'https://commons.wikimedia.org/wiki/File:Edward_Hicks,_Peaceable_Kingdom,_c._1834,_NGA_59908.jpg',
+          licence: 'CC0 1.0 (National Gallery of Art Open Access, via Wikimedia Commons)' },
         { work: 'Fate of the Animals (Tierschicksale)', author: 'Franz Marc', date: '1913 (not stated on the Commons file page; to be verified)',
           collection: 'Kunstmuseum Basel (per Wikipedia; inventory number to be verified)',
           source: 'https://commons.wikimedia.org/wiki/File:Marc_tierschicksale.jpg',
@@ -647,14 +655,38 @@ export const STRINGS = {
   },
 };
 
+STRINGS.zh = zh;
+STRINGS.ko = ko;
+export const LANGS = [['en', 'EN'], ['zh', '中文'], ['ko', '한국어']];
 export const LANG = new URLSearchParams(location.search).get('lang') in STRINGS
   ? new URLSearchParams(location.search).get('lang') : 'en';
+
+// Korean particles depend on the word before them (a final consonant or not), and names
+// are only known at run time: "{name}(이)야", "을(를)", "은(는)", "이(가)", "와(과)", "(으)로"
+// become the right form once the name is in. Latin names keep the written-out form.
+const JOSA = [['(이)', '이', ''], ['(으)로', '으로', '로'], ['을(를)', '을', '를'], ['은(는)', '은', '는'], ['이(가)', '이', '가'], ['와(과)', '과', '와']];
+export function localize(s) {
+  if (LANG !== 'ko' || typeof s !== 'string') return s;
+  for (const [mark, withC, without] of JOSA) {
+    let i = s.indexOf(mark);
+    while (i > 0) {
+      const c = s.charCodeAt(i - 1);
+      if (c >= 0xac00 && c <= 0xd7a3) {
+        const fin = (c - 0xac00) % 28;
+        const form = mark === '(으)로' ? (fin && fin !== 8 ? withC : without) : (fin ? withC : without);
+        s = s.slice(0, i) + form + s.slice(i + mark.length);
+      }
+      i = s.indexOf(mark, i + 1);
+    }
+  }
+  return s;
+}
 
 // t('roles.author.name') or t('indexCount', {n: 3})
 export function t(key, vars = {}) {
   const get = lang => key.split('.').reduce((o, k) => (o ? o[k] : undefined), STRINGS[lang]);
   const val = get(LANG) ?? get('en') ?? key;
   return typeof val === 'string'
-    ? val.replace(/\{(\w+)\}/g, (_, k) => (k in vars ? vars[k] : `{${k}}`))
+    ? localize(val.replace(/\{(\w+)\}/g, (_, k) => (k in vars ? vars[k] : `{${k}}`)))
     : val;
 }

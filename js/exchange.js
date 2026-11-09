@@ -7,6 +7,7 @@
 // was actually said on this visit, so no two finales are the same.
 
 import { loadImage } from './paint.js';
+import { wrapLines } from './util.js';
 
 // ---- which things each line talks about --------------------------------------------
 // keys are string paths in strings.js (array index last)
@@ -40,12 +41,15 @@ export const TAGS = {
   'hostLife.eden-rabbit': [['eden-rabbit'], ['eden-rabbit']],
   'hostLife.eden-dog': [['eden-dog'], ['eden-dog']],
   'hostLife.eden-peacock': [['eden-peacock'], ['eden-peacock']],
-  'hostLife.durer-horse': [['durer-horsehead', 'durer-signature'], ['durer-road']],
-  'hostLife.durer-dog': [['durer-hound'], ['durer-hound']],
+  'hostLife.hicks-lion': [['hicks-lionface'], ['hicks-lionface']],
+  'hostLife.hicks-cub': [['hicks-bearcorn'], ['hicks-children']],
+  'hostLife.hicks-calf': [['hicks-lionface'], ['hicks-children']],
+  'hostLife.hicks-goat': [['hicks-leopards'], ['hicks-treaty', 'hicks-river']],
+  'hostLife.hicks-leopard': [['hicks-children', 'hicks-leopards'], ['hicks-leopards']],
   'hostLife.marc-deer': [['marc-deer'], ['marc-light', 'marc-beams']],
   'hostLife.marc-boar': [['marc-boars'], ['marc-beams']],
   'answerHost.eden': [['eden-rabbit', 'eden-dog'], ['eden-apple'], ['eden-light'], ['eden-light'], ['eden-snake'], ['eden-parrots'], ['eden-rabbit'], ['eden-light']],
-  'answerHost.durer': [['durer-road'], ['durer-signature'], ['durer-signature'], ['durer-castle'], ['durer-death'], ['durer-signature'], ['durer-hound'], ['durer-signature']],
+  'answerHost.hicks': [['hicks-children'], ['hicks-bearcorn'], ['hicks-wolflamb'], ['hicks-tree', 'hicks-river'], ['hicks-wolflamb'], ['hicks-oxface'], ['hicks-treaty'], ['hicks-lionface']],
   'answerHost.marc': [['marc-light'], ['marc-storm'], ['marc-beams'], ['marc-storm'], ['marc-beams'], ['marc-light'], ['marc-deer'], ['marc-klee']],
 };
 export const tagsOf = path => {
@@ -65,12 +69,15 @@ export const FRAGMENTS = {
   'eden-lion': { work: 'eden', box: [1740, 880, 1930, 1070] },
   'eden-whitehorse': { work: 'eden', box: [1290, 780, 1430, 930] },
   'eden-stag': { work: 'eden', box: [1380, 790, 1520, 970] },
-  'durer-death': { work: 'durer', box: [400, 490, 820, 830] },
-  'durer-castle': { work: 'durer', box: [515, 35, 890, 240] },
-  'durer-signature': { work: 'durer', box: [30, 1930, 350, 2310] },
-  'durer-hound': { work: 'durer', box: [840, 1770, 1170, 1950] },
-  'durer-road': { work: 'durer', box: [500, 2160, 1580, 2370] },
-  'durer-horsehead': { work: 'durer', box: [130, 740, 360, 1210] },
+  'hicks-treaty': { work: 'hicks', box: [0, 1010, 640, 1290] },
+  'hicks-river': { work: 'hicks', box: [250, 700, 860, 1060] },
+  'hicks-children': { work: 'hicks', box: [840, 1580, 1600, 2002] },
+  'hicks-lionface': { work: 'hicks', box: [1430, 700, 1770, 1080] },
+  'hicks-oxface': { work: 'hicks', box: [880, 840, 1250, 1200] },
+  'hicks-leopards': { work: 'hicks', box: [1520, 1330, 1960, 1810] },
+  'hicks-tree': { work: 'hicks', box: [0, 0, 520, 640] },
+  'hicks-bearcorn': { work: 'hicks', box: [1880, 1580, 2240, 1960] },
+  'hicks-wolflamb': { work: 'hicks', box: [1880, 880, 2260, 1320] },
   'marc-beams': { work: 'marc', box: [1020, 70, 1700, 770] },
   'marc-deer': { work: 'marc', box: [990, 700, 1415, 1530] },
   'marc-boars': { work: 'marc', box: [100, 1160, 750, 1600] },
@@ -97,7 +104,7 @@ const ICONS = {
     shape(c, () => { c.moveTo(36, 104); c.bezierCurveTo(44, 170, 156, 170, 164, 104); c.closePath(); }, true);
     c.beginPath(); c.ellipse(100, 104, 64, 13, 0, 0, 7); c.stroke();
     hatch(c, 50, 120, 100, 30, 8, 0.5);
-    c.font = 'italic 400 19px "Cormorant Garamond", Georgia, serif'; c.fillStyle = INK; c.textAlign = 'center'; c.fillText('★', 100, 146);
+    c.font = 'italic 400 19px "Cormorant Garamond", "Songti SC", "Noto Serif SC", "AppleMyungjo", "Noto Serif KR", Georgia, serif'; c.fillStyle = INK; c.textAlign = 'center'; c.fillText('★', 100, 146);
   } },
   ball: { solid: true, draw(c) {
     shape(c, () => c.arc(100, 108, 50, 0, 7), true, '#e6d28a');
@@ -305,7 +312,7 @@ export function drawnPiece(id, caption) {
   x.drawImage(drawnCutout(id), 22, 4, 256, 256);
   x.restore();
   x.fillStyle = INK; x.textAlign = 'center';
-  x.font = 'italic 400 25px "Cormorant Garamond", Georgia, serif';
+  x.font = 'italic 400 25px "Cormorant Garamond", "Songti SC", "Noto Serif SC", "AppleMyungjo", "Noto Serif KR", Georgia, serif';
   fitText(x, caption, W / 2, H - 34, W - 40);
   cache.set(key, c);
   return c;
@@ -346,12 +353,9 @@ export async function fragmentPiece(id, work, caption) {
 // a strip of paper with a line someone said on it
 export function quoteSlip(text, who, painted) {
   const c = document.createElement('canvas'), x = c.getContext('2d');
-  const font = painted ? 'italic 400 30px "Cormorant Garamond", Georgia, serif' : '400 21px "IBM Plex Mono", Menlo, monospace';
+  const font = painted ? 'italic 400 30px "Cormorant Garamond", "Songti SC", "Noto Serif SC", "AppleMyungjo", "Noto Serif KR", Georgia, serif' : '400 21px "IBM Plex Mono", Menlo, monospace';
   x.font = font;
-  const maxW = 520, words = `“${text}”`.split(' '), lines = [];
-  let cur = '';
-  for (const w of words) { const t = cur ? cur + ' ' + w : w; if (x.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t; }
-  if (cur) lines.push(cur);
+  const maxW = 520, lines = wrapLines(x, `“${text}”`, maxW);
   const lh = painted ? 36 : 30, W = Math.ceil(Math.max(...lines.map(l => x.measureText(l).width), 160)) + 60, H = lines.length * lh + 64;
   c.width = W; c.height = H;
   const rnd = seeded(text);

@@ -107,17 +107,47 @@
   "w": 436,
   "h": 524
  },
- "durer-dog": {
-  "work": "durer",
-  "name": "hound",
-  "w": 900,
-  "h": 494
+ "hicks-lion": {
+  "work": "hicks",
+  "name": "lion",
+  "w": 617,
+  "h": 818
  },
- "durer-horse": {
-  "work": "durer",
-  "name": "knight\u2019s horse",
-  "w": 791,
-  "h": 900
+ "hicks-cub": {
+  "work": "hicks",
+  "name": "bear cub",
+  "w": 372,
+  "h": 301
+ },
+ "hicks-calf": {
+  "work": "hicks",
+  "name": "calf",
+  "w": 392,
+  "h": 291
+ },
+ "hicks-goat": {
+  "work": "hicks",
+  "name": "goat",
+  "w": 334,
+  "h": 267
+ },
+ "hicks-leopard": {
+  "work": "hicks",
+  "name": "leopard",
+  "w": 494,
+  "h": 416
+ },
+ "hicks-ox": {
+  "work": "hicks",
+  "name": "ox",
+  "w": 600,
+  "h": 751
+ },
+ "hicks-wolf": {
+  "work": "hicks",
+  "name": "wolf",
+  "w": 500,
+  "h": 432
  },
  "marc-deer": {
   "work": "marc",

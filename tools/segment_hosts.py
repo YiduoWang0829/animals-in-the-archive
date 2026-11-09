@@ -35,6 +35,7 @@ class Lama:
 
 HD = {"eden": "assets/paintings/hd/garden-of-eden.jpg",
       "durer": "assets/paintings/hd/knight-death-devil.jpg",
+      "hicks": "assets/paintings/hd/peaceable-kingdom.jpg",
       "marc": "assets/paintings/hd/fate-of-the-animals.jpg"}
 
 # box = [x0, y0, x1, y1] in HD pixels; pos/neg = extra click points; close = gap-closing kernel
@@ -82,6 +83,18 @@ HOSTS = {
                       "occlude": [[(1222, 1838), (1282, 1852), (1182, 2110), (1122, 2098)]],
                       # its back half reads as a separate shape to SAM: segment it on its own and join
                       "parts": [{"box": [1270, 1850, 1680, 2130], "pos": [[1450, 1980], [1560, 2000], [1380, 1930]]}]},
+    # The Peaceable Kingdom (Hicks, c. 1834): the lion stays where it sits, the others get up
+    "hicks-lion":    {"work": "hicks", "box": [1374, 664, 1871, 1385], "close": 15, "in_place": True,
+                      "pos": [[1600, 950], [1520, 1250], [1700, 1200], [1450, 800]], "neg": [[1440, 1470], [1900, 900]]},
+    "hicks-cub":     {"work": "hicks", "box": [973, 1365, 1268, 1596], "close": 9, "gc": True, "pos": [[1110, 1480], [1200, 1450]]},
+    "hicks-calf":    {"work": "hicks", "box": [1335, 1412, 1655, 1614], "close": 9, "pos": [[1500, 1520], [1400, 1470]], "neg": [[1700, 1450]]},
+    "hicks-goat":    {"work": "hicks", "box": [1928, 1240, 2205, 1386], "close": 9, "gc": True,
+                      "pos": [[2040, 1330], [2150, 1290], [1980, 1345]], "neg": [[1990, 1200], [2050, 1190], [2050, 1420]],
+                      # the lamb's fleece lies along its back: keep only the goat
+                      "clip": [(1925, 1302), (1960, 1287), (2030, 1286), (2098, 1286), (2122, 1258), (2138, 1214), (2176, 1203),
+                               (2212, 1228), (2216, 1330), (2205, 1425), (1925, 1425)]},
+    "hicks-leopard": {"work": "hicks", "box": [1519, 1450, 1958, 1808], "close": 11,
+                      "pos": [[1650, 1650], [1800, 1580], [1880, 1520]], "neg": [[1545, 1640], [1720, 1460]]},
     "marc-deer":     {"work": "marc", "box": [940, 690, 1460, 1720], "close": 15},
     "marc-boar":     {"work": "marc", "box": [60, 1120, 820, 1720], "close": 15},
 }
@@ -98,6 +111,7 @@ cache = {}
 
 DEPTH = {"eden": "assets/paintings/depth/garden-of-eden.png",
          "durer": "assets/paintings/depth/knight-death-devil.png",
+         "hicks": "assets/paintings/depth/peaceable-kingdom.png",
          "marc": "assets/paintings/depth/fate-of-the-animals.png"}
 
 

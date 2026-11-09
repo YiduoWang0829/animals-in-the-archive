@@ -3,6 +3,7 @@
 
 import { t } from './strings.js';
 import { loadImage } from './paint.js';
+import { wrapLines } from './util.js';
 
 export function recordNumber(date = new Date()) {
   const ymd = date.toISOString().slice(0, 10).replace(/-/g, '');
@@ -11,15 +12,8 @@ export function recordNumber(date = new Date()) {
 }
 
 function wrap(ctx, text, x, y, maxW, lh) {
-  const words = text.split(' ');
-  let line = '';
-  for (const w of words) {
-    const test = line ? line + ' ' + w : w;
-    if (ctx.measureText(test).width > maxW && line) { ctx.fillText(line, x, y); y += lh; line = w; }
-    else line = test;
-  }
-  if (line) ctx.fillText(line, x, y);
-  return y + lh;
+  for (const line of wrapLines(ctx, text, maxW)) { ctx.fillText(line, x, y); y += lh; }
+  return y;
 }
 
 export async function makeCard({ screenshot, record, date, work, workText, roleName, speciesName, hostName, mood, made, photoCredit, figure, told }) {
@@ -28,7 +22,7 @@ export async function makeCard({ screenshot, record, date, work, workText, roleN
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
   const c = cv.getContext('2d');
   const paper = '#eee8db', ink = '#1d1a16', muted = '#7b7266', rule = 'rgba(29,26,22,.22)';
-  const serif = '"Cormorant Garamond", Georgia, serif', mono = '"IBM Plex Mono", Menlo, monospace', sans = 'Inter, system-ui, sans-serif';
+  const serif = '"Cormorant Garamond", "Songti SC", "Noto Serif SC", "AppleMyungjo", "Noto Serif KR", Georgia, serif', mono = '"IBM Plex Mono", Menlo, monospace', sans = 'Inter, "PingFang SC", "Apple SD Gothic Neo", system-ui, sans-serif';
 
   c.fillStyle = paper; c.fillRect(0, 0, W, H);
   // faint paper grain

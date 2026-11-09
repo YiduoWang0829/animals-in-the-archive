@@ -12,7 +12,7 @@ from PIL import Image
 from transformers import SamModel, SamProcessor
 
 HD = {"eden": "assets/paintings/hd/garden-of-eden.jpg",
-      "durer": "assets/paintings/hd/knight-death-devil.jpg",
+      "hicks": "assets/paintings/hd/peaceable-kingdom.jpg",
       "marc": "assets/paintings/hd/fate-of-the-animals.jpg"}
 CUTS = {
     # Garden of Eden (swan, goat, pheasant, coot, moorhen and the Dürer lizard were tried
@@ -35,9 +35,15 @@ CUTS = {
     "eden-rabbit":   ("eden", [616, 1336, 720, 1430], "white rabbit"),
     "eden-dog":      ("eden", [710, 1238, 832, 1374], "little dog"),
     "eden-peacock":  ("eden", [762, 1026, 1186, 1550], "peacock"),
-    # Dürer
-    "durer-dog":     ("durer", [820, 1730, 1600, 2200], "hound"),
-    "durer-horse":   ("durer", [60, 190, 1800, 2380], "knight’s horse"),
+    # The Peaceable Kingdom
+    "hicks-lion":    ("hicks", [1374, 664, 1871, 1385], "lion"),
+    "hicks-cub":     ("hicks", [973, 1365, 1268, 1596], "bear cub"),
+    "hicks-calf":    ("hicks", [1335, 1412, 1655, 1614], "calf"),
+    "hicks-goat":    ("hicks", [1928, 1240, 2205, 1386], "goat"),
+    "hicks-leopard": ("hicks", [1519, 1450, 1958, 1808], "leopard"),
+    "hicks-ox":      ("hicks", [790, 620, 1395, 1420], "ox"),
+    "hicks-wolf":    ("hicks", [1890, 840, 2398, 1300], "wolf"),
+    # (the black bear and the kid were tried and dropped: cut by a horn / only the head shows)
     # Marc
     "marc-deer":     ("marc", [940, 690, 1460, 1720], "blue deer"),
     "marc-boar":     ("marc", [60, 1120, 820, 1720], "red boars"),

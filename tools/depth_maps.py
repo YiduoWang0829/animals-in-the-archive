@@ -10,7 +10,8 @@ import torch
 dev = "mps" if torch.backends.mps.is_available() else "cpu"
 pipe = pipeline("depth-estimation", model="depth-anything/Depth-Anything-V2-Small-hf", device=dev)
 os.makedirs("assets/paintings/depth", exist_ok=True)
-for n in ["garden-of-eden", "knight-death-devil", "fate-of-the-animals"]:
+import sys
+for n in (sys.argv[1:] or ["garden-of-eden", "peaceable-kingdom", "fate-of-the-animals"]):
     im = Image.open(f"assets/paintings/hd/{n}.jpg").convert("RGB")
     small = im.copy(); small.thumbnail((1024, 1024))
     d = np.array(pipe(small)["predicted_depth"].squeeze().cpu(), dtype=np.float32)

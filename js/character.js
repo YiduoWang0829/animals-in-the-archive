@@ -114,7 +114,10 @@ const FRAG = /* glsl */`
 
   void main() {
     vec4 t = texture2D(uMap, vUv);
-    if (t.a < 0.08) discard;
+    // a clean edge: the soft fringe of the cut-out (where bits of background cling) is
+    // tightened into a thin antialiased line instead of a fuzzy halo
+    t.a = smoothstep(0.2, 0.6, t.a);
+    if (t.a < 0.02) discard;
     vec3 col = t.rgb;
     // photo mode: relief shading from a normal map → reads as a 3D body
     if (uLit > 0.5) {
@@ -182,7 +185,7 @@ function blobShadow() {
     new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }));
 }
 
-const STYLE_ID = { eden: 1, durer: 2, marc: 3 };
+const STYLE_ID = { eden: 1, hicks: 1, durer: 2, marc: 3 };
 
 export class Character {
   // image: HTMLImageElement or canvas; headSide: which way the head points in the image
@@ -261,6 +264,9 @@ export class Character {
   face() {}
   stop() { this.target = null; this._arrive?.(); this._arrive = null; }
   hopOnce(height = 0.12) { this.hopT = 0; this.hopH = height; }
+  // getting up after centuries of lying (or standing) still: a little gathering crouch,
+  // the body rising and stretching, then a shake that settles it
+  standUp() { this.riseT = 0; }
   nod(times = 2) { this.nodT = 0; this.nodN = times; }
 
   update(dt, t) {
@@ -313,11 +319,21 @@ export class Character {
     const ph = u.uPhase.value, w = u.uWalk.value;
     const bob = Math.abs(Math.sin(ph)) * 0.035 * w + (turning ? 0.03 : 0);
     this.mesh.rotation.z = Math.sin(ph) * 0.035 * w * (Math.sign(this.turn) || 1) + Math.sin(t * 0.7 + this.height * 9) * 0.008 * (1 - w);
-    this.mesh.scale.set(sx, this.height * breathe, this.height);
+    let rx = 1, ry = 1, lift = 0, wob = 0;
+    if (this.riseT >= 0) {
+      this.riseT += dt / 1.1;
+      const k = Math.min(1, this.riseT), ease = q => q * q * (3 - 2 * q);
+      if (k < 0.3) { const q = ease(k / 0.3); ry = 1 - 0.07 * q; rx = 1 + 0.03 * q; }                     // gather
+      else if (k < 0.72) { const q = ease((k - 0.3) / 0.42); ry = 0.93 + 0.13 * q; rx = 1.03 - 0.05 * q; lift = Math.sin(q * Math.PI) * 0.035; }  // rise
+      else { const q = (k - 0.72) / 0.28; ry = 1.06 - 0.06 * ease(q); rx = 0.98 + 0.02 * ease(q); wob = Math.sin(q * Math.PI * 4) * 0.035 * (1 - q); }  // shake
+      if (this.riseT >= 1) this.riseT = -1;
+    }
+    this.mesh.scale.set(sx * rx, this.height * breathe * ry, this.height);
+    this.mesh.rotation.z += wob;
 
     if (this.lookTarget !== undefined) this.mesh.rotation.y += (this.lookTarget - this.mesh.rotation.y) * Math.min(1, dt * 6);
     const gy = this.ground ? this.ground(this.group.position.x, this.group.position.z) : this.group.position.y;
-    this.mesh.position.y = this.hop + bob * this.height;
+    this.mesh.position.y = this.hop + bob * this.height + lift * this.height;
     this.shadow.position.set(this.group.position.x, gy + 0.004, this.group.position.z + 0.02);
     this.shadow.material.opacity = 1 - Math.min(0.7, this.hop * 3);
   }

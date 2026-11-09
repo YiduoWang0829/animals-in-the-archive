@@ -14,6 +14,7 @@
 
 import * as THREE from 'three';
 import { Character } from './character.js';
+import { wrapLines } from './util.js';
 
 const PAINT_VERT = /* glsl */`
   uniform sampler2D uDepthTex;
@@ -107,8 +108,13 @@ export class Gallery {
     this.plateCtx.drawImage(img, 0, 0);
     const map = this.map = new THREE.CanvasTexture(plate);
     map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 8;
-    const depth = new THREE.Texture(depthImg); depth.needsUpdate = true;
-    this.depthImg = depthImg;
+    // the depth lives on a canvas too, so the ground can be smoothed where an animal got up
+    const dcan = this.depthCanvas = document.createElement('canvas');
+    dcan.width = depthImg.width; dcan.height = depthImg.height;
+    this.depthCtx = dcan.getContext('2d', { willReadFrequently: true });
+    this.depthCtx.drawImage(depthImg, 0, 0);
+    const depth = this.depthTex = new THREE.CanvasTexture(dcan);
+    this.depthImg = dcan;
     this.paintU = {
       uMap: { value: map }, uDepthTex: { value: depth },
       uDepth: { value: pw * 0.16 }, uEdge: { value: 1 }, uFill: { value: 0 }, uTime: { value: 0 }, uWind: { value: 0 }, uBright: { value: 1.0 },
@@ -173,9 +179,9 @@ export class Gallery {
     const g = lc.getContext('2d');
     g.fillStyle = '#ebe5d9'; g.fillRect(0, 0, 520, 300);
     g.fillStyle = '#6b6357'; g.font = '400 18px "IBM Plex Mono", monospace'; g.fillText(work.accession, 30, 46);
-    g.fillStyle = '#1d1a16'; g.font = 'italic 400 34px "Cormorant Garamond", Georgia, serif';
+    g.fillStyle = '#1d1a16'; g.font = 'italic 400 34px "Cormorant Garamond", "Songti SC", "Noto Serif SC", "AppleMyungjo", "Noto Serif KR", Georgia, serif';
     wrapText(g, this.o.workText.title, 30, 100, 460, 38);
-    g.font = '400 20px Inter, sans-serif'; g.fillStyle = '#3a342c';
+    g.font = '400 20px Inter, "PingFang SC", "Apple SD Gothic Neo", sans-serif'; g.fillStyle = '#3a342c';
     g.fillText(`${this.o.workText.artist}`.slice(0, 44), 30, 232); g.fillText(this.o.workText.date, 30, 262);
     const labelTex = new THREE.CanvasTexture(lc); labelTex.colorSpace = THREE.SRGBColorSpace;
     const label = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.196), new THREE.MeshStandardMaterial({ map: labelTex, roughness: 0.8 }));
@@ -193,13 +199,42 @@ export class Gallery {
     this.keyLight = new THREE.DirectionalLight(0xfff2e0, 0.0);  // used inside the painting
     this.keyLight.position.set(1, 3, 4); scene.add(this.keyLight);
 
+    // ---- the other paintings of the collection, on the same wall ----------------
+    // (flat: only the chosen one is opened up as a relief). Click one to walk over to it.
+    this.sides = [];
+    for (const { work: ow, text, side } of this.o.others || []) {
+      const oimg = await loadImg(ow.image);
+      const tex = new THREE.Texture(oimg); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4; tex.needsUpdate = true;
+      const w2 = ow.realWidth * 0.92, h2 = w2 * ow.size[1] / ow.size[0];
+      const x = side * (pw / 2 + 1.25 + w2 / 2), y = this.bottom + ph / 2 + 0.05;
+      const pic = new THREE.Mesh(new THREE.PlaneGeometry(w2, h2), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9 }));
+      pic.position.set(x, y, 0.03); scene.add(pic);
+      const fr = (w, h, px, py) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.06), gold); m.position.set(px, py, 0.04); scene.add(m); };
+      const f2 = 0.08;
+      fr(w2 + f2 * 2, f2, x, y + h2 / 2 + f2 / 2); fr(w2 + f2 * 2, f2, x, y - h2 / 2 - f2 / 2);
+      fr(f2, h2, x - w2 / 2 - f2 / 2, y); fr(f2, h2, x + w2 / 2 + f2 / 2, y);
+      // a small title plate underneath
+      const tc = document.createElement('canvas'); tc.width = 512; tc.height = 120;
+      const tg = tc.getContext('2d'); tg.fillStyle = '#ebe5d9'; tg.fillRect(0, 0, 512, 120);
+      tg.fillStyle = '#1d1a16'; tg.font = 'italic 400 34px "Cormorant Garamond", "Songti SC", "Noto Serif SC", "AppleMyungjo", "Noto Serif KR", Georgia, serif'; tg.textAlign = 'center';
+      tg.fillText(text.title.length > 30 ? text.title.slice(0, 29) + '…' : text.title, 256, 54, 480);
+      tg.font = '400 20px Inter, "PingFang SC", "Apple SD Gothic Neo", sans-serif'; tg.fillStyle = '#3a342c'; tg.fillText(`${text.artist.split(' and ')[0]}, ${text.date}`, 256, 92, 480);
+      const tt = new THREE.CanvasTexture(tc); tt.colorSpace = THREE.SRGBColorSpace;
+      const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.1), new THREE.MeshStandardMaterial({ map: tt, roughness: 0.8 }));
+      plate.position.set(x, y - h2 / 2 - f2 - 0.12, 0.012); scene.add(plate);
+      const lamp = new THREE.SpotLight(0xffe6c4, 26, 9, 0.45, 0.7, 1.6);
+      lamp.position.set(x, 4.4, 2.6); lamp.target.position.set(x, y, 0); scene.add(lamp, lamp.target);
+      this.sides.push({ mesh: pic, id: ow.id, side, x });
+    }
+
     // ---- visitor ------------------------------------------------------------
     const v = this.visitor = this.o.visitor;
     v.addTo(scene);
     v.setPaint?.(work.style, this.frameRect, 0.0);
     v.setSpot?.(new THREE.Vector3(-0.8, 0, 1.6));
-    v.position.set(-3.0, 0, 1.75);
-    v.setDir(1, true);
+    this.from = this.o.from || -1;                  // which side it comes in from
+    v.position.set(this.from * 3.0, 0, 1.75);
+    v.setDir(-this.from, true);
 
     // ---- painted animals ------------------------------------------------------
     for (const { host, meta } of this.o.hosts) {
@@ -214,7 +249,10 @@ export class Gallery {
       a.position.copy(home);
       a.setDir(host.faces === 'right' ? 1 : -1, true);
       a.mesh.renderOrder = 3;
-      this.hosts.push({ actor: a, host, meta, home, homeUV, awake: false, away: false, next: rand(2, 5), patch: null });
+      // one that never leaves its place speaks from the painting itself: a flat cut-out laid
+      // over the relief would show a double outline, so only the painting is drawn
+      if (host.inPlace) a.mesh.visible = false;
+      this.hosts.push({ actor: a, host, meta, home, homeUV, awake: false, away: false, next: rand(2, 5), patch: null, sprite });
     }
 
     // ---- loop --------------------------------------------------------------
@@ -250,6 +288,64 @@ export class Gallery {
     const [x0, y0, x1, y1] = h.meta.box, s = this.plate.width / this.W;
     this.plateCtx.drawImage(patch, x0 * s, y0 * s, (x1 - x0) * s, (y1 - y0) * s);
     this.map.needsUpdate = true;
+    this.flattenDepth(h);
+  }
+  // where the animal lay, the relief still had its shape: let the ground close over it.
+  // Inside the animal's outline the depth is filled in from the ground around it
+  // (diffusion from the edge inwards, then smoothed), so no bump or pit is left.
+  flattenDepth(h) {
+    const dc = this.depthCanvas, s = dc.width / this.W, [x0, y0, x1, y1] = h.meta.box, pad = 4;
+    const X0 = Math.max(0, Math.floor(x0 * s) - pad), Y0 = Math.max(0, Math.floor(y0 * s) - pad);
+    const X1 = Math.min(dc.width, Math.ceil(x1 * s) + pad), Y1 = Math.min(dc.height, Math.ceil(y1 * s) + pad);
+    const w = X1 - X0, hh = Y1 - Y0;
+    if (w < 3 || hh < 3) return;
+    const id = this.depthCtx.getImageData(X0, Y0, w, hh), d = id.data;
+    const mc = document.createElement('canvas'); mc.width = w; mc.height = hh;
+    const mx = mc.getContext('2d', { willReadFrequently: true });
+    mx.drawImage(h.sprite, x0 * s - X0, y0 * s - Y0, (x1 - x0) * s, (y1 - y0) * s);
+    const ma = mx.getImageData(0, 0, w, hh).data;
+    const N = w * hh, val = new Float32Array(N), known = new Uint8Array(N), hole = new Uint8Array(N);
+    for (let i = 0; i < N; i++) {
+      // the outline, grown by a pixel (the sprite's soft edge counts as animal)
+      let inside = ma[i * 4 + 3] > 12;
+      if (!inside) { const x = i % w, y = (i / w) | 0;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const xx = x + dx, yy = y + dy;
+          if (xx >= 0 && yy >= 0 && xx < w && yy < hh && ma[(yy * w + xx) * 4 + 3] > 12) { inside = true; break; } } }
+      hole[i] = inside ? 1 : 0; known[i] = inside ? 0 : 1; val[i] = d[i * 4];
+    }
+    // fill from the edge inwards
+    for (let pass = 0, left = 1; left && pass < 400; pass++) {
+      left = 0; const next = [];
+      for (let i = 0; i < N; i++) {
+        if (known[i]) continue;
+        const x = i % w, y = (i / w) | 0; let sum = 0, n = 0;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) {
+          const xx = x + dx, yy = y + dy;
+          if (xx < 0 || yy < 0 || xx >= w || yy >= hh) continue;
+          const j = yy * w + xx; if (known[j]) { sum += val[j]; n++; }
+        }
+        if (n) next.push([i, sum / n]); else left++;
+      }
+      for (const [i, v] of next) { val[i] = v; known[i] = 1; }
+      if (!next.length) break;
+    }
+    // smooth the filled area so it reads as soft ground
+    for (let it = 0; it < 6; it++) {
+      const tmp = val.slice();
+      for (let i = 0; i < N; i++) {
+        if (!hole[i]) continue;
+        const x = i % w, y = (i / w) | 0; let sum = 0, n = 0;
+        for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+          const xx = x + dx, yy = y + dy;
+          if (xx >= 0 && yy >= 0 && xx < w && yy < hh) { sum += tmp[yy * w + xx]; n++; }
+        }
+        val[i] = sum / n;
+      }
+    }
+    for (let i = 0; i < N; i++) if (hole[i]) d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = Math.round(val[i]);
+    this.depthCtx.putImageData(id, X0, Y0);
+    this.depthTex.needsUpdate = true;
+    this._ddata = null;                          // footholds read the new ground
   }
 
   tween(dur, fn) { return new Promise(res => this.tweens.push({ t: 0, dur, fn, res })); }
@@ -280,6 +376,7 @@ export class Gallery {
       const p = new THREE.Vector3();
       for (const a of [this.visitor, ...this.hosts.map(h => h.actor)]) { a.group.getWorldPosition(p); a.setSpot?.(p); }
       this.liveInside(dt);
+      this.followYou();
     }
     // where the visitor looks. While it talks with a painted animal: at that animal (the
     // one speaking to it, or the one it is answering), whatever else is going on. When you
@@ -313,6 +410,21 @@ export class Gallery {
     this.updateCamera();
   }
 
+  // inside, the visitor drifts to where you are (your head, or a resting hand), a short
+  // unhurried walk at a time; never while someone is walking up to it
+  followYou() {
+    const u = this.userGaze, v = this.visitor;
+    if (!this.inside || !this.follow || !u?.active || u.gesture || v.target) return;
+    if (this.hosts.some(h => h.meeting || h.called || h.rising)) return;
+    const now = performance.now();
+    if (now - (this.lastFollow || 0) < 1800) return;
+    const lim = this.pw / 2 - this.widthOf(v) / 2 - 0.05;
+    const want = THREE.MathUtils.clamp((u.x - 0.5) * this.pw * 0.85, -lim, lim);
+    if (Math.abs(want - v.position.x) < 0.14) return;
+    this.lastFollow = now;
+    const x = v.position.x + THREE.MathUtils.clamp(want - v.position.x, -0.32, 0.32);
+    v.walkTo(this.spot(x, v.position.z, v), 0.2);
+  }
   // two animals are talking right now (a line is on screen, or was a moment ago)
   talking() { const c = this.convo; return !!c && performance.now() - c.t < c.dur + 2500; }
   // a point in front of the screen where the person is (their head or hand, if tracked)
@@ -465,18 +577,36 @@ export class Gallery {
   }
 
   // ---- the gallery tour: just the visitor and you ----------------------------
-  async walkIn() { await this.visitor.walkTo([new THREE.Vector3(-1.9, 0, 1.5), new THREE.Vector3(-1.0, 0, 1.25)], 0.32); }
+  async walkIn() { const f = this.from; await this.visitor.walkTo([new THREE.Vector3(f * 1.9, 0, 1.5), new THREE.Vector3(f * 1.0, 0, 1.25)], 0.55); }
+  // one of the other paintings on the wall, under a screen point (or null)
+  sideAt(nx, ny) {
+    if (this.inside || !this.sides?.length) return null;
+    const ray = new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2(nx, ny), this.camera);
+    const hit = ray.intersectObjects(this.sides.map(s => s.mesh), false)[0];
+    return hit ? this.sides.find(s => s.mesh === hit.object) : null;
+  }
+  // walk off towards another painting on the wall; the view turns with it
+  async leaveToward(side) {
+    const v = this.visitor; v.face?.(null); v.attend?.(false);
+    this.follow = false;
+    const from = this.camBase.clone(), look = this.camLook.clone();
+    v.walkTo(new THREE.Vector3(side * 3.4, 0, 1.45), 0.75);
+    await this.tween(1.3, e => {
+      this.camBase.set(from.x + side * 1.9 * e, from.y, from.z);
+      this.camLook.set(look.x + side * 2.1 * e, look.y, look.z);
+    });
+  }
   // stand and face a direction (null = free), or face you
-  async goTo(points, speed = 0.32) { this.visitor.face?.(null); await this.visitor.walkTo(points, speed); }
+  async goTo(points, speed = 0.48) { this.visitor.face?.(null); await this.visitor.walkTo(points, speed); }
   async toLabel() {
     await this.goTo([new THREE.Vector3(this.labelX - 0.25, 0, 0.9), new THREE.Vector3(this.labelX - 0.05, 0, 0.62)]);
     this.visitor.face?.(Math.PI); this.visitor.setDir(1);
-    await this.wait(0.8);
+    await this.wait(0.35);
   }
   async toPainting() {
     await this.goTo([new THREE.Vector3(this.labelX * 0.5, 0, 1.0), new THREE.Vector3(0.05, 0, 1.05)]);
     this.visitor.face?.(Math.PI);
-    await this.wait(1.2);
+    await this.wait(0.5);
   }
   talkToYou(on) { this.visitor.face?.(null); this.visitor.attend?.(on); }
 
@@ -496,10 +626,16 @@ export class Gallery {
     if (h.awake) return;
     h.awake = true;
     if (h.host.inPlace) return;                     // too big to leave: it talks from where it is
-    this.revealGround(h);
-    h.actor.ground = (x, z) => this.groundY(z);
-    h.actor.shadow.visible = true;
-    h.actor.walkTo(this.spot(h.actor.position.x, h.actor.position.z + 0.1, h.actor), 0.35);
+    // it gets up first (it has been lying or standing still for centuries), then steps out
+    h.actor.standUp?.();
+    h.rising = true;
+    this.wait(1.15).then(() => {
+      h.rising = false;
+      this.revealGround(h);
+      h.actor.ground = (x, z) => this.groundY(z);
+      h.actor.shadow.visible = true;
+      h.actor.walkTo(this.spot(h.actor.position.x, h.actor.position.z + 0.1, h.actor), 0.26);
+    });
   }
   async hostsRefuse() {}
 
@@ -594,7 +730,7 @@ export class Gallery {
     let side = 1, reachL = this.widthOf(v) / 2, reachR = this.widthOf(v) / 2;
     hs.forEach((h, k) => {
       const a = h.actor, w = this.widthOf(a);
-      if (h.called || h.meeting) return;
+      if (h.called || h.meeting || h.rising) return;
       if (settled) { if (!a.target && !a.attending) a.setDir(Math.sign(vp.x - a.position.x) || 1); return; }
       // alternate right / left of the visitor, further out each time, a step back each time
       let tx;
@@ -606,7 +742,7 @@ export class Gallery {
       tx = THREE.MathUtils.clamp(tx, -this.pw / 2 + w / 2, this.pw / 2 - w / 2);
       const target = this.spot(tx, tz, a);
       const d = target.distanceTo(a.position);
-      if (d > 0.12 && (!a.target || a.target.distanceTo(target) > 0.18)) { h.placed = false; a.walkTo(target, d > 0.7 ? 0.9 : 0.4, { run: d > 0.7 }).then(() => { h.placed = true; }); }
+      if (d > 0.12 && (!a.target || a.target.distanceTo(target) > 0.18)) { h.placed = false; a.walkTo(target, d > 0.9 ? 0.45 : 0.26).then(() => { h.placed = true; }); }
       else if (!a.target) h.placed = true;
       if (!a.target) a.setDir(Math.sign(vp.x - a.position.x) || 1);
     });
@@ -653,15 +789,16 @@ export class Gallery {
     if (!h || !h.awake || h.host.inPlace) return;
     const v = this.visitor, a = h.actor, vp = v.position.clone();
     const side = Math.sign(a.position.x - vp.x) || 1, gap = (this.widthOf(v) + this.widthOf(a)) / 2 + 0.1;
+    for (let k = 0; h.rising && k < 30; k++) await this.wait(0.1);      // let it finish getting up
     const dx = Math.abs(a.position.x - vp.x);
-    if (dx > gap * 0.85 && dx < gap * 1.5 && Math.abs(a.position.z - vp.z) < 0.15) {   // already together
+    // near enough to talk (not nose to nose): just turn to each other
+    if (dx > gap * 0.85 && dx < gap * 2.2 && Math.abs(a.position.z - vp.z) < 0.22) {
       a.setDir(-side); v.setDir?.(side); return;
     }
-    const mid = vp.clone().lerp(a.position, 0.35);
-    const vT = this.spot(mid.x - side * gap * 0.5, mid.z, v);
-    const aT = this.spot(vT.x + side * gap, vT.z - 0.04, a);
+    // the visitor stays where it is and turns; the painted animal comes over, unhurried
+    const aT = this.spot(vp.x + side * gap * 1.15, vp.z - 0.04, a);
     h.meeting = true;
-    await this.arrive([v.walkTo(vT, 0.35), a.walkTo(aT, 0.35)], [v, a]);
+    await this.arrive([a.walkTo(aT, 0.26)], [a], 9);
     a.lastFlip = -9; a.setDir(-side); v.setDir(side);
     h.meeting = false;
     this.formAnchor = v.position.clone();       // everyone else stays where they are
@@ -705,7 +842,7 @@ export class Gallery {
     local.x = THREE.MathUtils.clamp(local.x, -this.pw / 2 + 0.2, this.pw / 2 - 0.2);
     local.z = THREE.MathUtils.clamp(local.z, -this.paintU.uDepth.value * 0.6, 0.45);
     const dest = this.spot(local.x, local.z, this.visitor);
-    this.visitor.walkTo(dest, 0.55, { run: dest.distanceTo(this.visitor.position) > 0.8 });
+    this.visitor.walkTo(dest, 0.32);                // a calm walk, never a dash
   }
   // call a painted animal: it comes to the visitor
   async callHost(i) {
@@ -733,10 +870,5 @@ export class Gallery {
 }
 
 function wrapText(g, text, x, y, maxW, lh) {
-  let line = '';
-  for (const w of text.split(' ')) {
-    const test = line ? line + ' ' + w : w;
-    if (g.measureText(test).width > maxW && line) { g.fillText(line, x, y); y += lh; line = w; } else line = test;
-  }
-  g.fillText(line, x, y);
+  for (const line of wrapLines(g, text, maxW)) { g.fillText(line, x, y); y += lh; }
 }

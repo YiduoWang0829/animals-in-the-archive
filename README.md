@@ -26,7 +26,10 @@ works. The camera only works on `localhost` or `https://`.
 
 ## The experience
 
-1. **Collection index.** Three works with catalogue metadata and generated accession numbers.
+1. **Collection index.** Three works side by side, with catalogue metadata and generated
+   accession numbers: *The Garden of Eden with the Fall of Man* (Brueghel and Rubens, c. 1615),
+   *Peaceable Kingdom* (Edward Hicks, c. 1834) and *Fate of the Animals* (Franz Marc, 1913).
+   The switch at the top right of this page changes the language: English, 中文, 한국어.
 2. **Record and role.** Author, Guard or Passer-by. The role changes what the animals say
    and how the painted animals react to you (they turn to you, or turn away).
 3. **Camera (optional).** An unchecked consent box, then face and hand tracking
@@ -35,7 +38,9 @@ works. The camera only works on `localhost` or `https://`.
    watercolour character. DoodleNet suggests the nearest 3D animal, with its real score.
    Or choose one of 11 rigged 3D animals, shown on a turntable that walks, runs, stands or
    grazes, in a Natural or Storybook (ink outline) look, or one of 13 storybook animals.
-5. **Gallery.** Only your animal and you. The painting hangs still on the wall. The animal
+5. **Gallery.** Only your animal and you. The chosen painting hangs in the middle of the
+   wall, the other two either side under their own lights. Click one of them (or the ‹ ›
+   buttons) and your animal walks over to it; the visit carries on at that painting. The animal
    walks in with its own walk cycle; the playback speed matches its stride, so the feet
    stay planted. It turns to you and says hello (wave with the camera on, or click it).
    It reads the wall label aloud with two facts about the work, looks at the painting,
@@ -82,7 +87,7 @@ works. The camera only works on `localhost` or `https://`.
      animal on the page, facing each other across the tear. The fragments lie on the
      painting, the drawings on the page, and two of the lines they said are pinned over
      the top as paper slips. The shelf holds everything the conversation mentioned plus
-     22 animals cut from all three works. Move, scale, turn, flip, rearrange; change the
+     27 animals cut from all three works. Move, scale, turn, flip, rearrange; change the
      season (spring blossom, summer, autumn leaves, winter snow) and the picture (night,
      engraving, prism, storybook), or turn "Two worlds" off.
    - **Monument (3D):** the painting carved in relief, with the visitor and painted
@@ -101,7 +106,7 @@ stops on "Turn camera off", when the tab is hidden, or when the page is closed.
 ```
 index.html            page shell, import map for three.js
 css/style.css         design
-js/strings.js         ALL user-facing text (add a `zh` block for Chinese; ?lang=zh)
+js/strings.js         ALL user-facing text in English; strings.zh.js and strings.ko.js translate it
 js/data.js            works, painted animals, 3D animals, storybook species
 js/app.js             flow controller
 js/gallery.js         gallery room, the painting as a depth relief, living animals, entering
@@ -117,7 +122,7 @@ js/sketch.js          drawing pad, DoodleNet, drawing → watercolour character
 js/card.js, paint.js, util.js
 assets/paintings/     paintings (web + hd/) and depth maps (depth/)
 assets/hosts/         painted animals that come alive (WebP) and repainted ground patches
-assets/collage/       22 animals cut from the three paintings
+assets/collage/       27 animals cut from the three paintings
 assets/animals/3d/    rigged 3D animals (.glb) and studio thumbnails
 assets/animals/       photo originals/, rembg cutouts/, storybook/ illustrations
 blender/              render_thumb.py (studio thumbnails), make_relief.py, preview_render.py
@@ -169,11 +174,17 @@ in Blender with File → Import → glTF 2.0.
 
 The site is about 100 MB including history. The largest file is the MediaPipe wasm (~9 MB).
 
-## Adding Chinese
+## Languages
 
-Copy `STRINGS.en` in `js/strings.js` to `STRINGS.zh`, translate the values (keep the
-`{placeholders}`), and open the site with `?lang=zh`. The web fonts are Latin only, so
-Chinese text uses the system font.
+English is in `js/strings.js`, Simplified Chinese in `js/strings.zh.js` and Korean in
+`js/strings.ko.js`, key for key (any missing key falls back to English). The language
+follows `?lang=en|zh|ko`, set by the switch at the top right of the first page. The credits
+table stays in English: it is the original record of sources and licences. Korean
+particles after a name (이/가, 을/를, 은/는, 와/과, (으)로) are chosen at run time by
+`localize()` in `strings.js`, because names are only known then. The web fonts are Latin
+only; Chinese and Korean use the system's serif and sans faces (Songti, Myeongjo, PingFang,
+Apple SD Gothic Neo, or the Noto equivalents). The Korean text has not yet been read by a
+native speaker; please have it checked before publication.
 
 ## Credits
 

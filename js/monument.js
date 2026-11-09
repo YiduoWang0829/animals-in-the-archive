@@ -202,10 +202,10 @@ export async function createMonument(container, { work, visitor, statues, object
     const x = tc.getContext('2d');
     x.fillStyle = '#fff'; x.fillRect(0, 0, tc.width, tc.height);
     x.fillStyle = '#34302a'; x.textAlign = 'center';
-    x.font = '500 50px "Cormorant Garamond", Georgia, serif';
+    x.font = '500 50px "Cormorant Garamond", "Songti SC", "Noto Serif SC", "AppleMyungjo", "Noto Serif KR", Georgia, serif';
     x.fillText(inscription.head.toUpperCase(), tc.width / 2, 92, tc.width - 120);
     x.strokeStyle = '#6d675d'; x.lineWidth = 4; x.beginPath(); x.moveTo(560, 128); x.lineTo(tc.width - 560, 128); x.stroke();
-    x.font = 'italic 400 66px "Cormorant Garamond", Georgia, serif';
+    x.font = 'italic 400 66px "Cormorant Garamond", "Songti SC", "Noto Serif SC", "AppleMyungjo", "Noto Serif KR", Georgia, serif';
     inscription.lines.slice(0, 5).forEach((l, i) => x.fillText(l, tc.width / 2, 212 + i * 88, tc.width - 100));
     const tex = new THREE.CanvasTexture(tc); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
     const stone = new THREE.Group();

@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 
-const STYLE_ID = { eden: 1, durer: 2, marc: 3, storybook: 4 };
+const STYLE_ID = { eden: 1, hicks: 1, durer: 2, marc: 3, storybook: 4 };
 
 // GLSL injected into the standard material: repaint after lighting
 const PAINT_HEAD = /* glsl */`

@@ -83,34 +83,6 @@
   ],
   "in_place": false
  },
- "durer-horse": {
-  "work": "durer",
-  "box": [
-   20,
-   318,
-   1826,
-   2374
-  ],
-  "size": [
-   1847,
-   2400
-  ],
-  "in_place": true
- },
- "durer-dog": {
-  "work": "durer",
-  "box": [
-   812,
-   1714,
-   1726,
-   2216
-  ],
-  "size": [
-   1847,
-   2400
-  ],
-  "in_place": false
- },
  "marc-deer": {
   "work": "marc",
   "box": [
@@ -136,6 +108,76 @@
   "size": [
    2385,
    1783
+  ],
+  "in_place": false
+ },
+ "hicks-lion": {
+  "work": "hicks",
+  "box": [
+   1318,
+   639,
+   1935,
+   1457
+  ],
+  "size": [
+   2400,
+   2002
+  ],
+  "in_place": true
+ },
+ "hicks-cub": {
+  "work": "hicks",
+  "box": [
+   936,
+   1332,
+   1308,
+   1633
+  ],
+  "size": [
+   2400,
+   2002
+  ],
+  "in_place": false
+ },
+ "hicks-calf": {
+  "work": "hicks",
+  "box": [
+   1290,
+   1374,
+   1682,
+   1665
+  ],
+  "size": [
+   2400,
+   2002
+  ],
+  "in_place": false
+ },
+ "hicks-leopard": {
+  "work": "hicks",
+  "box": [
+   1482,
+   1441,
+   1976,
+   1857
+  ],
+  "size": [
+   2400,
+   2002
+  ],
+  "in_place": false
+ },
+ "hicks-goat": {
+  "work": "hicks",
+  "box": [
+   1903,
+   1175,
+   2237,
+   1442
+  ],
+  "size": [
+   2400,
+   2002
   ],
   "in_place": false
  }

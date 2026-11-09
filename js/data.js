@@ -15,15 +15,15 @@ export const WORKS = [
     wall: 0x2a2622,
   },
   {
-    id: 'durer', accession: 'AIA.1513.002', style: 'durer',
-    image: 'assets/paintings/knight-death-devil.jpg',
-    hd: 'assets/paintings/hd/knight-death-devil.jpg',
-    depth: 'assets/paintings/depth/knight-death-devil.png',
-    size: [1847, 2400], realWidth: 1.45,
-    hosts: ['durer-horse', 'durer-dog'],
-    kinds: ['horse', 'dog'],
-    ground: [0.1, 0.1],       // the road along the bottom (a little above the edge, so the view can breathe)
-    wall: 0x24231f,
+    id: 'hicks', accession: 'AIA.1834.002', style: 'hicks',
+    image: 'assets/paintings/peaceable-kingdom.jpg',
+    hd: 'assets/paintings/hd/peaceable-kingdom.jpg',
+    depth: 'assets/paintings/depth/peaceable-kingdom.png',
+    size: [2400, 2002], realWidth: 2.0,
+    hosts: ['hicks-lion', 'hicks-cub', 'hicks-calf', 'hicks-goat', 'hicks-leopard'],
+    kinds: ['lion', 'wolf', 'cattle', 'bear'],
+    ground: [0.1, 0.24],      // the dark earth the animals rest on, rising towards the trees
+    wall: 0x26241f,
   },
   {
     id: 'marc', accession: 'AIA.1913.003', style: 'marc',
@@ -47,8 +47,11 @@ export const HOSTS = {
   'eden-rabbit':  { faces: 'left' },
   'eden-dog':     { faces: 'left' },
   'eden-peacock': { faces: 'right' },
-  'durer-horse':  { faces: 'left', inPlace: true },
-  'durer-dog':    { faces: 'left' },
+  'hicks-lion':    { faces: 'left', inPlace: true },
+  'hicks-cub':     { faces: 'right' },
+  'hicks-calf':    { faces: 'left' },
+  'hicks-goat':    { faces: 'right' },
+  'hicks-leopard': { faces: 'left' },
   'marc-deer':    { faces: 'left' },
   'marc-boar':    { faces: 'right' },
 };

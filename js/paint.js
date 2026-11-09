@@ -110,7 +110,7 @@ function marc(d, w, h) {
   }
 }
 
-const STYLES = { eden, durer, marc };
+const STYLES = { eden, hicks: eden, durer, marc };
 
 // Returns a data URL of the painted cut-out. `maxW` keeps the filter fast.
 export async function paintify(src, style, maxW = 360) {

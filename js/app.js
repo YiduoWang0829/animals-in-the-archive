@@ -4,7 +4,7 @@
 //   → step into the painting → create (sculpt 3D / new painting 2D) → card.
 // No data is stored or sent anywhere; state lives in memory only.
 
-import { t, STRINGS, LANG } from './strings.js';
+import { t, STRINGS, LANG, LANGS, localize } from './strings.js';
 import { WORKS, SPECIES, HOSTS, ANIMALS3D, workById, speciesById, animal3dById } from './data.js';
 import { loadClassifier, createPad, classify, matchSpecies, drawingToCharacter } from './sketch.js';
 import { makeCard, recordNumber } from './card.js';
@@ -28,11 +28,19 @@ let face = null, hands = [];
 // ---------------------------------------------------------------- i18n
 document.documentElement.lang = LANG;
 document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+// the language switch (top right of the first page): EN · 中文 · 한국어
+{
+  const box = document.createElement('div');
+  box.className = 'lang-switch'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Language');
+  box.innerHTML = LANGS.map(([code, label]) => `<a href="?lang=${code}" lang="${code}" ${code === LANG ? 'aria-current="true"' : ''}>${label}</a>`).join('');
+  document.querySelector('.masthead').appendChild(box);
+}
 
 // ---------------------------------------------------------------- views
 function show(view) {
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('is-active', v.id === `view-${view}`));
   document.body.classList.toggle('in-stage', view === 'stage');
+  document.body.classList.toggle('on-index', view === 'index');
   document.body.classList.toggle('in-sculpt', view === 'create');
   document.body.classList.toggle('in-studio', view === 'character');
   if (view !== 'character' && turntable) { turntable.dispose(); turntable = null; }
@@ -320,14 +328,46 @@ async function enterStage(visitor) {
   const actor = await makeVisitorActor();
   gallery?.dispose();
   const { Gallery } = await import('./gallery.js');
+  // the other two paintings hang either side on the same wall
+  const wi = WORKS.indexOf(w), nb = k => WORKS[(wi + k + WORKS.length) % WORKS.length];
   gallery = new Gallery($('#stage3d'), {
-    work: w, workText: W(w.id), visitor: actor,
+    work: w, workText: W(w.id), visitor: actor, from: state.from || -1,
+    others: [{ work: nb(-1), text: W(nb(-1).id), side: -1 }, { work: nb(1), text: W(nb(1).id), side: 1 }],
     hosts: state.hosts.map(h => ({ host: h, meta: hostMeta[h.id] })),
     onFrame: g => { placeBubbles(g); stageFrame(g); },
   });
   await gallery.init();
   status('');
+  workNav(true);
+  if ($('.veil')) { $('.veil').classList.remove('on'); setTimeout(() => $('.veil')?.remove(), 800); }
   runStory(gallery);
+}
+
+// ‹ › beside the gallery: walk over to the painting next door
+function workNav(on) {
+  let nav = $('#work-nav');
+  if (!on) { if (nav) nav.hidden = true; return; }
+  if (!nav) { nav = document.createElement('div'); nav.id = 'work-nav'; $('#view-stage').appendChild(nav); }
+  const wi = WORKS.indexOf(state.work), nb = k => WORKS[(wi + k + WORKS.length) % WORKS.length];
+  nav.innerHTML = `<button class="work-nav prev" data-action="switch-work" data-work="${nb(-1).id}" data-side="-1" aria-label="${esc(W(nb(-1).id).title)}">
+      <span class="arr">‹</span><span class="t">${esc(W(nb(-1).id).title)}</span></button>
+    <button class="work-nav next" data-action="switch-work" data-work="${nb(1).id}" data-side="1" aria-label="${esc(W(nb(1).id).title)}">
+      <span class="t">${esc(W(nb(1).id).title)}</span><span class="arr">›</span></button>`;
+  nav.hidden = false;
+}
+let switching = false;
+async function switchWork(id, side) {
+  const g = gallery;
+  if (!g || g.inside || g.entering || switching) return;
+  switching = true;
+  storyToken++; giveAnswer(null); speechLock = Promise.resolve(); clearBubbles(); controls(''); status(''); workNav(false);
+  await g.leaveToward(side);
+  const veil = document.createElement('div'); veil.className = 'veil'; document.body.appendChild(veil);
+  requestAnimationFrame(() => veil.classList.add('on'));
+  await sleep(650);
+  state.work = workById(id); state.from = -side; state.switched = true;
+  switching = false;
+  await enterStage(state.visitor);
 }
 
 // the visitor as an actor: a rigged 3D animal, or a 2D character (drawing / storybook)
@@ -357,15 +397,15 @@ const hostName = () => t(`hostNames.${state.host.id}`);   // the first painted a
 let speechLock = Promise.resolve();
 let storyToken = 0;                       // bumped when the stage closes: stops all scripts
 let pendingAnswer = null, waveWaiter = null;
-const fill = s => String(s).replace(/\{name\}/g, state.name || '');
+const fill = s => localize(String(s).replace(/\{name\}/g, state.name || ''));
 const speakerName = who => who === 'visitor' ? state.name : hostNameOf(who);
 const shuffled = arr => [...arr].sort(() => Math.random() - 0.5);
 
 // say a line after whoever is speaking now has finished; resolves when it has been read
 function speak(who, text, { pause = 350, tags = null, q = '' } = {}) {
-  const tok = storyToken;
+  const tok = storyToken, g0 = gallery;
   const run = speechLock.then(async () => {
-    if (tok !== storyToken || !gallery) return;
+    if (tok !== storyToken || !gallery || switching || g0 !== gallery) return;
     const g = gallery, dur = 1500 + fill(text).length * 48;
     g.actorOf(who)?.nod?.(1);
     // whoever speaks and whoever listens turn to each other (the visitor looks at the
@@ -427,18 +467,21 @@ async function runStory(g) {
   const w = state.work, x = W(w.id), kind = kindOf();
   await g.walkIn();
   if (!alive()) return;
-  g.talkToYou(true);
-  await speak('visitor', pickLine(t('visitorHello')));
-  if (tracker && alive()) {                         // invite a wave (only with the camera on)
-    status(esc(t('waveHint')));
-    await new Promise(res => { waveWaiter = res; setTimeout(res, 5000); });
-    waveWaiter = null; status('');
+  if (state.switched) await speak('visitor', pickLine(t('switchArrive')));
+  else {
+    g.talkToYou(true);
+    await speak('visitor', pickLine(t('visitorHello')));
+    if (tracker && alive()) {                       // invite a wave (only with the camera on)
+      status(esc(t('waveHint')));
+      await new Promise(res => { waveWaiter = res; setTimeout(res, 3500); });
+      waveWaiter = null; status('');
+    }
+    g.talkToYou(false);
   }
-  g.talkToYou(false);
   await Promise.all([g.toLabel(), speak('visitor', pickLine(t('tourArrive')))]);
   if (!alive()) return;
   await speak('visitor', t('tourLabel', { title: x.title, artist: x.artist, date: x.date }));
-  for (const f of x.facts) await speak('visitor', f);
+  for (const f of x.facts) { if (!alive()) return; await speak('visitor', f); }
   if (!alive()) return;
   await Promise.all([g.toPainting(), speak('visitor', t('tourSee', { animals: x.see }))]);
   await speak('visitor', kind === 'drawing' ? t('tourDrawing')
@@ -468,12 +511,12 @@ async function stepIn(g = gallery) {
   if (!g || g.inside || g.entering) return;
   g.entering = true;
   const tok = storyToken, alive = () => g === gallery && tok === storyToken;
-  controls(''); clearBubbles(); g.talkToYou(false);
+  controls(''); clearBubbles(); g.talkToYou(false); workNav(false);
   // the visitor sets off towards the picture; the light closes around it, and while the
   // screen is dark a title card says what is about to happen. The walk through the frame
   // (and the moment the relief opens up) happens behind the card.
   const entering = g.enter();
-  await sleep(1100);
+  await sleep(650);
   if (!alive()) return;
   const x = W(state.work.id);
   await crossing(g, [
@@ -508,24 +551,24 @@ async function crossing(g, lines, entering, alive, title) {
   el.style.setProperty('--cx', `${(c.x / innerWidth * 100).toFixed(1)}%`);
   el.style.setProperty('--cy', `${(c.y / innerHeight * 100).toFixed(1)}%`);
   const R0 = Math.hypot(innerWidth, innerHeight) * 0.75;
-  await animate(2300, k => el.style.setProperty('--r', `${(R0 * (1 - k)).toFixed(1)}px`), k => k * k * (3 - 2 * k));
+  await animate(1600, k => el.style.setProperty('--r', `${(R0 * (1 - k)).toFixed(1)}px`), k => k * k * (3 - 2 * k));
   el.classList.add('dark');
   if (!alive()) { el.remove(); return; }
   const ps = [...el.querySelectorAll('.line')];
-  await sleep(500);
+  await sleep(250);
   for (const p of ps) {
     p.classList.add('show');
-    const read = 1300 + p.textContent.length * 46;
+    const read = 800 + p.textContent.length * 30;
     for (let w = 0; w < read && !hurry; w += 100) await sleep(100);
     if (!alive()) { el.remove(); return; }
   }
   el.classList.add('can-skip');
   // hold until the walk-in is done (and a moment longer, unless they click)
   let done = false; entering.then(() => { done = true; });
-  for (let w = 0; (!done || (w < 2600 && !hurry)) && alive(); w += 100) await sleep(100);
+  for (let w = 0; (!done || (w < 1400 && !hurry)) && alive(); w += 100) await sleep(100);
   // the words go first, then the dark lifts onto the inside of the picture
   el.classList.add('leaving');
-  await sleep(900);
+  await sleep(600);
   el.classList.add('lift');
   setTimeout(() => el.remove(), 2200);
 }
@@ -539,7 +582,7 @@ function animate(ms, fn, ease = k => k) {
 
 // ---- the ledger: what each world told the other, then the way into the finale ------
 const firstSentence = s => {
-  const parts = s.match(/[^.!?…]+[.!?…]+[”’]?/g) || [s];
+  const parts = s.match(/[^.!?…。！？]+[.!?…。！？]+[”’」』]?/g) || [s];
   let out = parts[0].trim();
   if (out.length < 30 && parts[1]) out += ' ' + parts[1].trim();
   return out;
@@ -589,12 +632,19 @@ async function insideStory(g, tok) {
   const x = W(state.work.id), kind = kindOf();
   const H = state.hosts.length, hid = i => state.hosts[i % H].id;
   const B = H > 1 ? 1 : 0;
-  await sleep(1200);
+  await sleep(900);
+  if (!alive()) return;
+  // first of all the visitor turns to the painted animal that is about to speak: face to face
+  g.partner = 0;
+  g.convo = { speaker: 0, listener: 'visitor', t: performance.now(), dur: 2400 };
+  await sleep(900);
   if (!alive()) return;
   // the opening: a fixed little scene the visitor does not steer
   await g.startle();
   await speak(0, t('insideStartled'));
   await speak(0, t('openShy'));
+  g.visitor.hopOnce?.(0.05 * (g.visitor.height || 0.3) / 0.3); g.visitor.nod?.(2);   // it jumps a little: a painting just spoke!
+  await speak('visitor', t('openAmazed'));
   await speak('visitor', t('openSorry'));
   await speak(B, t(H > 1 ? 'openWhisper' : 'openWhisperSolo'));
   await speak('visitor', t('openFriendly'));
@@ -694,7 +744,8 @@ function stageFrame(g) {
   if (face) stageFrame.fx = face.x;
   if (hands[0]) stageFrame.moved = now;
   const src = hands[0] || face;
-  g.userGaze = src && now - (stageFrame.moved || 0) < 3000 ? { x: src.x, y: src.y, active: true } : null;
+  // (a hand that is pinching or open is steering the view, not asking to be followed)
+  g.userGaze = src && now - (stageFrame.moved || 0) < 3000 ? { x: src.x, y: src.y, active: true, gesture: !!(hands[0] && (hands[0].pinch || hands[0].open)) } : null;
   if (g.visitor) g.visitor.calm = g.inside;
   if (g.inside && g.userGaze && state.hostAwake && !g.talking()) {   // painted animals turn towards your side (not mid-conversation)
     const you = g.userGaze.x * innerWidth;
@@ -728,6 +779,8 @@ stage3d.addEventListener('pointerup', e => {
   if (!gallery || wasDrag) return;
   const nx = e.clientX / innerWidth * 2 - 1, ny = -(e.clientY / innerHeight * 2 - 1);
   if (gallery.visitorAt(nx, ny)) return greetBack();       // click your animal: it greets you
+  const other = gallery.sideAt(nx, ny);
+  if (other) return switchWork(other.id, other.side);
   if (gallery.inside) tapInside(nx, ny);
 });
 stage3d.addEventListener('wheel', e => { if (gallery?.inside) { e.preventDefault(); gallery.zoomBy(-e.deltaY * 0.0015); } }, { passive: false });
@@ -880,7 +933,7 @@ async function openCompose() {
   shelf.innerHTML = `<h3>${esc(t('fromTalk'))}</h3><div class="shelf-row">${tp.all.map((p, i) =>
     `<button class="pick piece" data-action="add-piece" data-i="${i}"><img src="${thumb(p.img)}" alt=""><span>${esc(p.label)}</span></button>`).join('')}</div>
     <h3 style="margin-top:16px">${esc(t('addAnimals'))}</h3><div class="shelf-row">${Object.entries(collage).map(([id, c]) =>
-    `<button class="pick" data-action="add-collage" data-id="${id}"><img src="assets/collage/${id}.webp" alt=""><span>${esc(c.name)}</span></button>`).join('')}</div>`;
+    `<button class="pick" data-action="add-collage" data-id="${id}"><img src="assets/collage/${id}.webp" alt=""><span>${esc(LANG === 'en' ? c.name : (STRINGS[LANG].collageNames?.[id] || c.name))}</span></button>`).join('')}</div>`;
   if (!composer) {
     const v = state.visitor;
     let vimg, vflip = false;
@@ -1003,6 +1056,7 @@ async function openCard() {
 }
 
 function teardown() {
+  workNav(false); $('.veil')?.remove();
   closeLedger(); document.querySelectorAll('.crossing').forEach(e => e.remove());
   storyToken++; giveAnswer(null); speechLock = Promise.resolve();
   gallery?.dispose(); gallery = null;
@@ -1081,9 +1135,10 @@ document.addEventListener('click', e => {
     case 'choose-2d': choose({ kind: 'species', species: speciesById(el.dataset.species) }); break;
     case 'tt-anim': pressGroup(el); turntable?.setAnim(el.dataset.anim); break;
     case 'tt-look': pressGroup(el); state.choice.look = el.dataset.look; choose(state.choice); break;
-    case 'walk-in': state.name = $('#vname').value.trim().slice(0, 16) || pickLine(t('names')); enterStage({ ...state.choice }); break;
+    case 'walk-in': state.from = -1; state.switched = false; state.name = $('#vname').value.trim().slice(0, 16) || pickLine(t('names')); enterStage({ ...state.choice }); break;
     case 'answer': giveAnswer(el.dataset.answer); break;
     case 'step-in': stepIn(); break;
+    case 'switch-work': switchWork(el.dataset.work, +el.dataset.side); break;
     case 'to-create':
       if (gallery?.inside && state.talk?.length && !$('.ledger')) { showLedger(); break; }
       goCreate('compose'); break;
