@@ -256,7 +256,7 @@ export class Character {
   walkTo(target, speed = 0.8, { run = false } = {}) {
     const pts = Array.isArray(target) ? target.map(p => p.clone()) : [target.clone()];
     this._arrive?.();
-    this.target = pts.shift(); this.path = pts; this.speed = speed; this.running = run;
+    this.target = pts.shift(); this.path = pts; this.speed = Math.min(speed, 0.45); this.running = false;   // a walk, never a run
     const dx = this.target.x - this.group.position.x;
     if (Math.abs(dx) > 0.02) this.setDir(Math.sign(dx));
     return new Promise(res => { this._arrive = res; });

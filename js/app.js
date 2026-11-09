@@ -234,7 +234,7 @@ function choose(c) {
     const r = animal3dById(c.id)?.real;
     name.innerHTML = `<div class="n">${esc(label)}</div><div class="s">3D · ${esc(r ? `${r.author} · ${r.licence}` : 'Quaternius · CC0')}</div>`;
     tools.innerHTML = `
-      <div class="segmented" role="group">${['walk', 'run', 'idle', 'eat'].map(k => `<button data-action="tt-anim" data-anim="${k}" aria-pressed="${(turntable.anim || 'walk') === k}">${esc(t({ walk: 'animWalk', run: 'animRun', idle: 'animIdle', eat: 'animEat' }[k]))}</button>`).join('')}</div>
+      <div class="segmented" role="group">${['walk', 'idle', 'eat'].map(k => `<button data-action="tt-anim" data-anim="${k}" aria-pressed="${(turntable.anim || 'walk') === k}">${esc(t({ walk: 'animWalk', run: 'animRun', idle: 'animIdle', eat: 'animEat' }[k]))}</button>`).join('')}</div>
       <div class="segmented" role="group">
         <button data-action="tt-look" data-look="real" aria-pressed="${c.look !== 'storybook'}">${esc(t('lookNatural'))}</button>
         <button data-action="tt-look" data-look="storybook" aria-pressed="${c.look === 'storybook'}">${esc(t('lookStorybookShort'))}</button>
@@ -333,6 +333,8 @@ async function enterStage(visitor) {
   const wi = WORKS.indexOf(w), nb = k => WORKS[(wi + k + WORKS.length) % WORKS.length];
   gallery = new Gallery($('#stage3d'), {
     work: w, workText: W(w.id), visitor: actor, from: state.from || -1,
+    visitorRealH: state.visitor.kind === 'animal3d' ? animal3dById(state.visitor.id).realH
+      : state.visitor.kind === 'species' ? state.visitor.species.realH : 0.6,
     others: [{ work: nb(-1), text: W(nb(-1).id), side: -1 }, { work: nb(1), text: W(nb(1).id), side: 1 }],
     hosts: state.hosts.map(h => ({ host: h, meta: hostMeta[h.id] })),
     onFrame: g => { placeBubbles(g); stageFrame(g); },
@@ -513,6 +515,7 @@ async function stepIn(g = gallery) {
   g.entering = true;
   const tok = storyToken, alive = () => g === gallery && tok === storyToken;
   controls(''); clearBubbles(); g.talkToYou(false); workNav(false);
+  g.locked = true;                                  // no steering until the opening has played
   // the visitor sets off towards the picture; the light closes around it, and while the
   // screen is dark a title card says what is about to happen. The walk through the frame
   // (and the moment the relief opens up) happens behind the card.
@@ -529,8 +532,7 @@ async function stepIn(g = gallery) {
   ], entering, alive, x.title);
   if (!alive()) return;
   state.inside = true;
-  status(esc(tracker ? t('insideHint') : t('insideHintMouse')));
-  setTimeout(() => { if (gallery === g) status(''); }, 9000);
+  status(esc(t('watchFirst')));                    // the opening plays first; the view is the story's
   controls(`<button class="btn primary cta" data-action="to-create">${esc(t('create'))}</button>`);
   insideStory(g, tok);
 }
@@ -670,6 +672,10 @@ async function insideStory(g, tok) {
     await speak('visitor', t('openWow'));
   }
   if (!alive()) return;
+  // the opening is over: now the view is yours
+  g.locked = false;
+  status(`<strong>${esc(t('lookNow'))}</strong> ${esc(tracker ? t('insideHint') : t('insideHintMouse'))}`);
+  setTimeout(() => { if (gallery === g && !g.locked) status(''); }, 10000);
   // getting to know each other: a different mix every visit, and every question is answered.
   // Before each exchange the two walk towards each other.
   const life = t(`life.${kind}`), host = i => t(`hostLife.${hid(i)}`);
@@ -711,7 +717,8 @@ async function insideStory(g, tok) {
 // inside the painting: a steady, readable conversation around the visitor
 async function insideLife(g, tok) {
   const alive = () => g === gallery && tok === storyToken && g.inside;
-  const qa = shuffled(t('qa').slice(1, 7)), ask = shuffled(t('askYou')), toYou = shuffled(t('visitorAskYou'));
+  const qa = shuffled(t('qa').filter((_, k) => k >= 1 && k < 7 && k !== 3)),   // (no 'can you run fast?': they only walk)
+    ask = shuffled(t('askYou')), toYou = shuffled(t('visitorAskYou'));
   const chorus = shuffled(W(state.work.id).chorus);
   const awake = () => state.hosts.map((h, i) => i).filter(i => g.hosts[i].awake);
   let n = 0;
@@ -797,6 +804,7 @@ stage3d.addEventListener('wheel', e => { if (gallery?.inside) { e.preventDefault
 
 // a tap/pinch inside the picture: call the animal under it, or walk there
 function tapInside(nx, ny) {
+  if (gallery.locked) return;
   const i = gallery.hostAt(nx, ny);
   if (i >= 0) { gallery.callHost(i); speak(i, pickLine(t('called'))); }
   else gallery.walkVisitorToScreen(nx, ny);

@@ -158,14 +158,20 @@
   "box": [
    1482,
    1441,
-   1976,
+   2166,
    1857
   ],
   "size": [
    2400,
    2002
   ],
-  "in_place": false
+  "in_place": false,
+  "patchBox": [
+   1482,
+   1441,
+   1976,
+   1857
+  ]
  },
  "hicks-goat": {
   "work": "hicks",

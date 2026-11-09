@@ -320,6 +320,8 @@ export const STRINGS = {
       ],
     },
     // ---- the crossing: a black title card while the visitor walks into the picture ----
+    watchFirst: 'Watch for a moment: the painted animals are waking up. You can look around when they have said hello.',
+    lookNow: 'Now you can look around.',
     crossKicker: 'Into the picture',
     crossTime: {
       eden: 'In this garden it has been the same golden afternoon since 1615.',

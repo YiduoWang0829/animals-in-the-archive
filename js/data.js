@@ -20,7 +20,7 @@ export const WORKS = [
     hd: 'assets/paintings/hd/peaceable-kingdom.jpg',
     depth: 'assets/paintings/depth/peaceable-kingdom.png',
     size: [2400, 2002], realWidth: 2.0,
-    hosts: ['hicks-lion', 'hicks-cub', 'hicks-calf', 'hicks-goat', 'hicks-leopard'],
+    hosts: ['hicks-lion', 'hicks-cub', 'hicks-calf', 'hicks-leopard'],
     kinds: ['lion', 'wolf', 'cattle', 'bear'],
     ground: [0.1, 0.24],      // the dark earth the animals rest on, rising towards the trees
     wall: 0x26241f,
@@ -39,21 +39,23 @@ export const WORKS = [
 ];
 
 // Painted animals that can come alive. box = sprite rect in HD pixels (hosts.json).
-// faces = where its head points; inPlace = too big / interlocked to walk away.
+// faces = where its head points; inPlace = too big / interlocked to walk away;
+// realH = real-life height in metres in the pose painted (lying animals are low), which sets
+// the scale of the visitor inside the picture.
 export const HOSTS = {
-  'eden-lion':    { faces: 'left' },
-  'eden-horse':   { faces: 'left' },
-  'eden-deer':    { faces: 'left' },
-  'eden-rabbit':  { faces: 'left' },
-  'eden-dog':     { faces: 'left' },
-  'eden-peacock': { faces: 'right' },
-  'hicks-lion':    { faces: 'left', inPlace: true },
-  'hicks-cub':     { faces: 'right' },
-  'hicks-calf':    { faces: 'left' },
-  'hicks-goat':    { faces: 'right' },
-  'hicks-leopard': { faces: 'left' },
-  'marc-deer':    { faces: 'left' },
-  'marc-boar':    { faces: 'right' },
+  'eden-lion':    { faces: 'left', realH: 1.0 },
+  'eden-horse':   { faces: 'left', realH: 1.6 },
+  'eden-deer':    { faces: 'left', realH: 1.75 },
+  'eden-rabbit':  { faces: 'left', realH: 0.25 },
+  'eden-dog':     { faces: 'left', realH: 0.32 },
+  'eden-peacock': { faces: 'right', realH: 1.1 },
+  'hicks-lion':    { faces: 'left', realH: 1.25, inPlace: true },
+  'hicks-cub':     { faces: 'right', realH: 0.45 },
+  'hicks-calf':    { faces: 'left', realH: 0.6 },
+  'hicks-goat':    { faces: 'right', realH: 0.6 },
+  'hicks-leopard': { faces: 'left', realH: 0.55 },
+  'marc-deer':    { faces: 'left', realH: 1.9 },
+  'marc-boar':    { faces: 'right', realH: 0.85 },
 };
 for (const [id, h] of Object.entries(HOSTS)) {
   h.id = id; h.sprite = `assets/hosts/${id}.webp`; h.patch = `assets/hosts/${id}-patch.jpg`; h.glb = `assets/hosts/glb/${id}.glb`;
@@ -63,19 +65,19 @@ for (const [id, h] of Object.entries(HOSTS)) {
 // doodle = DoodleNet (QuickDraw) classes that count as this species.
 // gait = force 'hop' for animals that hop rather than walk.
 export const SPECIES = [
-  { id: 'domestic_cat', kind: 'cat', file: 'domestic_cat_236808539', faces: 'right', doodle: ['cat'] },
-  { id: 'domestic_dog', kind: 'dog', file: 'domestic_dog_251913625', faces: 'right', doodle: ['dog'] },
-  { id: 'rabbit',       kind: 'rabbit', file: 'rabbit_78502673',        faces: 'left',  doodle: ['rabbit'], gait: 'hop' },
-  { id: 'red_deer',     kind: 'deer', file: 'red_deer_10941056',      faces: 'left',  doodle: ['giraffe', 'camel', 'kangaroo'] },
-  { id: 'horse',        kind: 'horse', file: 'horse_121483510',        faces: 'left',  doodle: ['horse', 'cow', 'zebra'] },
-  { id: 'red_fox',      kind: 'fox', file: 'red_fox_2262475',        faces: 'left',  doodle: ['raccoon'] },
-  { id: 'red_squirrel', kind: 'squirrel', file: 'red_squirrel_171989381', faces: 'right', doodle: ['squirrel', 'mouse'] },
-  { id: 'hedgehog',     kind: 'hedgehog', file: 'hedgehog_203070926',     faces: 'right', doodle: ['hedgehog'] },
-  { id: 'owl',          kind: 'bird', file: 'owl_324147361',          faces: 'right', doodle: ['owl', 'bird', 'parrot', 'duck'], gait: 'hop' },
-  { id: 'brown_bear',   kind: 'bear', file: 'brown_bear_24160860',    faces: 'right', doodle: ['bear', 'teddy-bear', 'panda'] },
-  { id: 'grey_wolf',    kind: 'wolf', file: 'grey_wolf_4909114',      faces: 'right', doodle: [] },
-  { id: 'lion',         kind: 'lion', file: 'lion_236419',            faces: 'left',  doodle: ['lion'] },
-  { id: 'tiger',        kind: 'tiger', file: 'tiger_50541307',         faces: 'right', doodle: ['tiger'] },
+  { id: 'domestic_cat', kind: 'cat', realH: 0.3, file: 'domestic_cat_236808539', faces: 'right', doodle: ['cat'] },
+  { id: 'domestic_dog', kind: 'dog', realH: 0.6, file: 'domestic_dog_251913625', faces: 'right', doodle: ['dog'] },
+  { id: 'rabbit',       kind: 'rabbit', realH: 0.25, file: 'rabbit_78502673',        faces: 'left',  doodle: ['rabbit'], gait: 'hop' },
+  { id: 'red_deer',     kind: 'deer', realH: 1.3, file: 'red_deer_10941056',      faces: 'left',  doodle: ['giraffe', 'camel', 'kangaroo'] },
+  { id: 'horse',        kind: 'horse', realH: 1.6, file: 'horse_121483510',        faces: 'left',  doodle: ['horse', 'cow', 'zebra'] },
+  { id: 'red_fox',      kind: 'fox', realH: 0.45, file: 'red_fox_2262475',        faces: 'left',  doodle: ['raccoon'] },
+  { id: 'red_squirrel', kind: 'squirrel', realH: 0.25, file: 'red_squirrel_171989381', faces: 'right', doodle: ['squirrel', 'mouse'] },
+  { id: 'hedgehog',     kind: 'hedgehog', realH: 0.15, file: 'hedgehog_203070926',     faces: 'right', doodle: ['hedgehog'] },
+  { id: 'owl',          kind: 'bird', realH: 0.35, file: 'owl_324147361',          faces: 'right', doodle: ['owl', 'bird', 'parrot', 'duck'], gait: 'hop' },
+  { id: 'brown_bear',   kind: 'bear', realH: 1.25, file: 'brown_bear_24160860',    faces: 'right', doodle: ['bear', 'teddy-bear', 'panda'] },
+  { id: 'grey_wolf',    kind: 'wolf', realH: 0.85, file: 'grey_wolf_4909114',      faces: 'right', doodle: [] },
+  { id: 'lion',         kind: 'lion', realH: 1.1, file: 'lion_236419',            faces: 'left',  doodle: ['lion'] },
+  { id: 'tiger',        kind: 'tiger', realH: 1.0, file: 'tiger_50541307',         faces: 'right', doodle: ['tiger'] },
 ].map(s => ({
   ...s,
   original: `assets/animals/originals/${s.file}.png`,
@@ -89,27 +91,27 @@ export const SPECIES = [
 // read from the licence file that came with each download; see assets/animals/3d/real/).
 // height = metres in the gallery (kept relative to each other, a little smaller than life).
 export const ANIMALS3D = [
-  { id: 'fox', kind: 'fox', height: 0.32, doodle: ['raccoon', 'squirrel'],
+  { id: 'fox', kind: 'fox', height: 0.32, realH: 0.45, doodle: ['raccoon', 'squirrel'],
     real: { title: 'FOX - Realistic 3D Model (DEMO FREE)', author: 'WildMesh 3D', licence: 'CC BY-NC 4.0', url: 'https://sketchfab.com/3d-models/fox-realistic-3d-model-demo-free-83b1b144712c43d282d90c2fb15ba450' } },
-  { id: 'wolf', kind: 'wolf', height: 0.48, doodle: ['dog'],
+  { id: 'wolf', kind: 'wolf', height: 0.48, realH: 0.85, doodle: ['dog'],
     real: { title: 'WOLF - Realistic 3D Model (DEMO FREE)', author: 'WildMesh 3D', licence: 'CC BY-NC 4.0', url: 'https://sketchfab.com/3d-models/wolf-realistic-3d-model-demo-free-8840b859a566485c874a27b1731e1db8' } },
-  { id: 'rabbit', kind: 'rabbit', height: 0.2, doodle: ['rabbit'],
+  { id: 'rabbit', kind: 'rabbit', realH: 0.25, height: 0.2, realH: 0.3, doodle: ['rabbit'],
     real: { title: 'RABBIT - Realistic 3D Model (DEMO FREE)', author: 'WildMesh 3D', licence: 'CC BY-NC 4.0', url: 'https://sketchfab.com/3d-models/rabbit-realistic-3d-model-demo-free-d70284ea0d7644988bdcd327c3ffb59a' } },
-  { id: 'deer', kind: 'deer', height: 0.62, doodle: ['kangaroo'],
+  { id: 'deer', kind: 'deer', height: 0.62, realH: 1.2, doodle: ['kangaroo'],
     real: { title: 'DEER - Realistic 3D Model (DEMO FREE)', author: 'WildMesh 3D', licence: 'CC BY-NC 4.0', url: 'https://sketchfab.com/3d-models/deer-realistic-3d-model-demo-free-3997d669818c4e0d8c8bcafb0a1ae2ee' } },
-  { id: 'stag', kind: 'deer', height: 0.8, doodle: [],
+  { id: 'stag', kind: 'deer', height: 0.8, realH: 2.3, doodle: [],
     real: { title: 'Realistic Animated Elk 3D Model', author: 'WildMesh 3D', licence: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/realistic-animated-elk-3d-model-787834f9caa2474d9f1814b807c072d7' } },
-  { id: 'donkey', kind: 'donkey', height: 0.6, doodle: [],
+  { id: 'donkey', kind: 'donkey', height: 0.6, realH: 1.3, doodle: [],
     real: { title: 'Realistic Animated Donkey 3D Model', author: 'WildMesh 3D', licence: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/realistic-animated-donkey-3d-model-2b4086035df94d9e88fd0f18d34b3872' } },
-  { id: 'horse', kind: 'horse', height: 0.84, doodle: ['horse'],
+  { id: 'horse', kind: 'horse', realH: 1.6, height: 0.84, realH: 1.65, doodle: ['horse'],
     real: { title: 'HORSE - Realistic 3D Model (DEMO FREE)', author: 'WildMesh 3D', licence: 'CC BY-NC 4.0', url: 'https://sketchfab.com/3d-models/horse-realistic-3d-model-demo-free-65d6a70a6721495f938c93e80a5998e4' } },
-  { id: 'zebra', kind: 'zebra', height: 0.72, doodle: ['zebra'],
+  { id: 'zebra', kind: 'zebra', height: 0.72, realH: 1.45, doodle: ['zebra'],
     real: { title: 'Zebra - Rigged', author: 'Noa Seller', licence: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/zebra-rigged-5d6ff2749afc438b9989f91ecb242574' } },
-  { id: 'tiger', kind: 'tiger', height: 0.52, doodle: ['tiger'],
+  { id: 'tiger', kind: 'tiger', realH: 1.0, height: 0.52, realH: 1.0, doodle: ['tiger'],
     real: { title: 'Tiger rebuilt', author: 'kenchoo', licence: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/tiger-rebuilt-6b5d14b2de984ffcb00ee00e404ad208' } },
-  { id: 'lioness', kind: 'lion', height: 0.52, doodle: ['lion'],
+  { id: 'lioness', kind: 'lion', height: 0.52, realH: 1.0, doodle: ['lion'],
     real: { title: 'LIONESS - Realistic 3D Model (DEMO FREE)', author: 'WildMesh 3D', licence: 'CC BY-NC 4.0', url: 'https://sketchfab.com/3d-models/lioness-realistic-3d-model-demo-free-51e60bf5fe37445e91093b4b00a5b0aa' } },
-  { id: 'bear', kind: 'bear', height: 0.62, doodle: ['bear', 'teddy-bear'],
+  { id: 'bear', kind: 'bear', height: 0.62, realH: 1.25, doodle: ['bear', 'teddy-bear'],
     real: { title: 'Realistic Animated Bear 3D Model', author: 'WildMesh 3D', licence: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/realistic-animated-bear-3d-model-bffc3c87d2d148ff8533e1cc8a11c9f1' } },
 ].map(a => ({ ...a,
   // realistic models (Sketchfab, see `real` for the credit) live in assets/animals/3d/real/

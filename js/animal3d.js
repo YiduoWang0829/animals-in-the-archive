@@ -191,7 +191,9 @@ export class Animal3D {
         const fa = feet.reduce((acc, f) => acc.add(wp(f)), new THREE.Vector3()).multiplyScalar(1 / feet.length);
         up = wp(backB).sub(fa);
       }
-      fwd.normalize(); up.addScaledVector(fwd, -up.dot(fwd)).normalize();
+      // up comes first (feet → hips); forward is the head direction made level with it, so a
+      // head held higher than the hips never tips the whole body nose-up or tail-up
+      up.normalize(); fwd.addScaledVector(up, -fwd.dot(up)).normalize();
       if (up.lengthSq() > 0.5) {
         const right = new THREE.Vector3().crossVectors(up, fwd);
         const basis = new THREE.Matrix4().makeBasis(right, up, fwd);
@@ -376,10 +378,10 @@ export class Animal3D {
     // the hooves and paws stay planted. A walk that is asked to go much faster gallops.
     const natW = this.stride.walk.len * this._h / this.stride.walk.dur, natR = this.stride.run.len * this._h / this.stride.run.dur;
     if (this.target) {
-      const running = this.running || this.speed > natW * 2.4;
+      const running = false;                    // they always walk: calm, never a dash
       this.gaitRun = running;
       // a normal pace: about two of its own animation strides per second of travel
-      this.effSpeed = Math.min(this.speed, (running ? natR * 1.6 : natW * 2.3));
+      this.effSpeed = Math.min(this.speed, natW * 1.5);
     }
     if (this.target) {
       const d = this.target.clone().sub(p), dist = d.length(), step = this.effSpeed * dt;

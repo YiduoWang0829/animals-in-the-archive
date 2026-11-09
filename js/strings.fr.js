@@ -296,6 +296,8 @@ const fr = {
       'La moitié d’entre nous a brûlé, un jour. Paul Klee nous a repeints. Alors oui, un peu.',
     ],
   },
+  watchFirst: 'Regardez un instant : les animaux peints se réveillent. Vous pourrez regarder autour de vous quand ils auront dit bonjour.',
+  lookNow: 'Vous pouvez maintenant regarder autour de vous.',
   crossKicker: 'Dans le tableau',
   crossTime: {
     eden: 'Dans ce jardin, c’est le même après-midi doré depuis 1615.',

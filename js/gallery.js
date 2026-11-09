@@ -251,7 +251,9 @@ export class Gallery {
       a.mesh.renderOrder = 3;
       // one that never leaves its place speaks from the painting itself: a flat cut-out laid
       // over the relief would show a double outline, so only the painting is drawn
-      if (host.inPlace) a.mesh.visible = false;
+      // until it wakes, the painted animal is only the painting itself (a cut-out laid over the
+      // relief would show a double outline, and a completed body would cover its neighbours)
+      a.mesh.visible = false;
       this.hosts.push({ actor: a, host, meta, home, homeUV, awake: false, away: false, next: rand(2, 5), patch: null, sprite });
     }
 
@@ -285,7 +287,7 @@ export class Gallery {
     if (h.host.inPlace || h.away) return;
     h.away = true;
     const patch = await loadImg(h.host.patch);
-    const [x0, y0, x1, y1] = h.meta.box, s = this.plate.width / this.W;
+    const [x0, y0, x1, y1] = h.meta.patchBox || h.meta.box, s = this.plate.width / this.W;
     this.plateCtx.drawImage(patch, x0 * s, y0 * s, (x1 - x0) * s, (y1 - y0) * s);
     this.map.needsUpdate = true;
     this.flattenDepth(h);
@@ -295,8 +297,10 @@ export class Gallery {
   // (diffusion from the edge inwards, then smoothed), so no bump or pit is left.
   flattenDepth(h) {
     const dc = this.depthCanvas, s = dc.width / this.W, [x0, y0, x1, y1] = h.meta.box, pad = 4;
-    const X0 = Math.max(0, Math.floor(x0 * s) - pad), Y0 = Math.max(0, Math.floor(y0 * s) - pad);
-    const X1 = Math.min(dc.width, Math.ceil(x1 * s) + pad), Y1 = Math.min(dc.height, Math.ceil(y1 * s) + pad);
+    // only where the animal was actually painted (a completed, hidden part lies over its neighbours)
+    const [px0, py0, px1, py1] = h.meta.patchBox || h.meta.box;
+    const X0 = Math.max(0, Math.floor(px0 * s) - pad), Y0 = Math.max(0, Math.floor(py0 * s) - pad);
+    const X1 = Math.min(dc.width, Math.ceil(px1 * s) + pad), Y1 = Math.min(dc.height, Math.ceil(py1 * s) + pad);
     const w = X1 - X0, hh = Y1 - Y0;
     if (w < 3 || hh < 3) return;
     const id = this.depthCtx.getImageData(X0, Y0, w, hh), d = id.data;
@@ -407,6 +411,7 @@ export class Gallery {
     }
     this.visitor.update(dt, t);
     for (const h of this.hosts) h.actor.update(dt, t);
+    this._dt = dt;
     this.updateCamera();
   }
 
@@ -414,7 +419,7 @@ export class Gallery {
   // unhurried walk at a time; never while someone is walking up to it
   followYou() {
     const u = this.userGaze, v = this.visitor;
-    if (!this.inside || !this.follow || !u?.active || u.gesture || v.target) return;
+    if (!this.inside || this.locked || !this.follow || !u?.active || u.gesture || v.target) return;
     if (this.hosts.some(h => h.meeting || h.called || h.rising)) return;
     const now = performance.now();
     if (now - (this.lastFollow || 0) < 1800) return;
@@ -436,6 +441,7 @@ export class Gallery {
   }
 
   updateCamera() {
+    const ease = rate => 1 - Math.exp(-(this._dt || 1 / 60) * rate);
     const cam = this.camera, px = this.parallax, v = this.view;
     if (this.follow && !this.inside) {                 // walking up to the picture: follow behind
       const vp = this.visitor.position;
@@ -472,11 +478,11 @@ export class Gallery {
         pairW = 1;
         const tanV = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
         const need = (Math.abs(dx) / 2 + this.widthOf(gh.actor) / 2 + this.widthOf(vis) / 2 + 0.08) / (tanV * cam.aspect) + Math.abs(hp.z - T.z) * 0.5;
-        this.pairT = (this.pairT || T.clone()).lerp(new THREE.Vector3(T.x + dx * 0.5, T.y + (hp.y + gh.actor.height * 0.5 - T.y) * 0.3, (T.z + hp.z) / 2), 0.06);
-        this.pairD = THREE.MathUtils.lerp(this.pairD || D, Math.max(D, Math.min(need, base * 1.7)), 0.06);
+        this.pairT = (this.pairT || T.clone()).lerp(new THREE.Vector3(T.x + dx * 0.5, T.y + (hp.y + gh.actor.height * 0.5 - T.y) * 0.3, (T.z + hp.z) / 2), ease(2.6));
+        this.pairD = THREE.MathUtils.lerp(this.pairD || D, Math.max(D, Math.min(need, base * 1.7)), ease(2.6));
       }
     }
-    this.pairK = THREE.MathUtils.lerp(this.pairK || 0, pairW, 0.04);
+    this.pairK = THREE.MathUtils.lerp(this.pairK || 0, pairW, ease(1.8));
     if (this.pairK > 0.01 && this.pairT) { T.lerp(this.pairT, this.pairK); D = THREE.MathUtils.lerp(D, this.pairD, this.pairK); }
     // The camera's direction comes from the view angles (not from aiming at the animal),
     // so moving it never changes where it points. It sits behind and above your animal,
@@ -492,8 +498,10 @@ export class Gallery {
     want.x += px.x * 0.04; want.y += px.y * 0.03;                     // a touch of head parallax
     // catch up faster when the animal nears the edge of the view
     const off = Math.max(Math.abs(T.clone().project(cam).x), 0);
-    cam.position.lerp(want, 0.08 + 0.3 * THREE.MathUtils.smoothstep(off, 0.45, 0.9));
-    cam.quaternion.slerp(q, 0.1);
+    // time-based easing: the same soft glide at any frame rate (faster only when the
+    // animal is about to leave the frame)
+    cam.position.lerp(want, ease(3.2 + 16 * THREE.MathUtils.smoothstep(off, 0.45, 0.9)));
+    cam.quaternion.slerp(q, ease(3.6));
     this.keepFrameOut();
     // if the picture's edge holds the camera back so far that your animal drifts out of
     // view, the orbit gives way (the view swings back behind the animal)
@@ -541,19 +549,19 @@ export class Gallery {
   // ---- VR-style controls inside the painting (mouse drag, wheel, head, hands)
   // orbit around your animal (relative, e.g. a mouse drag) …
   look(dx, dy) {
-    if (!this.inside) return;
+    if (!this.inside || this.locked) return;
     this.view.ty = THREE.MathUtils.clamp(this.view.ty - dx * 3.2, -0.6, 0.6);
     this.view.tp = THREE.MathUtils.clamp(this.view.tp + dy * 2.4, -0.12, 0.45);
   }
   // … or directly to an angle (e.g. where your open hand is)
   lookTo(yaw, pitch) {
-    if (!this.inside) return;
+    if (!this.inside || this.locked) return;
     this.view.ty = THREE.MathUtils.clamp(yaw, -0.6, 0.6); this.view.tp = THREE.MathUtils.clamp(pitch, -0.12, 0.45);
   }
-  orbitBy(d) { if (this.inside) this.view.ty = THREE.MathUtils.clamp(this.view.ty + d, -0.65, 0.65); }
-  zoomTo(z) { if (this.inside) this.view.tz = THREE.MathUtils.clamp(z, -0.3, 0.45); }
+  orbitBy(d) { if (this.inside && !this.locked) this.view.ty = THREE.MathUtils.clamp(this.view.ty + d, -0.65, 0.65); }
+  zoomTo(z) { if (this.inside && !this.locked) this.view.tz = THREE.MathUtils.clamp(z, -0.3, 0.45); }
   zoomBy(d) {
-    if (!this.inside) return;
+    if (!this.inside || this.locked) return;
     this.view.tz = THREE.MathUtils.clamp(this.view.tz + d, -0.3, 0.45);
   }
 
@@ -626,12 +634,15 @@ export class Gallery {
     if (h.awake) return;
     h.awake = true;
     if (h.host.inPlace) return;                     // too big to leave: it talks from where it is
-    // it gets up first (it has been lying or standing still for centuries), then steps out
+    // the whole animal fades in over its painted self while the ground behind is painted back,
+    // then it gets up (it has been lying or standing still for centuries) and steps out
+    const a = h.actor; a.mesh.visible = true; a.uniforms.uOpacity.value = 0;
+    this.tween(0.45, e => { a.uniforms.uOpacity.value = e; });
+    this.wait(0.3).then(() => this.revealGround(h));
     h.actor.standUp?.();
     h.rising = true;
     this.wait(1.15).then(() => {
       h.rising = false;
-      this.revealGround(h);
       h.actor.ground = (x, z) => this.groundY(z);
       h.actor.shadow.visible = true;
       h.actor.walkTo(this.spot(h.actor.position.x, h.actor.position.z + 0.1, h.actor), 0.26);
@@ -660,8 +671,12 @@ export class Gallery {
     this.maxZoom = dist * 0.72; this.viewDist = dist;
     const recede = dist + 0.3;
     const camTo = new THREE.Vector3(0, this.cy, dist - recede - 0.03), lookTo = new THREE.Vector3(0, this.cy, -recede);
-    const h0 = v.height, ref = this.hosts.find(h => !h.host.inPlace)?.actor.height ?? this.ph * 0.15;
-    const h1 = Math.max(0.1, Math.min(Math.max(ref * 0.9, this.ph * 0.1), this.ph * 0.15));   // the size of the painted animals
+    // in proportion with the painted animals: each one, with its real-life height, says how big
+    // a metre is in this picture; the visitor takes its own real height on that scale
+    const h0 = v.height, vr = this.o.visitorRealH || 0.8;
+    const est = this.hosts.filter(h => h.host.realH).map(h => h.actor.height * vr / h.host.realH).sort((p, q) => p - q);
+    const mid = est.length ? est[Math.floor(est.length / 2)] : this.ph * 0.12;
+    const h1 = THREE.MathUtils.clamp(mid, this.ph * 0.045, this.ph * 0.42);
     // keep walking forward, into the depth of the picture (away from you)
     // the deepest place the painting lets you reach (measured on the relief as it will be inside)
     const keep = this.paintU.uDepth.value, hNow = v.height; this.paintU.uDepth.value = depth1; v.setHeight(h1);
@@ -831,7 +846,7 @@ export class Gallery {
 
   // walk the visitor to a screen point (mouse click or pinch in the air)
   walkVisitorToScreen(nx, ny) {
-    if (!this.inside) return;
+    if (!this.inside || this.locked) return;
     const ray = new THREE.Raycaster();
     ray.setFromCamera(new THREE.Vector2(nx, ny), this.camera);
     const gy = this.paintGroup.position.y + this.groundY(0.2);
