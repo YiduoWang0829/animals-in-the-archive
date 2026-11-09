@@ -1,0 +1,11 @@
+Model Information:
+* title:	FOX - Realistic 3D Model (DEMO FREE)
+* source:	https://sketchfab.com/3d-models/fox-realistic-3d-model-demo-free-83b1b144712c43d282d90c2fb15ba450
+* author:	WildMesh 3D (https://sketchfab.com/WildMesh_3D)
+
+Model License:
+* license type:	CC-BY-NC-4.0 (http://creativecommons.org/licenses/by-nc/4.0/)
+* requirements:	Author must be credited. No commercial use.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "FOX - Realistic 3D Model (DEMO FREE)" (https://sketchfab.com/3d-models/fox-realistic-3d-model-demo-free-83b1b144712c43d282d90c2fb15ba450) by WildMesh 3D (https://sketchfab.com/WildMesh_3D) licensed under CC-BY-NC-4.0 (http://creativecommons.org/licenses/by-nc/4.0/)

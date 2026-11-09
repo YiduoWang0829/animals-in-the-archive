@@ -59,8 +59,7 @@ export const STRINGS = {
     bringMatch: 'Or bring the 3D {name}',
     dragToTurn: 'Drag to turn it around',
     animals3d: {
-      fox: 'fox', shiba_inu: 'shiba dog', husky: 'husky', deer: 'deer', stag: 'stag', alpaca: 'alpaca',
-      donkey: 'donkey', white_horse: 'white horse', zebra: 'zebra', cow: 'cow', bull: 'bull',
+      fox: 'fox', wolf: 'wolf', rabbit: 'rabbit', deer: 'deer', stag: 'elk', donkey: 'donkey', horse: 'white horse', zebra: 'zebra', tiger: 'tiger', lioness: 'lioness', bear: 'brown bear',
     },
     visitorHeading: 'Who walks in?',
     visitorIntro: 'Draw an animal: your drawing becomes the character. Or choose one from the archive.',
@@ -520,7 +519,7 @@ export const STRINGS = {
 
     creditsHeading: 'Credits',
     credits: {
-      paintings: 'Paintings', photos: 'Animal photographs', models3d: '3D animals', modelsNote: 'Realistic rigged and animated animals from Sketchfab, each credited below under the licence stated in the licence file that came with its download (CC BY 4.0 or CC BY-NC 4.0); for this project the props (such as a saddle) were removed, unused animations dropped, textures reduced and the shading made painterly. The remaining low-poly animals are by Quaternius, released under CC0 1.0 on poly.pizza (licence checked on each model page on 2026-11-06).', model: 'Model', hosts: 'Painted animals', software: 'Software, models and fonts',
+      paintings: 'Paintings', photos: 'Animal photographs', models3d: '3D animals', modelsNote: 'Realistic rigged and animated animals from Sketchfab, each credited below under the licence stated in the licence file that came with its download (CC BY 4.0, or CC BY-NC 4.0 for non-commercial use only). For this project the props (a saddle) were removed, unused animations dropped, textures reduced and the shading made painterly.', model: 'Model', hosts: 'Painted animals', software: 'Software, models and fonts',
       work: 'Work', author: 'Artist', date: 'Date', collection: 'Collection', source: 'Image source', licence: 'Licence status',
       file: 'Source file', species: 'Species', record: 'Source record', photographer: 'Photographer',
       recorded: 'Licence as recorded', via: 'Obtained from', item: 'Item', version: 'Version', use: 'Used for',

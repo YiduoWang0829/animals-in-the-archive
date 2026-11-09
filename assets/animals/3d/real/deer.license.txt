@@ -1,0 +1,11 @@
+Model Information:
+* title:	DEER - Realistic 3D Model (DEMO FREE)
+* source:	https://sketchfab.com/3d-models/deer-realistic-3d-model-demo-free-3997d669818c4e0d8c8bcafb0a1ae2ee
+* author:	WildMesh 3D (https://sketchfab.com/WildMesh_3D)
+
+Model License:
+* license type:	CC-BY-NC-4.0 (http://creativecommons.org/licenses/by-nc/4.0/)
+* requirements:	Author must be credited. No commercial use.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "DEER - Realistic 3D Model (DEMO FREE)" (https://sketchfab.com/3d-models/deer-realistic-3d-model-demo-free-3997d669818c4e0d8c8bcafb0a1ae2ee) by WildMesh 3D (https://sketchfab.com/WildMesh_3D) licensed under CC-BY-NC-4.0 (http://creativecommons.org/licenses/by-nc/4.0/)

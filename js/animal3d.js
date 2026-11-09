@@ -111,7 +111,7 @@ const clipName = c => c.name.split('|').pop();
 // steady drift is taken out (the sway and bob stay).
 function stripRootMotion(clip) {
   for (const tr of clip.tracks) {
-    if (!/\.position$/.test(tr.name) || !/^(_?root|root|cg|hips|pelvis|armature)/i.test(tr.name.split('.')[0].replace(/^.*\//, ''))) continue;
+    if (!/\.position$/.test(tr.name) || !/(root|^cg|hips|pelvis|armature)/i.test(tr.name.split('.')[0].replace(/^.*\//, ''))) continue;
     const v = tr.values, t = tr.times, n = t.length, T = t[n - 1] - t[0];
     if (n < 3 || T <= 0) continue;
     for (let k = 0; k < 3; k++) {
@@ -169,16 +169,35 @@ export class Animal3D {
       o.parent.add(line);
       (this.outlines ||= []).push(line);
     }
-    // face forward (+z): some models are authored facing sideways. The head bone and
-    // the hips/tail tell which way the animal points.
+    // stand the animal up and face it forward (+z). Models come authored in every way
+    // (sideways, nose-up); the bones say where the head, the hips and the feet are.
     const allBones = []; this.root.traverse(o => { if (o.isBone) allBones.push(o); });
-    const headB = allBones.find(b => /^head(_?\d+)?$/i.test(b.name));
-    const backB = allBones.find(b => /^(pelvis|hips|cg)(_?\d+)?$/i.test(b.name)) || allBones.find(b => /^tail/i.test(b.name));
+    const isHead = b => /head/i.test(b.name) && !/(nub|end|correct|be_head|ponytail|ik|dyn)/i.test(b.name);
+    const isBack = b => /(pelvis|hips)/i.test(b.name);
+    const isFoot = b => /(ankle|foot|toe|hoof|hand|digit|metatars|paw)/i.test(b.name) && !/(nub|end|twist|correct|ik|dyn)/i.test(b.name);
+    const headB = allBones.find(isHead), backB = allBones.find(isBack) || allBones.find(b => /spine|^cg/i.test(b.name)) || allBones.find(b => /^tail/i.test(b.name));
+    const feet = allBones.filter(isFoot);
+    // measure in a real pose (the first frame of its idle or walk): some rigs keep a rest
+    // pose turned differently from how every animation holds the body
+    const poseMixer = new THREE.AnimationMixer(this.root);
+    const poseClip = gltf.animations.find(c => /^walk$/i.test(clipName(c))) || gltf.animations.find(c => /walk/i.test(clipName(c))) || gltf.animations.find(c => /idle|stand|breath/i.test(clipName(c))) || gltf.animations[0];
+    if (poseClip) { poseMixer.clipAction(poseClip).play(); poseMixer.setTime(0); }
+    this.root.updateMatrixWorld(true);
+    const wp = b => b.getWorldPosition(new THREE.Vector3());
     if (headB && backB) {
-      this.root.updateMatrixWorld(true);
-      const hp = headB.getWorldPosition(new THREE.Vector3()), bp = backB.getWorldPosition(new THREE.Vector3());
-      const ang = Math.atan2(hp.x - bp.x, hp.z - bp.z);
-      if (Math.abs(ang) > 0.35) this.root.rotation.y = -ang;
+      const fwd = wp(headB).sub(wp(backB));
+      let up = new THREE.Vector3(0, 1, 0);
+      if (feet.length >= 2) {                     // up: from the feet towards the hips
+        const fa = feet.reduce((acc, f) => acc.add(wp(f)), new THREE.Vector3()).multiplyScalar(1 / feet.length);
+        up = wp(backB).sub(fa);
+      }
+      fwd.normalize(); up.addScaledVector(fwd, -up.dot(fwd)).normalize();
+      if (up.lengthSq() > 0.5) {
+        const right = new THREE.Vector3().crossVectors(up, fwd);
+        const basis = new THREE.Matrix4().makeBasis(right, up, fwd);
+        const q = new THREE.Quaternion().setFromRotationMatrix(basis).invert();
+        if (q.angleTo(new THREE.Quaternion()) > 0.3) this.root.quaternion.premultiply(q);
+      }
     }
     // normalise size: the model's height becomes `height` metres, feet at y = 0, centred.
     // The bounds come from the skinned (posed) vertices, not the raw mesh, since a rig can
@@ -189,15 +208,17 @@ export class Animal3D {
     this.root.scale.multiplyScalar(s);
     this.root.position.set(-(box.min.x + box.max.x) / 2 * s, -box.min.y * s, -(box.min.z + box.max.z) / 2 * s);
     this.length = (box.max.z - box.min.z) * s;
+    poseMixer.stopAllAction(); poseMixer.uncacheRoot(this.root);
     this.uniforms.uOutline.value = 0.0035;        // outline thickness (fraction of the screen)
     // neck and head bones, with the direction each one "faces" in the rest pose
     // (the model faces +z), so the head can be aimed at a point anatomically
     // bones are found by name pattern: "Head", "Head_023", "Neck2", "Neck1_021" …
-    const bones = []; this.root.traverse(o => { if (o.isBone) bones.push(o); });
+    const bones = allBones;
     const byName = n => bones.find(b => b.name === n) || null;
-    this.head = byName('Head') || bones.find(b => /^head(_?\d+)?$/i.test(b.name)) || null;
-    const necks = bones.filter(b => /^neck\d*(_\d+)?$/i.test(b.name));
+    this.head = byName('Head') || bones.find(isHead) || null;
+    const necks = bones.filter(b => /neck/i.test(b.name) && !/(fix|off|correct|end|nub|ik)/i.test(b.name));
     this.neck = byName('Neck2') ? ['Neck2', 'Neck3', 'Neck'].map(byName).filter(Boolean) : necks.slice(-2).reverse();
+    this.feet = feet; this.backBone = backB;
     this.aimChain = [...this.neck.map(b => ({ b, share: 0.25, limit: 0.16 })), ...(this.head ? [{ b: this.head, share: 1, limit: 0.5 }] : [])];
     this.root.updateMatrixWorld(true);
     const qw = new THREE.Quaternion();
@@ -206,7 +227,38 @@ export class Animal3D {
     // animations
     this.mixer = new THREE.AnimationMixer(this.root);
     this.clips = {};
-    for (const c of gltf.animations) { const n = clipName(c); if (!this.clips[n]) this.clips[n] = stripRootMotion(c); }
+    for (const c of gltf.animations) { const n = clipName(c); if (!this.clips[n]) this.clips[n] = c; }
+    // how far a walk or run carries the body in one cycle (its own root motion), measured
+    // before that motion is taken out: the honest pace for the feet
+    this.travel = {};
+    for (const k of ['Walk', 'Gallop', 'Run']) {
+      const c = this.clips[k]; if (!c || !this.backBone) continue;
+      const act = this.mixer.clipAction(c); act.reset().play();
+      const p = t => { this.mixer.setTime(t); this.root.updateMatrixWorld(true); return this.inner.worldToLocal(this.backBone.getWorldPosition(new THREE.Vector3())); };
+      const d = p(c.duration - 1e-3).sub(p(0)); act.stop(); this.mixer.setTime(0);
+      this.travel[k] = Math.hypot(d.x, d.z);
+    }
+    for (const c of Object.values(this.clips)) stripRootMotion(c);
+    // a clip that holds the body some other way than the walk does (a different root
+    // orientation in the file) would flip the animal over: leave it out
+    if (this.clips.Walk && this.head) {
+      const probe = c => {
+        const act = this.mixer.clipAction(c); act.reset().play(); this.mixer.setTime(0.05); this.root.updateMatrixWorld(true);
+        const h = this.inner.worldToLocal(this.head.getWorldPosition(new THREE.Vector3()));
+        const fy = feet.length ? Math.min(...feet.map(f => this.inner.worldToLocal(f.getWorldPosition(new THREE.Vector3())).y)) : 0;
+        act.stop(); this.mixer.setTime(0); return { h, fy };
+      };
+      const ref = probe(this.clips.Walk);
+      for (const k of Object.keys(this.clips)) {
+        if (k === 'Walk' || /^Sleep/.test(k)) continue;
+        const p = probe(this.clips[k]);
+        const flipped = p.fy > 0.3 || p.h.z * ref.h.z < 0 || Math.abs(p.h.x) > 0.5;
+        if (flipped || (!/^(Eating|Call|Shake)$/.test(k) && p.h.distanceTo(ref.h) > 0.6)) delete this.clips[k];
+      }
+    }
+    // a model without a standing clip holds a still frame of its walk; without a walk, it trots
+    if (!this.clips.Walk && (this.clips.Gallop || this.clips.Run)) this.clips.Walk = this.clips.Gallop || this.clips.Run;
+    if (!this.clips.Idle && this.clips.Walk) this.clips.Idle = THREE.AnimationUtils.subclip(this.clips.Walk, 'Idle', 0, 1, 30);
     const pick = (...names) => names.map(n => this.clips[n]).find(Boolean);
     this.anim = {
       idle: pick('Idle'), idle2: pick('Idle_2', 'Idle_Headlow', 'Idle_2_HeadLow'), eat: pick('Eating', 'Idle_Eating'),
@@ -218,7 +270,13 @@ export class Animal3D {
     this.current = null;
     // measure how far one cycle of each gait carries the animal (in body heights),
     // so playback speed can match ground speed: the feet plant instead of sliding
-    this.stride = { walk: this.measureStride(this.anim.walk) || { len: 0.9, dur: 1 }, run: this.measureStride(this.anim.run) || { len: 2.2, dur: 1 } };
+    const fromTravel = k => this.travel[k] > 0.08 ? { len: this.travel[k], dur: this.clips[k].duration } : null;
+    // a foot sweep that is implausibly short (an odd foot bone) falls back to body length
+    const sane = (m, k, clip) => m && m.len > 0.3 ? m : clip ? { len: this.length * k, dur: clip.duration } : null;
+    this.stride = {
+      walk: fromTravel('Walk') || sane(this.measureStride(this.anim.walk), 0.6, this.anim.walk) || { len: 0.9, dur: 1 },
+      run: fromTravel('Gallop') || fromTravel('Run') || sane(this.measureStride(this.anim.run), 1.3, this.anim.run) || { len: 2.2, dur: 1 },
+    };
     this.play('idle', 0);
 
     this.shadow = blobShadow();
@@ -232,7 +290,11 @@ export class Animal3D {
     if (!clip) return 0;
     let foot = null;
     this.root.traverse(o => { if (!foot && /^FrontLowerLeg\.?L(_end)?$/.test(o.name) && (o.name.endsWith('_end') || !o.children.length)) foot = o; });
-    if (!foot) this.root.traverse(o => { if (!foot && o.isBone && /^L_(Hand|Finger0|Foot)(_?\d+)?$/i.test(o.name) && /Hand|Finger/i.test(o.name)) foot = o; });
+    if (!foot && this.feet?.length) {
+      this.root.updateMatrixWorld(true);
+      const P = o => this.inner.worldToLocal(o.getWorldPosition(new THREE.Vector3()));
+      foot = [...this.feet].sort((a, b) => P(b).z - P(a).z)[0];
+    }
     if (!foot) return 0;
     const act = this.mixer.clipAction(clip); act.reset().play();
     const p = new THREE.Vector3(); let zMin = 1e9, zMax = -1e9;

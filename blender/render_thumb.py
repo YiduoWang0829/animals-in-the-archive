@@ -18,14 +18,39 @@ for o in sc.objects:
         if idle: o.animation_data.action = idle
 sc.frame_set(8)
 bpy.context.view_layer.update()
+# stand it up and face it along -Y (Blender's forward for this camera): the same rule the
+# site uses, from the bones (head, hips, feet), for models authored nose-up or sideways
+import re
+arm = next((o for o in sc.objects if o.type == 'ARMATURE'), None)
+if arm:
+    bw = lambda pb: arm.matrix_world @ pb.head
+    pbs = arm.pose.bones
+    head = next((b for b in pbs if re.search('head', b.name, re.I) and not re.search('nub|end|correct|be_head|ponytail|ik|dyn', b.name, re.I)), None)
+    back = next((b for b in pbs if re.search('pelvis|hips', b.name, re.I)), None)
+    feet = [b for b in pbs if re.search('ankle|foot|toe|hoof|hand|digit|metatars|paw', b.name, re.I) and not re.search('nub|end|twist|correct|ik|dyn', b.name, re.I)]
+    if head and back:
+        f = (bw(head) - bw(back)).normalized()
+        up = mathutils.Vector((0, 0, 1))
+        if len(feet) >= 2:
+            fa = sum((bw(b) for b in feet), mathutils.Vector()) / len(feet)
+            up = bw(back) - fa
+        up = (up - f * up.dot(f)).normalized()
+        r = f.cross(up)
+        cur = mathutils.Matrix((r, f, up)).transposed()          # columns: right, forward, up
+        want = mathutils.Matrix(((-1, 0, 0), (0, -1, 0), (0, 0, 1)))  # facing -y (towards the camera side), z up
+        R = (want @ cur.inverted()).to_4x4()
+        for o in sc.objects:
+            if o.parent is None: o.matrix_world = R @ o.matrix_world
+        bpy.context.view_layer.update()
 sc.render.engine = 'BLENDER_EEVEE_NEXT' if 'BLENDER_EEVEE_NEXT' in [e.identifier for e in bpy.types.RenderSettings.bl_rna.properties['engine'].enum_items] else 'BLENDER_EEVEE'
 sc.render.resolution_x, sc.render.resolution_y = 520, 400
 w = bpy.data.worlds.new('w'); sc.world = w; w.use_nodes = True
 w.node_tree.nodes['Background'].inputs[0].default_value = (0.5, 0.48, 0.45, 1); sc.render.film_transparent = True
 meshes = [o for o in sc.objects if o.type == 'MESH']
 mn = mathutils.Vector((1e9,)*3); mx = mathutils.Vector((-1e9,)*3)
+dg = bpy.context.evaluated_depsgraph_get()
 for o in meshes:
-    for c in o.bound_box:
+    for c in o.evaluated_get(dg).bound_box:
         v = o.matrix_world @ mathutils.Vector(c); mn = mathutils.Vector(map(min, mn, v)); mx = mathutils.Vector(map(max, mx, v))
 ctr = (mn + mx) / 2; size = max(mx - mn)
 cam = bpy.data.objects.new('cam', bpy.data.cameras.new('cam')); sc.collection.objects.link(cam)

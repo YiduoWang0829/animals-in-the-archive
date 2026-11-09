@@ -55,8 +55,7 @@ export default {
   bringMatch: '아니면 3D {name}을(를) 데려가기',
   dragToTurn: '드래그해서 돌려 보세요',
   animals3d: {
-    fox: '여우', shiba_inu: '시바견', husky: '허스키', deer: '사슴', stag: '수사슴', alpaca: '알파카',
-    donkey: '당나귀', white_horse: '백마', zebra: '얼룩말', cow: '젖소', bull: '황소',
+    fox: '여우', wolf: '늑대', rabbit: '산토끼', deer: '사슴', stag: '엘크', donkey: '당나귀', horse: '백마', zebra: '얼룩말', tiger: '호랑이', lioness: '암사자', bear: '불곰',
   },
   visitorHeading: '누가 들어갈까요?',
   visitorIntro: '동물을 그려 보세요. 당신의 그림이 캐릭터가 됩니다. 아니면 아카이브에서 하나를 고르세요.',
@@ -484,7 +483,7 @@ export default {
   creditsHeading: '출처',
   credits: {
     paintings: '그림', photos: '동물 사진', models3d: '3D 동물',
-    modelsNote: '사실적인, 뼈대와 애니메이션이 있는 동물들은 Sketchfab에서 왔으며, 각각 내려받을 때 함께 온 라이선스 파일(CC BY 4.0 또는 CC BY-NC 4.0)에 따라 아래 표에 저작자를 표시했습니다. 이 프로젝트에서는 소품(안장 등)을 없애고, 쓰지 않는 애니메이션을 빼고, 텍스처를 줄이고, 회화적인 셰이딩을 더했습니다. 나머지 로우폴리 동물은 Quaternius가 만들었고 poly.pizza에서 CC0 1.0으로 공개되었습니다(2026-11-06에 각 모델 페이지에서 라이선스 확인).',
+    modelsNote: '사실적인, 뼈대와 애니메이션이 있는 동물들은 Sketchfab에서 왔으며, 각각 내려받을 때 함께 온 라이선스 파일에 따라 아래 표에 저작자를 표시했습니다(CC BY 4.0, 또는 비상업적 이용만 허용되는 CC BY-NC 4.0). 이 프로젝트에서는 소품(안장)을 없애고, 쓰지 않는 애니메이션을 빼고, 텍스처를 줄이고, 회화적인 셰이딩을 더했습니다.',
     model: '모델', hosts: '그림 속 동물', software: '소프트웨어, 모델, 글꼴',
     work: '작품', author: '작가', date: '연도', collection: '소장처', source: '이미지 출처', licence: '라이선스 상태',
     file: '원본 파일', species: '종', record: '출처 기록', photographer: '사진가',

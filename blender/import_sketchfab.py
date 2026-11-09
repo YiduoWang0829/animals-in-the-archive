@@ -33,25 +33,27 @@ for ob in list(bpy.data.objects):
         bpy.data.objects.remove(ob, do_unlink=True)
 
 # ---- clips: the site's names ← patterns tried in order on the model's own clip names ----
+NOT_STANDING = r"(trans_|_to_|lying|lie_|sitting|sit_|death|dead|hit|attack|swim|fly|jump|fall|turn|strafe|back)"
 WANT = [
-    ("Idle",        [r"(^|_)idle_?0?1$", r"(^|_)idle$", r"idle.*01", r"idle"]),
-    ("Idle_2",      [r"idle.*look(?!.*opp)", r"idle_?0?3", r"idle_?0?2(?!.*shake)", r"look"]),
+    ("Idle",        [r"stand.*(idle|breath)", r"(^|_)idle_?0?1$", r"(^|_)idle$", r"(^|_)idle", r"(^|_)stand$", r"breath"]),
+    ("Idle_2",      [r"idle.*look(?!.*opp)", r"stand_idle_?0?2", r"(^|_)idle_?0?[23]", r"look", r"breath"]),
     ("Eating",      [r"(^|_)eat", r"graz", r"drink"]),
-    ("Walk",        [r"(^|_)walk$", r"(^|_)walk_?f(orward)?$", r"(^|_)walk(?!.*(back|left|right|strafe|up|down|_\d))"]),
-    ("Gallop",      [r"(^|_)trot$", r"(^|_)canter$", r"(^|_)run$", r"(^|_)gallop$"]),
-    ("Sit",         [r"(^|_)sit(_?loop|_?idle)?$", r"(^|_)lie(_?loop|_?idle)?$", r"(^|_)rest"]),
-    ("Sleep_Start", [r"sleep.*start", r"lie.*down", r"sit.*start"]),
-    ("Sleep_Loop",  [r"sleep.*loop", r"(^|_)sleep$"]),
-    ("Sleep_End",   [r"sleep.*end", r"get.?up", r"stand.*up"]),
+    ("Walk",        [r"(^|_)walk$", r"(^|_)walk_?f(orward)?$", r"(^|_)walk(fast|slow)?(_f)?$", r"(^|_)walk(?!.*(left|right|_l$|_r$|l$|r$|up|down|_\d))"]),
+    ("Gallop",      [r"(^|_)trot$", r"(^|_)canter$", r"(^|_)run$", r"walk_?fast", r"(^|_)gallop$"]),
+    ("Sleep_Start", [r"sleep.*start", r"stand_to_lying", r"lie.*down"]),
+    ("Sleep_Loop",  [r"sleep.*loop", r"(^|_)sleep$", r"lying_(idle|breath)"]),
+    ("Sleep_End",   [r"sleep.*end", r"lying_to_stand", r"get.?up", r"stand.*up"]),
     ("Shake",       [r"head.?shake", r"shake"]),
     ("Call",        [r"neigh", r"howl", r"roar", r"call", r"bark", r"bleat", r"moo", r"bray"]),
 ]
+STANDING = {"Idle", "Idle_2", "Walk", "Gallop", "Eating"}
 acts = {a.name: a for a in bpy.data.actions}
 clean = lambda n: re.sub(r"^[A-Za-z]{1,3}_", "", n.split("|")[-1]).lower().replace(" ", "_")
 chosen = {}
 for std, pats in WANT:
     for p in pats:
-        hit = next((a for n, a in acts.items() if a not in chosen.values() and re.search(p, clean(n))), None)
+        hit = next((a for n, a in acts.items() if a not in chosen.values() and re.search(p, clean(n))
+                    and not (std in STANDING and re.search(NOT_STANDING, clean(n)))), None)
         if hit: chosen[std] = hit; break
 for std, a in chosen.items():
     print(f"clip {std:12s} <- {a.name}")

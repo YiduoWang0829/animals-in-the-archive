@@ -231,7 +231,8 @@ function choose(c) {
     img2d.hidden = true; $('#turntable').style.visibility = '';
     turntable.show(a, c.look);
     label = t(`animals3d.${a.id}`);
-    name.innerHTML = `<div class="n">${esc(label)}</div><div class="s">3D · Quaternius · CC0</div>`;
+    const r = animal3dById(c.id)?.real;
+    name.innerHTML = `<div class="n">${esc(label)}</div><div class="s">3D · ${esc(r ? `${r.author} · ${r.licence}` : 'Quaternius · CC0')}</div>`;
     tools.innerHTML = `
       <div class="segmented" role="group">${['walk', 'run', 'idle', 'eat'].map(k => `<button data-action="tt-anim" data-anim="${k}" aria-pressed="${(turntable.anim || 'walk') === k}">${esc(t({ walk: 'animWalk', run: 'animRun', idle: 'animIdle', eat: 'animEat' }[k]))}</button>`).join('')}</div>
       <div class="segmented" role="group">
@@ -573,9 +574,17 @@ async function crossing(g, lines, entering, alive, title) {
   setTimeout(() => el.remove(), 2200);
 }
 function animate(ms, fn, ease = k => k) {
+  // smooth on animation frames, but also stepped by a timer, so it always finishes even
+  // when the browser holds back frames (a background tab, a hidden window)
   return new Promise(res => {
-    const t0 = performance.now();
-    const f = () => { const k = Math.min(1, (performance.now() - t0) / ms); fn(ease(k)); k < 1 ? requestAnimationFrame(f) : res(); };
+    const t0 = performance.now(); let done = false;
+    const step = () => {
+      if (done) return;
+      const k = Math.min(1, (performance.now() - t0) / ms); fn(ease(k));
+      if (k >= 1) { done = true; clearInterval(iv); res(); }
+    };
+    const f = () => { step(); if (!done) requestAnimationFrame(f); };
+    const iv = setInterval(step, 80);
     requestAnimationFrame(f);
   });
 }
@@ -1093,7 +1102,7 @@ function renderCredits() {
     <h2>${L('models3d')}</h2><p class="note">${L('modelsNote')}</p><div class="scroll"><table>
       <tr><th>${L('file')}</th><th>${L('model')}</th><th>${L('source')}</th><th>${L('licence')}</th></tr>
       ${ANIMALS3D.filter(a => a.real).map(a => `<tr><td>${esc(a.glb.split('/').pop())}</td><td>${esc(a.real.title)} · ${esc(a.real.author)}</td><td>${link(a.real.url)}</td><td>${esc(a.real.licence)}</td></tr>`).join('')}
-      ${c.models3d.filter(m => !animal3dById(m.file.replace('.glb', ''))?.real).map(m => `<tr><td>${esc(m.file)}</td><td>${esc(m.name)} · Quaternius</td><td>${link(m.source)}</td><td>CC0 1.0</td></tr>`).join('')}
+
     </table></div>
     <h2>${L('software')}</h2><div class="scroll"><table>
       <tr><th>${L('item')}</th><th>${L('version')}</th><th>${L('use')}</th><th>${L('licence')}</th></tr>

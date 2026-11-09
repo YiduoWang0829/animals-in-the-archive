@@ -85,22 +85,32 @@ export const SPECIES = [
   glbStorybook: `assets/animals/glb-storybook/${s.file}.glb`,
 }));
 
-// Rigged, animated 3D animals (Quaternius, CC0). height = metres in the gallery
-// (kept relative to each other; slightly smaller than life to suit the room).
+// Realistic rigged and animated 3D animals from Sketchfab (credits and licences in `real`,
+// read from the licence file that came with each download; see assets/animals/3d/real/).
+// height = metres in the gallery (kept relative to each other, a little smaller than life).
 export const ANIMALS3D = [
-  { id: 'fox', kind: 'fox',         height: 0.3,  doodle: ['raccoon', 'squirrel'] },
-  { id: 'shiba_inu', kind: 'dog',   height: 0.34, doodle: ['dog'] },
-  { id: 'husky', kind: 'dog',       height: 0.44, doodle: [] },
-  { id: 'deer', kind: 'deer',        height: 0.56, doodle: ['kangaroo'] },
-  { id: 'stag', kind: 'deer',        height: 0.66, doodle: [] },
-  { id: 'alpaca', kind: 'alpaca',      height: 0.64, doodle: ['camel', 'giraffe'] },
-  { id: 'donkey', kind: 'donkey',      height: 0.6,  doodle: [],
-    real: { title: 'Realistic Animated Donkey 3D Model', author: 'WildMesh 3D', licence: 'CC BY 4.0',
-            url: 'https://sketchfab.com/3d-models/realistic-animated-donkey-3d-model-2b4086035df94d9e88fd0f18d34b3872' } },
-  { id: 'white_horse', kind: 'horse', height: 0.8,  doodle: ['horse'] },
-  { id: 'zebra', kind: 'zebra',       height: 0.74, doodle: ['zebra'] },
-  { id: 'cow', kind: 'cattle',         height: 0.7,  doodle: ['cow'] },
-  { id: 'bull', kind: 'cattle',        height: 0.76, doodle: [] },
+  { id: 'fox', kind: 'fox', height: 0.32, doodle: ['raccoon', 'squirrel'],
+    real: { title: 'FOX - Realistic 3D Model (DEMO FREE)', author: 'WildMesh 3D', licence: 'CC BY-NC 4.0', url: 'https://sketchfab.com/3d-models/fox-realistic-3d-model-demo-free-83b1b144712c43d282d90c2fb15ba450' } },
+  { id: 'wolf', kind: 'wolf', height: 0.48, doodle: ['dog'],
+    real: { title: 'WOLF - Realistic 3D Model (DEMO FREE)', author: 'WildMesh 3D', licence: 'CC BY-NC 4.0', url: 'https://sketchfab.com/3d-models/wolf-realistic-3d-model-demo-free-8840b859a566485c874a27b1731e1db8' } },
+  { id: 'rabbit', kind: 'rabbit', height: 0.2, doodle: ['rabbit'],
+    real: { title: 'RABBIT - Realistic 3D Model (DEMO FREE)', author: 'WildMesh 3D', licence: 'CC BY-NC 4.0', url: 'https://sketchfab.com/3d-models/rabbit-realistic-3d-model-demo-free-d70284ea0d7644988bdcd327c3ffb59a' } },
+  { id: 'deer', kind: 'deer', height: 0.62, doodle: ['kangaroo'],
+    real: { title: 'DEER - Realistic 3D Model (DEMO FREE)', author: 'WildMesh 3D', licence: 'CC BY-NC 4.0', url: 'https://sketchfab.com/3d-models/deer-realistic-3d-model-demo-free-3997d669818c4e0d8c8bcafb0a1ae2ee' } },
+  { id: 'stag', kind: 'deer', height: 0.8, doodle: [],
+    real: { title: 'Realistic Animated Elk 3D Model', author: 'WildMesh 3D', licence: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/realistic-animated-elk-3d-model-787834f9caa2474d9f1814b807c072d7' } },
+  { id: 'donkey', kind: 'donkey', height: 0.6, doodle: [],
+    real: { title: 'Realistic Animated Donkey 3D Model', author: 'WildMesh 3D', licence: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/realistic-animated-donkey-3d-model-2b4086035df94d9e88fd0f18d34b3872' } },
+  { id: 'horse', kind: 'horse', height: 0.84, doodle: ['horse'],
+    real: { title: 'HORSE - Realistic 3D Model (DEMO FREE)', author: 'WildMesh 3D', licence: 'CC BY-NC 4.0', url: 'https://sketchfab.com/3d-models/horse-realistic-3d-model-demo-free-65d6a70a6721495f938c93e80a5998e4' } },
+  { id: 'zebra', kind: 'zebra', height: 0.72, doodle: ['zebra'],
+    real: { title: 'Zebra - Rigged', author: 'Noa Seller', licence: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/zebra-rigged-5d6ff2749afc438b9989f91ecb242574' } },
+  { id: 'tiger', kind: 'tiger', height: 0.52, doodle: ['tiger'],
+    real: { title: 'Tiger rebuilt', author: 'kenchoo', licence: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/tiger-rebuilt-6b5d14b2de984ffcb00ee00e404ad208' } },
+  { id: 'lioness', kind: 'lion', height: 0.52, doodle: ['lion'],
+    real: { title: 'LIONESS - Realistic 3D Model (DEMO FREE)', author: 'WildMesh 3D', licence: 'CC BY-NC 4.0', url: 'https://sketchfab.com/3d-models/lioness-realistic-3d-model-demo-free-51e60bf5fe37445e91093b4b00a5b0aa' } },
+  { id: 'bear', kind: 'bear', height: 0.62, doodle: ['bear', 'teddy-bear'],
+    real: { title: 'Realistic Animated Bear 3D Model', author: 'WildMesh 3D', licence: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/realistic-animated-bear-3d-model-bffc3c87d2d148ff8533e1cc8a11c9f1' } },
 ].map(a => ({ ...a,
   // realistic models (Sketchfab, see `real` for the credit) live in assets/animals/3d/real/
   glb: a.real ? `assets/animals/3d/real/${a.id}.glb` : `assets/animals/3d/${a.id}.glb`,

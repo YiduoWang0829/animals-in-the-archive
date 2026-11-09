@@ -1,0 +1,11 @@
+Model Information:
+* title:	Zebra - Rigged
+* source:	https://sketchfab.com/3d-models/zebra-rigged-5d6ff2749afc438b9989f91ecb242574
+* author:	Noa Seller (https://sketchfab.com/NoaSeller)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Zebra - Rigged" (https://sketchfab.com/3d-models/zebra-rigged-5d6ff2749afc438b9989f91ecb242574) by Noa Seller (https://sketchfab.com/NoaSeller) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

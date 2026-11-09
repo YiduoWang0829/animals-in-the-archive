@@ -55,8 +55,7 @@ export default {
   bringMatch: '或者带上 3D 的{name}',
   dragToTurn: '拖动可以转动它',
   animals3d: {
-    fox: '狐狸', shiba_inu: '柴犬', husky: '哈士奇', deer: '鹿', stag: '公鹿', alpaca: '羊驼',
-    donkey: '驴', white_horse: '白马', zebra: '斑马', cow: '奶牛', bull: '公牛',
+    fox: '狐狸', wolf: '狼', rabbit: '野兔', deer: '鹿', stag: '马鹿', donkey: '驴', horse: '白马', zebra: '斑马', tiger: '老虎', lioness: '母狮', bear: '棕熊',
   },
   visitorHeading: '谁要走进去？',
   visitorIntro: '画一只动物，你的画就会变成角色；或者从档案里挑一只。',
@@ -484,7 +483,7 @@ export default {
   creditsHeading: '署名与来源',
   credits: {
     paintings: '画作', photos: '动物照片', models3d: '3D 动物',
-    modelsNote: '写实的、带骨骼和动画的动物来自 Sketchfab，每个都按下载时附带的授权文件（CC BY 4.0 或 CC BY-NC 4.0）在下表中署名；本项目去掉了道具（如马鞍）、删减了用不到的动画、缩小了贴图，并加上了绘画效果。其余低多边形动物的作者是 Quaternius，以 CC0 1.0 发布于 poly.pizza（授权已于 2026-11-06 在每个模型页面上核对）。',
+    modelsNote: '写实的、带骨骼和动画的动物来自 Sketchfab，每个都按下载时附带的授权文件在下表中署名（CC BY 4.0；或 CC BY-NC 4.0，仅限非商业用途）。本项目去掉了道具（马鞍）、删减了用不到的动画、缩小了贴图，并加上了绘画效果。',
     model: '模型', hosts: '画中动物', software: '软件、模型与字体',
     work: '作品', author: '画家', date: '年代', collection: '收藏地', source: '图片来源', licence: '授权状态',
     file: '源文件', species: '物种', record: '来源记录', photographer: '摄影者',

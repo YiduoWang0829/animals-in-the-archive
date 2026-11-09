@@ -29,24 +29,10 @@ checked on each Commons file page on 2026-11-06.
 
 ## 3D animals
 
-Rigged and animated low-poly animals by **Quaternius**, released as **CC0 1.0** (public
-domain) on poly.pizza. The licence was checked on each model page on 2026-11-06. Credit is
-not required but is given here. The shading, outline and painterly look are this
-project's own.
-
-| File | Model | Author | Source page | Licence |
-|---|---|---|---|---|
-| fox.glb | Fox | Quaternius | https://poly.pizza/m/Bc97C66HKi | CC0 1.0 |
-| shiba_inu.glb | Shiba Inu | Quaternius | https://poly.pizza/m/y4wdQpg767 | CC0 1.0 |
-| husky.glb | Husky | Quaternius | https://poly.pizza/m/wcWiuEqwzq | CC0 1.0 |
-| deer.glb | Deer | Quaternius | https://poly.pizza/m/T6Cs7tmMHJ | CC0 1.0 |
-| stag.glb | Stag | Quaternius | https://poly.pizza/m/tQdzbZ1Cmw | CC0 1.0 |
-| alpaca.glb | Alpaca | Quaternius | https://poly.pizza/m/bCVFD48i2l | CC0 1.0 |
-| donkey.glb | Donkey | Quaternius | https://poly.pizza/m/qmX6nhnvp7 | CC0 1.0 |
-| white_horse.glb | White Horse | Quaternius | https://poly.pizza/m/bEdE4rmZy9 | CC0 1.0 |
-| zebra.glb | Zebra | Quaternius | https://poly.pizza/m/iclPBR6SBZ | CC0 1.0 |
-| cow.glb | Cow | Quaternius | https://poly.pizza/m/26zM1outCr | CC0 1.0 |
-| bull.glb | Bull | Quaternius | https://poly.pizza/m/a8PIIYwF7r | CC0 1.0 |
+The 3D animals are now the realistic Sketchfab models listed under "Realistic 3D animals
+(Sketchfab)" below. (Earlier versions used CC0 low-poly animals by Quaternius; they are no
+longer part of the site.) Six of the models (fox, wolf, rabbit, deer, horse, lioness) are **CC BY-NC 4.0: non-commercial use only**;
+if the site is ever used commercially they must be replaced.
 
 ## Animal photographs (storybook illustrations)
 
@@ -90,11 +76,21 @@ Pillow, NumPy, SciPy.
 
 ## Realistic 3D animals (Sketchfab)
 
-Each model keeps the licence file that came with its download next to the `.glb` in
+Each model keeps the licence file that came with its download (`<id>.license.txt`) next to the `.glb` in
 `assets/animals/3d/real/`. For this project the props were removed, unused animations
 dropped, textures reduced (`tools/import_model.py`, `blender/import_sketchfab.py`) and the
 shading made painterly in the browser.
 
 | File | Model | Author | Source | Licence |
 |---|---|---|---|---|
+| fox.glb | FOX - Realistic 3D Model (DEMO FREE) | WildMesh 3D | [Sketchfab](https://sketchfab.com/3d-models/fox-realistic-3d-model-demo-free-83b1b144712c43d282d90c2fb15ba450) | CC BY-NC 4.0 (non-commercial) |
+| wolf.glb | WOLF - Realistic 3D Model (DEMO FREE) | WildMesh 3D | [Sketchfab](https://sketchfab.com/3d-models/wolf-realistic-3d-model-demo-free-8840b859a566485c874a27b1731e1db8) | CC BY-NC 4.0 (non-commercial) |
+| rabbit.glb | RABBIT - Realistic 3D Model (DEMO FREE) | WildMesh 3D | [Sketchfab](https://sketchfab.com/3d-models/rabbit-realistic-3d-model-demo-free-d70284ea0d7644988bdcd327c3ffb59a) | CC BY-NC 4.0 (non-commercial) |
+| deer.glb | DEER - Realistic 3D Model (DEMO FREE) | WildMesh 3D | [Sketchfab](https://sketchfab.com/3d-models/deer-realistic-3d-model-demo-free-3997d669818c4e0d8c8bcafb0a1ae2ee) | CC BY-NC 4.0 (non-commercial) |
+| stag.glb | Realistic Animated Elk 3D Model | WildMesh 3D | [Sketchfab](https://sketchfab.com/3d-models/realistic-animated-elk-3d-model-787834f9caa2474d9f1814b807c072d7) | CC BY 4.0 |
 | donkey.glb | Realistic Animated Donkey 3D Model (saddle removed) | WildMesh 3D | [Sketchfab](https://sketchfab.com/3d-models/realistic-animated-donkey-3d-model-2b4086035df94d9e88fd0f18d34b3872) | CC BY 4.0 |
+| horse.glb | HORSE - Realistic 3D Model (DEMO FREE) (saddle removed) | WildMesh 3D | [Sketchfab](https://sketchfab.com/3d-models/horse-realistic-3d-model-demo-free-65d6a70a6721495f938c93e80a5998e4) | CC BY-NC 4.0 (non-commercial) |
+| zebra.glb | Zebra - Rigged | Noa Seller | [Sketchfab](https://sketchfab.com/3d-models/zebra-rigged-5d6ff2749afc438b9989f91ecb242574) | CC BY 4.0 |
+| tiger.glb | Tiger rebuilt | kenchoo | [Sketchfab](https://sketchfab.com/3d-models/tiger-rebuilt-6b5d14b2de984ffcb00ee00e404ad208) | CC BY 4.0 |
+| lioness.glb | LIONESS - Realistic 3D Model (DEMO FREE) | WildMesh 3D | [Sketchfab](https://sketchfab.com/3d-models/lioness-realistic-3d-model-demo-free-51e60bf5fe37445e91093b4b00a5b0aa) | CC BY-NC 4.0 (non-commercial) |
+| bear.glb | Realistic Animated Bear 3D Model | WildMesh 3D | [Sketchfab](https://sketchfab.com/3d-models/realistic-animated-bear-3d-model-bffc3c87d2d148ff8533e1cc8a11c9f1) | CC BY 4.0 |

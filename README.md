@@ -36,7 +36,8 @@ works. The camera only works on `localhost` or `https://`.
    (MediaPipe, on this device only). Everything also works with mouse or touch.
 4. **Character studio.** A full page. Give your animal a name (or keep the suggested one). Draw your own animal: it becomes a walking
    watercolour character. DoodleNet suggests the nearest 3D animal, with its real score.
-   Or choose one of 11 rigged 3D animals, shown on a turntable that walks, runs, stands or
+   Or choose one of 11 realistic rigged 3D animals (Sketchfab: fox, wolf, rabbit, deer, elk,
+   donkey, horse, zebra, tiger, lioness, brown bear), shown on a turntable that walks, runs, stands or
    grazes, in a Natural or Storybook (ink outline) look, or one of 13 storybook animals.
 5. **Gallery.** Only your animal and you. The chosen painting hangs in the middle of the
    wall, the other two either side under their own lights. Click one of them (or the ‹ ›

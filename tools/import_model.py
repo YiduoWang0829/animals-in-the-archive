@@ -33,8 +33,7 @@ licence = {"CC-BY-4.0": "CC BY 4.0", "CC-BY-NC-4.0": "CC BY-NC 4.0", "CC0": "CC0
 tmp = f"/tmp/{mid}_thumb.png"
 subprocess.run([BLENDER, "-b", "-P", "blender/render_thumb.py", "--", glb, tmp], capture_output=True)
 im = Image.open(tmp).convert("RGBA"); im = im.crop(im.getbbox())
-# thumbnails face left, like the others (render_thumb shows the animal's right side)
-im = ImageOps.mirror(im)
+# render_thumb shows the animal facing left already (as the studio and collage expect)
 pad = Image.new("RGBA", (im.width + 16, im.height + 16), (0, 0, 0, 0)); pad.paste(im, (8, 8))
 pad.save(f"{out_dir}/thumbs/{mid}.webp", "WEBP", quality=88)
 
