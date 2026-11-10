@@ -301,6 +301,10 @@ function placeBubbles(g) {
     let x = Math.max(170, Math.min(innerWidth - 170, p.x)), y = Math.min(innerHeight - 120, Math.max(160, p.y));
     // keep clear of the camera window
     if (chip && x + 170 > chip.left - 10 && y - el.offsetHeight - 14 < chip.bottom + 10) x = Math.min(x, chip.left - 180);
+    // and never over the hint box (the bubble moves down below it)
+    const hint = $('#stage-status .glass')?.getBoundingClientRect();
+    const hw = (el.offsetWidth || 340) / 2;
+    if (hint && x + hw > hint.left && x - hw < hint.right && y - el.offsetHeight - 14 < hint.bottom + 8) y = Math.min(innerHeight - 20, hint.bottom + 8 + el.offsetHeight + 14);
     el.style.left = x + 'px'; el.style.top = y + 'px';
   }
 }

@@ -127,6 +127,27 @@ export async function loadAnimal3D(url, opts = {}) {
   return new Animal3D(gltf, opts);
 }
 
+// A standing pose made from a walk: every bone at its average over one cycle (rotations
+// averaged on the same hemisphere), held still. Legs swing forward and back about the
+// upright, so the average stands square on all four feet.
+function standClip(walk, N = 24) {
+  const tracks = [];
+  for (const tr of walk.tracks) {
+    const it = tr.createInterpolant(), size = tr.getValueSize(), acc = new Float64Array(size);
+    const quat = tr.ValueTypeName === 'quaternion'; let ref = null;
+    for (let i = 0; i < N; i++) {
+      const v = it.evaluate(walk.duration * i / N);
+      let sgn = 1;
+      if (quat) { if (!ref) ref = Array.from(v); sgn = (v[0] * ref[0] + v[1] * ref[1] + v[2] * ref[2] + v[3] * ref[3]) < 0 ? -1 : 1; }
+      for (let k = 0; k < size; k++) acc[k] += v[k] * sgn;
+    }
+    if (quat) { const l = Math.hypot(acc[0], acc[1], acc[2], acc[3]) || 1; for (let k = 0; k < 4; k++) acc[k] /= l; }
+    else for (let k = 0; k < size; k++) acc[k] /= N;
+    tracks.push(new tr.constructor(tr.name, [0, 1], [...acc, ...acc]));
+  }
+  return new THREE.AnimationClip('Idle', 1, tracks);
+}
+
 export class Animal3D {
   constructor(gltf, { height = 0.55, look = 'real' } = {}) {
     this.root = gltf.scene;
@@ -284,7 +305,9 @@ export class Animal3D {
     }
     // a model without a standing clip holds a still frame of its walk; without a walk, it trots
     if (!this.clips.Walk && (this.clips.Gallop || this.clips.Run)) this.clips.Walk = this.clips.Gallop || this.clips.Run;
-    if (!this.clips.Idle && this.clips.Walk) this.clips.Idle = THREE.AnimationUtils.subclip(this.clips.Walk, 'Idle', 0, 1, 30);
+    // (a still frame of a walk is caught mid-stride: legs apart, one paw lifted. The average of
+    // the whole cycle is the animal standing square, every leg under the body.)
+    if (!this.clips.Idle && this.clips.Walk) this.clips.Idle = standClip(this.clips.Walk);
     const pick = (...names) => names.map(n => this.clips[n]).find(Boolean);
     this.anim = {
       idle: pick('Idle'), idle2: pick('Idle_2', 'Idle_Headlow', 'Idle_2_HeadLow'), eat: pick('Eating', 'Idle_Eating'),
@@ -405,7 +428,7 @@ export class Animal3D {
       this.gaitRun = false;                     // they always walk: calm, never a dash
       // the pace is the walk's own: ground speed = one stride per cycle × a playback rate kept
       // between 0.75 and 1.25, so the feet are always planted (never sliding over the ground)
-      this.effSpeed = THREE.MathUtils.clamp(this.speed, natW * 0.75, natW * 1.25);
+      this.effSpeed = THREE.MathUtils.clamp(this.speed, natW * 0.92, natW * 1.08);   // its own natural cadence
     }
     let stepK = 1;
     if (this.target) {

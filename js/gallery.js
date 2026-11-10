@@ -425,10 +425,10 @@ export class Gallery {
     if (!this.inside || this.locked || !this.follow || !u?.active || u.gesture || v.target) return;
     if (this.hosts.some(h => h.meeting || h.called || h.rising)) return;
     const now = performance.now();
-    if (now - (this.lastFollow || 0) < 1800) return;
+    if (now - (this.lastFollow || 0) < 3200) return;
     const lim = this.pw / 2 - this.widthOf(v) / 2 - 0.05;
     const want = THREE.MathUtils.clamp((u.x - 0.5) * this.pw * 0.85, -lim, lim);
-    if (Math.abs(want - v.position.x) < 0.14) return;
+    if (Math.abs(want - v.position.x) < 0.25) return;
     this.lastFollow = now;
     const x = v.position.x + THREE.MathUtils.clamp(want - v.position.x, -0.32, 0.32);
     v.walkTo(this.spot(x, v.position.z, v), 0.2);
@@ -473,7 +473,9 @@ export class Gallery {
     // zoomed out past the follow view: blend into a straight-on view of the whole painting
     const wide = THREE.MathUtils.smoothstep(-v.zoom, 0.3, 1.0);
     const panned = Math.hypot(v.px, v.py) > 0.03;
-    const base = Math.max(vis.height * 3.6, (this.viewDist || 2) * 0.6);
+    // one steady distance, wide enough for two animals side by side: the view never pumps in
+    // and out (everything would seem to grow and shrink)
+    const base = Math.max(vis.height * 3.6, (this.viewDist || 2) * 0.6) * 1.45;
     let D = THREE.MathUtils.clamp(base * (1 - Math.max(v.zoom, -0.3)), vis.height * 2.0, base * 1.3);
     // in a conversation, frame both: aim between your animal and the one talking with it,
     // and step back just enough to see the two of them
@@ -483,14 +485,16 @@ export class Gallery {
       const hp = gh.actor.group.getWorldPosition(new THREE.Vector3());
       const dx = hp.x - T.x;
       if (Math.abs(dx) < 1.6) {
-        pairW = 1;
         const tanV = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
         const need = (Math.abs(dx) / 2 + this.widthOf(gh.actor) / 2 + this.widthOf(vis) / 2 + 0.08) / (tanV * cam.aspect) + Math.abs(hp.z - T.z) * 0.5;
-        this.pairT = (this.pairT || T.clone()).lerp(new THREE.Vector3(T.x + dx * 0.5, T.y + (hp.y + gh.actor.height * 0.5 - T.y) * 0.3, (T.z + hp.z) / 2), ease(2.6));
-        this.pairD = THREE.MathUtils.lerp(this.pairD || D, Math.max(D, Math.min(need, base * 1.7)), ease(2.6));
+        // frame the two only if both fit at this (fixed) distance; otherwise the view stays on
+        // your animal, which must never be pushed out of the picture
+        pairW = need <= D * 1.02 ? 1 : 0;
+        this.pairT = (this.pairT || T.clone()).lerp(new THREE.Vector3(T.x + dx * 0.5, T.y + (hp.y + gh.actor.height * 0.5 - T.y) * 0.3, (T.z + hp.z) / 2), ease(1.2));
+        this.pairD = D; void need;
       }
     }
-    this.pairK = THREE.MathUtils.lerp(this.pairK || 0, pairW, ease(1.8));
+    this.pairK = THREE.MathUtils.lerp(this.pairK || 0, pairW, ease(0.9));
     if (this.pairK > 0.01 && this.pairT) { T.lerp(this.pairT, this.pairK); D = THREE.MathUtils.lerp(D, this.pairD, this.pairK); }
     // The camera's direction comes from the view angles (not from aiming at the animal),
     // so moving it never changes where it points. It sits behind and above your animal,
@@ -526,7 +530,7 @@ export class Gallery {
     // the same when the foot of the picture lifts the view so far that the animal's feet
     // would leave it: come closer instead (a smaller view fits the strip of ground)
     const feet = vis.group.getWorldPosition(new THREE.Vector3()).project(cam).y;
-    if (feet < -0.8 && !panned && wide === 0) { const k = (feet + 0.8) * -0.25; v.tz = Math.min(0.6, v.tz + k); v.zoom = Math.min(0.6, v.zoom + k); v.ty *= 0.92; v.yaw *= 0.92; if (this.pairD) this.pairD *= 0.97; }
+    if (feet < -0.8 && !panned && wide === 0) { const k = (feet + 0.8) * -0.25; v.tz = Math.min(0.6, v.tz + k); v.ty *= 0.92; v.yaw *= 0.92; }
   }
 
   // Final guarantee that the black beyond the picture never shows: cast rays through the
@@ -609,7 +613,11 @@ export class Gallery {
   }
 
   // ---- the gallery tour: just the visitor and you ----------------------------
-  async walkIn() { const f = this.from; await this.visitor.walkTo([new THREE.Vector3(f * 1.9, 0, 1.5), new THREE.Vector3(f * 1.0, 0, 1.25)], 0.55); }
+  async walkIn() {
+    const f = this.from, v = this.visitor, half = (v.length || v.aspect || 1) * v.height / 2;
+    const z = Math.max(1.3, 0.54 + half + 0.25);         // the steps end at z = 0.54
+    await v.walkTo([new THREE.Vector3(f * 1.9, 0, z + 0.2), new THREE.Vector3(f * 0.8, 0, z)], 0.55);
+  }
   // one of the other paintings on the wall, under a screen point (or null)
   sideAt(nx, ny) {
     if (this.inside || !this.sides?.length) return null;
@@ -630,15 +638,18 @@ export class Gallery {
   }
   // stand and face a direction (null = free), or face you
   async goTo(points, speed = 0.48) { this.visitor.face?.(null); await this.visitor.walkTo(points, speed); }
+  // In the hall it stays where it arrived, well clear of the steps and the walls, and only
+  // turns to look: at the label, then at the painting (no walking about, nothing to bump into)
   async toLabel() {
-    await this.goTo([new THREE.Vector3(this.labelX - 0.25, 0, 0.9), new THREE.Vector3(this.labelX - 0.05, 0, 0.62)]);
-    this.visitor.face?.(Math.PI); this.visitor.setDir(1);
-    await this.wait(0.35);
+    const v = this.visitor, p = v.position;
+    v.attend?.(false);
+    v.face?.(Math.atan2(this.labelX - p.x, 0.05 - p.z));
+    await this.wait(0.9);
   }
   async toPainting() {
-    await this.goTo([new THREE.Vector3(this.labelX * 0.5, 0, 1.0), new THREE.Vector3(0.05, 0, 1.05)]);
-    this.visitor.face?.(Math.PI);
-    await this.wait(0.5);
+    const v = this.visitor, p = v.position;
+    v.face?.(Math.atan2(0 - p.x, 0.05 - p.z));
+    await this.wait(0.9);
   }
   talkToYou(on) { this.visitor.face?.(null); this.visitor.attend?.(on); }
 
@@ -659,7 +670,7 @@ export class Gallery {
     if (h.host.inPlace) return;                     // too big to leave: it talks from where it is
     // the whole animal fades in over its painted self while the ground behind is painted back,
     // then it gets up (it has been lying or standing still for centuries) and steps out
-    const a = h.actor; a.mesh.visible = true; a.uniforms.uOpacity.value = 0;
+    const a = h.actor; a.mesh.visible = true; a.uniforms.uOpacity.value = 0; h.h0Size = a.height;
     this.tween(0.45, e => { a.uniforms.uOpacity.value = e; });
     this.wait(0.3).then(() => this.revealGround(h));
     h.actor.standUp?.();
@@ -721,7 +732,7 @@ export class Gallery {
       for (const h of this.hosts) if (!h.awake) h.actor.position.z = this.paintPoint(h.homeUV[0], h.homeUV[1], 0.004).z;
     });
     v.setPaintAll?.(1);
-    this.paintU.uWind.value = 1;             // inside, the picture breathes
+    this.paintU.uWind.value = 0;             // the picture holds still (a ripple reads as flicker)
     this.follow = true;                      // from now on the view keeps the visitor in sight
     this.lastLook = -99;
     await this.wait(1.5);
@@ -734,18 +745,30 @@ export class Gallery {
   }
   // a spot where a figure of width w and height h can stand at x, as deep as `zWant`
   // but always in front of whatever is painted there (never inside the relief)
+  // Only open ground counts: where a painted figure (a person, a tree, a big animal) rises out
+  // of the picture, standing in front of it would look like walking through it, so the
+  // nearest clear place to the side is taken instead.
   spot(x, zWant, a) {
-    const w = this.widthOf(a), h = a.height;
-    x = THREE.MathUtils.clamp(x, -this.pw / 2 + w / 2 + 0.04, this.pw / 2 - w / 2 - 0.04);
-    let z = zWant;
-    for (let pass = 0; pass < 3; pass++) {
-      const y = this.groundY(z);
-      let front = -1e9;
-      for (const fx of [-0.45, 0, 0.45]) for (const fy of [0.05, 0.5, 0.95]) front = Math.max(front, this.surfaceZ(x + fx * w, y + fy * h));
-      z = Math.max(z, front + 0.05);
+    const w = this.widthOf(a), h = a.height, lo = -this.pw / 2 + w / 2 + 0.04, hi = this.pw / 2 - w / 2 - 0.04;
+    const at = x0 => {
+      const xx = THREE.MathUtils.clamp(x0, lo, hi);
+      let z = zWant;
+      for (let pass = 0; pass < 3; pass++) {
+        const y = this.groundY(z);
+        let front = -1e9;
+        for (const fx of [-0.5, -0.25, 0, 0.25, 0.5]) for (const fy of [0.05, 0.35, 0.65, 0.95]) front = Math.max(front, this.surfaceZ(xx + fx * w, y + fy * h));
+        z = Math.max(z, front + 0.05);
+      }
+      z = Math.min(z, 0.45);
+      return { p: new THREE.Vector3(xx, this.groundY(z), z), push: z - zWant };
+    };
+    let best = null;
+    for (let k = 0; k <= 16; k++) for (const sg of k ? [1, -1] : [1]) {
+      const c = at(x + sg * k * 0.07);
+      if (c.push <= 0.04) return c.p;
+      if (!best || c.push < best.push) best = c;
     }
-    z = Math.min(z, 0.45);
-    return new THREE.Vector3(x, this.groundY(z), z);
+    return best.p;
   }
 
   // a believable "ground" inside the picture: further back is higher up
@@ -758,6 +781,12 @@ export class Gallery {
   // inside: the painted animals stay near the visitor, in a loose half-circle.
   // Each keeps at least its own width (plus a margin) from the others and stands at
   // its own depth, so two flat figures never overlap or flicker.
+  // turn to face a point to the left or right, only when it is clearly on the other side
+  // (a figure standing almost level with it would flip to and fro: a twitch)
+  faceToward(a, x) {
+    const d = x - a.position.x;
+    if (Math.abs(d) > Math.max(0.12, this.widthOf(a) * 0.35)) a.setDir(Math.sign(d));
+  }
   widthOf(a) { return a.aspect ? a.aspect * a.height : (a.length || 1) * a.height; }
   liveInside(dt) {
     const v = this.visitor, vp = v.position;
@@ -769,7 +798,7 @@ export class Gallery {
     hs.forEach((h, k) => {
       const a = h.actor, w = this.widthOf(a);
       if (h.called || h.meeting || h.rising) return;
-      if (settled) { if (!a.target && !a.attending) a.setDir(Math.sign(vp.x - a.position.x) || 1); return; }
+      if (settled) { if (!a.target && !a.attending) this.faceToward(a, vp.x); return; }
       // alternate right / left of the visitor, further out each time, a step back each time
       let tx;
       if (side > 0) { tx = vp.x + reachR + 0.08 + w / 2; reachR += w + 0.08; }
@@ -782,7 +811,7 @@ export class Gallery {
       const d = target.distanceTo(a.position);
       if (d > 0.12 && (!a.target || a.target.distanceTo(target) > 0.18)) { h.placed = false; a.walkTo(target, d > 0.9 ? 0.45 : 0.26).then(() => { h.placed = true; }); }
       else if (!a.target) h.placed = true;
-      if (!a.target) a.setDir(Math.sign(vp.x - a.position.x) || 1);
+      if (!a.target) this.faceToward(a, vp.x);
     });
     // personal space: if two figures overlap at nearly the same depth, the painted one
     // steps aside (and a little back), so no two flat figures ever share a spot
@@ -813,8 +842,24 @@ export class Gallery {
     // draw order follows depth: nearer figures are drawn last (no flicker)
     const all = [v, ...this.hosts.map(h => h.actor)];
     const wp = new THREE.Vector3();
-    all.map(a => { a.group.getWorldPosition(wp); return [a, wp.z]; }).sort((x, y) => x[1] - y[1])
-      .forEach(([a], i) => a.group.traverse(o => { if (o.isMesh) o.renderOrder = 10 + i; }));
+    const zs = new Map(all.map(a => { a.group.getWorldPosition(wp); return [a, wp.z]; }));
+    // keep the last order unless two figures have clearly changed places (no swapping to and
+    // fro while they stand at almost the same depth: that flickers)
+    const prev = this._order && this._order.length === all.length ? this._order : all.slice().sort((p, q) => zs.get(p) - zs.get(q));
+    const order = prev.slice();
+    for (let i = 0; i < order.length - 1; i++) if (zs.get(order[i]) > zs.get(order[i + 1]) + 0.03) { [order[i], order[i + 1]] = [order[i + 1], order[i]]; i = Math.max(-1, i - 2); }
+    this._order = order;
+    order.forEach((a, i) => a.group.traverse(o => { if (o.isMesh) o.renderOrder = 10 + i; }));
+    // a painted animal that has come out takes its true size next to the visitor, growing or
+    // shrinking only while it walks (as anything does coming nearer or going further off)
+    const m = v.height / (this.o.visitorRealH || 0.8);
+    for (const h of hs) {
+      const a = h.actor, want = h.host.realH * m;
+      if (!h.host.realH || Math.abs(a.height - want) < 1e-3) continue;
+      if (!a.target) continue;
+      const rate = Math.abs(want - h.h0Size) / 2.4 * dt;
+      a.setHeight(a.height + THREE.MathUtils.clamp(want - a.height, -rate, rate));
+    }
   }
   // wait for walkers to arrive, but never for ever: after a while they simply stop where
   // they are (a blocked path must not hold up the conversation)

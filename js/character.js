@@ -39,9 +39,9 @@ const VERT = /* glsl */`
     if (uLegCount > 0.5) p.xy += swing(uv.x, uv.y, uLegs.x, uLegs.y, uPhase, 1.0);
     if (uLegCount > 1.5) p.xy += swing(uv.x, uv.y, uLegs.z, uLegs.w, uPhase + PI, 1.0);
     float upper = smoothstep(uPivot - 0.1, uPivot + 0.1, uv.y);
-    p.y += abs(sin(uPhase)) * 0.022 * uWalk * upper;                       // body bob
+    p.y += (0.5 - 0.5 * cos(uPhase * 2.0)) * 0.006 * uWalk * upper;        // the back rises a little with each step
     float head = (1.0 - smoothstep(0.0, 0.32, abs(uv.x - uHeadU))) * smoothstep(uPivot, 1.0, uv.y);
-    p.y += (sin(uPhase * 2.0) * 0.012 * uWalk + uNod * 0.06) * head;          // head nod
+    p.y += (sin(uPhase * 2.0) * 0.005 * uWalk + uNod * 0.04) * head;          // head nods with the stride
     vec4 wp = modelMatrix * vec4(p, 1.0);
     vWorld = wp.xyz;
     gl_Position = projectionMatrix * viewMatrix * wp;
@@ -195,6 +195,7 @@ export class Character {
     this.aspect = image.width / image.height;
     this.rig = autoRig(image, headSide);
     if (gait === 'hop') this.rig.type = 'hop';
+    this.hops = gait === 'hop';                   // only animals that really hop (a rabbit, a bird); a figure whose legs weren't found still walks
     const tex = new THREE.Texture(image);
     tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4; tex.needsUpdate = true;
     const legs = this.rig.legs;
@@ -286,7 +287,7 @@ export class Character {
       // stride length ~ 0.55 × height: legs cycle in step with the distance covered
       if (walking) u.uPhase.value += (step / (this.height * (this.running ? 0.9 : 0.55))) * Math.PI;
     }
-    if (this.rig.type === 'hop' && walking && this.hopT < 0) this.hopOnce(0.08 * this.height / 0.6);
+    if (this.hops && walking && this.hopT < 0) this.hopOnce(0.08 * this.height / 0.6);
     // turning round: it steps round on its legs (never a flat spin on the spot)
     const flipping = Math.abs(this.dir * (this.headSide === 'right' ? 1 : -1) - this.turn) > 0.05;
     if (flipping && !walking) u.uPhase.value += dt * 4.5;
@@ -306,7 +307,7 @@ export class Character {
       if (this.nodT >= this.nodN) { this.nodT = undefined; u.uNod.value = 0; }
     }
     // breathing when idle, and now and then a small nod: alive, never frozen
-    const breathe = 1 + Math.sin(t * 2.1 + this.height * 7) * 0.014 * (1 - u.uWalk.value);
+    const breathe = 1 + Math.sin(t * 1.6 + this.height * 7) * 0.004 * (1 - u.uWalk.value);
     this.idleT = (this.idleT ?? 2 + Math.random() * 4) - dt;
     if (!walking && this.idleT < 0) { if (this.nodT === undefined) this.nod(1); this.idleT = 3 + Math.random() * 5; }
 
@@ -321,15 +322,18 @@ export class Character {
     const sx = this.height * mag * (Math.sign(this.turn) || 1);
     // walking: the body rises and rocks with each step; standing: slow breathing and weight shifts
     const ph = u.uPhase.value, w = u.uWalk.value;
-    const bob = Math.abs(Math.sin(ph)) * 0.035 * w + (turning ? 0.03 : 0);
-    this.mesh.rotation.z = Math.sin(ph) * 0.035 * w * (Math.sign(this.turn) || 1) + Math.sin(t * 0.7 + this.height * 9) * 0.008 * (1 - w);
+    // a real walk: the body glides level, rising only a touch with each step (no bouncing, no
+    // hop when it turns round), and hardly rocks
+    void turning;
+    const bob = (0.5 - 0.5 * Math.cos(ph * 2)) * 0.008 * w;
+    this.mesh.rotation.z = Math.sin(ph) * 0.008 * w * (Math.sign(this.turn) || 1) + Math.sin(t * 0.7 + this.height * 9) * 0.004 * (1 - w);
     let rx = 1, ry = 1, lift = 0, wob = 0;
     if (this.riseT >= 0) {
       this.riseT += dt / 1.1;
       const k = Math.min(1, this.riseT), ease = q => q * q * (3 - 2 * q);
       if (k < 0.3) { const q = ease(k / 0.3); ry = 1 - 0.07 * q; rx = 1 + 0.03 * q; }                     // gather
       else if (k < 0.72) { const q = ease((k - 0.3) / 0.42); ry = 0.93 + 0.13 * q; rx = 1.03 - 0.05 * q; lift = Math.sin(q * Math.PI) * 0.035; }  // rise
-      else { const q = (k - 0.72) / 0.28; ry = 1.06 - 0.06 * ease(q); rx = 0.98 + 0.02 * ease(q); wob = Math.sin(q * Math.PI * 4) * 0.035 * (1 - q); }  // shake
+      else { const q = (k - 0.72) / 0.28; ry = 1.06 - 0.06 * ease(q); rx = 0.98 + 0.02 * ease(q); wob = Math.sin(q * Math.PI * 2) * 0.012 * (1 - q); }  // shake
       if (this.riseT >= 1) this.riseT = -1;
     }
     this.mesh.scale.set(sx * rx, this.height * breathe * ry, this.height);
