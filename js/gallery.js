@@ -72,7 +72,7 @@ export class Gallery {
     this.clock = new THREE.Clock();
     this.tweens = [];
     this.parallax = new THREE.Vector2();      // from head tracking or the mouse, -1..1
-    this.view = { yaw: 0, pitch: 0, zoom: 0, ty: 0, tp: 0, tz: 0 };   // inside: look around + zoom
+    this.view = { yaw: 0, pitch: 0, zoom: 0, ty: 0, tp: 0, tz: 0, px: 0, py: 0, tpx: 0, tpy: 0 };   // inside: look around, zoom, pan
     this.inside = false;
     this.hosts = [];
   }
@@ -464,12 +464,17 @@ export class Gallery {
     if (!this.follow) {                      // the walk-in zoom: scripted camera move
       cam.position.lerp(this.camBase, 0.12); cam.lookAt(this.camLook); return;
     }
-    v.yaw += (v.ty - v.yaw) * 0.1; v.pitch += (v.tp - v.pitch) * 0.1; v.zoom += (v.tz - v.zoom) * 0.1;
+    v.yaw += (v.ty - v.yaw) * ease(6); v.pitch += (v.tp - v.pitch) * ease(6); v.zoom += (v.tz - v.zoom) * ease(5);
+    v.px += (v.tpx - v.px) * ease(6); v.py += (v.tpy - v.py) * ease(6);
     const vis = this.visitor, T = new THREE.Vector3();
     vis.group.getWorldPosition(T);
     T.y += vis.height * 0.55;
+    T.x += v.px; T.y += v.py;                      // where you have moved the view to
+    // zoomed out past the follow view: blend into a straight-on view of the whole painting
+    const wide = THREE.MathUtils.smoothstep(-v.zoom, 0.3, 1.0);
+    const panned = Math.hypot(v.px, v.py) > 0.03;
     const base = Math.max(vis.height * 3.6, (this.viewDist || 2) * 0.6);
-    let D = THREE.MathUtils.clamp(base * (1 - v.zoom), vis.height * 2.0, base * 1.3);
+    let D = THREE.MathUtils.clamp(base * (1 - Math.max(v.zoom, -0.3)), vis.height * 2.0, base * 1.3);
     // in a conversation, frame both: aim between your animal and the one talking with it,
     // and step back just enough to see the two of them
     const gh = typeof this.gazeHost === 'number' ? this.hosts[this.gazeHost] : null;
@@ -499,21 +504,29 @@ export class Gallery {
     const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(q);
     const want = T.clone().addScaledVector(fwd, -D);
     want.x += px.x * 0.04; want.y += px.y * 0.03;                     // a touch of head parallax
+    if (wide > 0) {                                // the whole picture, face on, centred where you panned
+      const pc = this.paintGroup.getWorldPosition(new THREE.Vector3());
+      const tanV = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
+      const fit = Math.max(this.ph / 2 / tanV, this.pw / 2 / (tanV * cam.aspect)) * 1.12;
+      const full = new THREE.Vector3(pc.x + v.px * (1 - wide), pc.y + v.py * (1 - wide), pc.z - 0.03 + fit);
+      want.lerp(full, wide);
+      q.slerp(new THREE.Quaternion(), wide);
+    }
     // catch up faster when the animal nears the edge of the view
     const off = Math.max(Math.abs(T.clone().project(cam).x), 0);
     // time-based easing: the same soft glide at any frame rate (faster only when the
     // animal is about to leave the frame)
     cam.position.lerp(want, ease(3.2 + 16 * THREE.MathUtils.smoothstep(off, 0.45, 0.9)));
     cam.quaternion.slerp(q, ease(3.6));
-    this.keepFrameOut();
+    if (wide < 0.02) this.keepFrameOut();          // (only the whole-picture view shows the frame's edge)
     // if the picture's edge holds the camera back so far that your animal drifts out of
     // view, the orbit gives way (the view swings back behind the animal)
     const sx = T.clone().project(cam).x;
-    if (Math.abs(sx) > 0.55) { v.ty *= 0.9; v.yaw *= 0.9; }
+    if (Math.abs(sx) > 0.55 && !panned && wide === 0) { v.ty *= 0.9; v.yaw *= 0.9; }
     // the same when the foot of the picture lifts the view so far that the animal's feet
     // would leave it: come closer instead (a smaller view fits the strip of ground)
     const feet = vis.group.getWorldPosition(new THREE.Vector3()).project(cam).y;
-    if (feet < -0.8) { const k = (feet + 0.8) * -0.25; v.tz = Math.min(0.6, v.tz + k); v.zoom = Math.min(0.6, v.zoom + k); v.ty *= 0.92; v.yaw *= 0.92; if (this.pairD) this.pairD *= 0.97; }
+    if (feet < -0.8 && !panned && wide === 0) { const k = (feet + 0.8) * -0.25; v.tz = Math.min(0.6, v.tz + k); v.zoom = Math.min(0.6, v.zoom + k); v.ty *= 0.92; v.yaw *= 0.92; if (this.pairD) this.pairD *= 0.97; }
   }
 
   // Final guarantee that the black beyond the picture never shows: cast rays through the
@@ -563,9 +576,17 @@ export class Gallery {
   }
   orbitBy(d) { if (this.inside && !this.locked) this.view.ty = THREE.MathUtils.clamp(this.view.ty + d, -0.65, 0.65); }
   zoomTo(z) { if (this.inside && !this.locked) this.view.tz = THREE.MathUtils.clamp(z, -0.3, 0.45); }
+  // zoom: closer to your animal (up to 0.45), or out, all the way to the whole painting (-1)
   zoomBy(d) {
     if (!this.inside || this.locked) return;
-    this.view.tz = THREE.MathUtils.clamp(this.view.tz + d, -0.3, 0.45);
+    this.view.tz = THREE.MathUtils.clamp(this.view.tz + d, -1, 0.45);
+  }
+  // move the view across the picture (a pinched hand dragging, or the mouse); in picture units
+  panBy(dx, dy) {
+    if (!this.inside || this.locked) return;
+    const v = this.view;
+    v.tpx = THREE.MathUtils.clamp(v.tpx + dx, -this.pw / 2, this.pw / 2);
+    v.tpy = THREE.MathUtils.clamp(v.tpy + dy, -this.ph / 2, this.ph / 2);
   }
 
   // screen position (CSS px) of a world point, for speech bubbles

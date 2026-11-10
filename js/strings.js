@@ -375,8 +375,8 @@ export const STRINGS = {
     cardTold: 'They said',
 
     welcomeInside: 'Welcome inside, {name}. Stay close to us.',
-    insideHint: 'One hand: open palm to come closer, pinch and hold to step back, pinch and drag sideways to walk round. Wave and they wave back.',
-    insideHintMouse: 'You are inside the painting. Drag to look around, scroll to zoom, click the ground to walk there, click an animal to call it.',
+    insideHint: 'Two hands: move them apart to come closer, together to step back, all the way out to the whole painting. One hand: pinch and drag to move the view. Wave and they wave back.',
+    insideHintMouse: 'You are inside the painting. Scroll to zoom (out to the whole painting), drag to move the view, click the ground to walk there, click an animal to call it.',
     called: ['You called?', 'Here I am.', 'Shall we walk together?', 'I was waiting for you.', 'Follow me, there is more over there.'],
     runAway: ['Catch me!', 'This way!', 'Too slow!'],
     create: 'Create something',

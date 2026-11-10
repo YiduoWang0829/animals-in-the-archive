@@ -786,7 +786,8 @@ const stage3d = $('#stage3d');
 stage3d.addEventListener('pointermove', e => {
   pointer = [e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight * 2 - 1)];
   if (drag && gallery?.inside) {
-    gallery.look(-(e.clientX - drag[0]) * 0.003, (e.clientY - drag[1]) * 0.002);
+    // drag = move the view across the picture (like the pinched hand)
+    gallery.panBy(-(e.clientX - drag[0]) / innerWidth * gallery.pw * 0.9, (e.clientY - drag[1]) / innerHeight * gallery.ph * 0.9);
     if (Math.hypot(e.clientX - drag[2], e.clientY - drag[3]) > 6) drag.moved = true;
     drag[0] = e.clientX; drag[1] = e.clientY;
   }
@@ -842,21 +843,26 @@ function onGesture(g) {
 }
 function onHands(hs) {
   const view = document.querySelector('.view.is-active')?.id;
-  // inside the painting, one hand is enough:
-  //   open palm = come closer · pinch and hold = step back · pinch and drag sideways = turn round
+  // inside the painting:
+  //   two hands moving apart = zoom in · moving together = zoom out (all the way to the whole painting)
+  //   one hand pinched and dragged = move the view across the picture
   if (view === 'view-stage' && gallery?.inside) {
-    const h = hs[0], now = performance.now(), dt = Math.min(0.1, (now - (onHands.last || now)) / 1000);
-    onHands.last = now;
-    if (!h) onHands.pinch = null;
-    else if (h.pinch) {
-      const ps = onHands.pinch ||= { x0: h.pinchX, last: h.pinchX, t0: now, moved: false };
-      const dx = h.pinchX - ps.last; ps.last = h.pinchX;
-      if (Math.abs(h.pinchX - ps.x0) > 0.035) ps.moved = true;
-      if (ps.moved) gallery.orbitBy(dx * 3.6);
-      else if (now - ps.t0 > 220) gallery.zoomBy(-dt * 0.55);
-    } else {
+    if (hs.length >= 2) {
       onHands.pinch = null;
-      if (h.open) gallery.zoomBy(dt * 0.55);
+      const d = Math.hypot(hs[0].x - hs[1].x, hs[0].y - hs[1].y);
+      if (onHands.span != null) {
+        const dd = d - onHands.span;
+        if (Math.abs(dd) > 0.003) gallery.zoomBy(dd * 3.2);   // spread ~0.3 of the view = a full zoom step
+      }
+      onHands.span = d;
+    } else {
+      onHands.span = null;
+      const h = hs[0];
+      if (h && h.pinch) {
+        const ps = onHands.pinch;
+        if (ps) gallery.panBy(-(h.pinchX - ps.x) * gallery.pw * 1.1, (h.pinchY - ps.y) * gallery.ph * 1.1);
+        onHands.pinch = { x: h.pinchX, y: h.pinchY };
+      } else onHands.pinch = null;
     }
   }
   if (view !== 'view-create' && !(view === 'view-stage' && gallery?.inside)) { $('#hand-cursor').hidden = $('#hand-cursor-2').hidden = true; return; }
