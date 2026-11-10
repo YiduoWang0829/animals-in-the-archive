@@ -275,7 +275,8 @@ export class Character {
     let walking = false;
     if (this.target) {
       const p = this.group.position, d = this.target.clone().sub(p);
-      const dist = d.length(), step = this.speed * dt;
+      // the pace eases in with the legs: no gliding before the first step
+      const dist = d.length(), step = this.speed * dt * Math.min(1, 0.1 + u.uWalk.value);
       if (dist <= step) {
         p.copy(this.target);
         if (this.path?.length) { this.target = this.path.shift(); walking = true; }
@@ -286,7 +287,10 @@ export class Character {
       if (walking) u.uPhase.value += (step / (this.height * (this.running ? 0.9 : 0.55))) * Math.PI;
     }
     if (this.rig.type === 'hop' && walking && this.hopT < 0) this.hopOnce(0.08 * this.height / 0.6);
-    u.uWalk.value += ((walking ? (this.running ? 1.45 : 1) : 0) - u.uWalk.value) * Math.min(1, dt * 8);
+    // turning round: it steps round on its legs (never a flat spin on the spot)
+    const flipping = Math.abs(this.dir * (this.headSide === 'right' ? 1 : -1) - this.turn) > 0.05;
+    if (flipping && !walking) u.uPhase.value += dt * 4.5;
+    u.uWalk.value += ((walking || flipping ? 1 : 0) - u.uWalk.value) * Math.min(1, dt * 8);
     if (!walking) u.uPhase.value += dt * 0.6 * (1 - u.uWalk.value) * 0;   // idle: legs still
 
     // hop arc

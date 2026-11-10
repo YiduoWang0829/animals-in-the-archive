@@ -322,7 +322,8 @@ async function enterStage(visitor) {
   // a different set of painted animals wakes up each visit (the first one speaks for them)
   const order = [...w.hosts].sort(() => Math.random() - 0.5);
   const free = order.filter(id => !HOSTS[id].inPlace), fixed = order.filter(id => HOSTS[id].inPlace);
-  const pick = (fixed.length && Math.random() < 0.5 ? [fixed[0]] : []).concat(free).slice(0, Math.min(3, w.hosts.length));
+  const pick = free.length ? (fixed.length && Math.random() < 0.5 ? [fixed[0]] : []).concat(free).slice(0, Math.min(3, w.hosts.length))
+    : fixed.slice(0, 3);                           // a painting whose speakers all stay in place
   state.hosts = pick.map(id => HOSTS[id]);
   state.host = state.hosts[0];
   hostMeta ??= await (await fetch('assets/hosts/hosts.json')).json();
@@ -655,7 +656,7 @@ async function insideStory(g, tok) {
   await speak(0, t('insideStartled'));
   await speak(0, t('openShy'));
   // it starts: a painting just spoke! (a realistic model calls out with its own voice clip)
-  if (!g.visitor.gesture?.('call')) { g.visitor.hopOnce?.(0.05 * (g.visitor.height || 0.3) / 0.3); g.visitor.nod?.(2); }
+  if (!g.visitor.gesture?.('call')) g.visitor.nod?.(2);      // (no hop: it only stands, walks or moves its head)
   await speak('visitor', t('openAmazed'));
   await speak('visitor', t('openSorry'));
   await speak(B, t(H > 1 ? 'openWhisper' : 'openWhisperSolo'));
@@ -817,8 +818,8 @@ function greetBack() {
   lastGreet = performance.now();
   const g = gallery;
   waveWaiter?.();
-  g.visitor.hopOnce(0.1); g.visitor.nod(2);
-  g.hosts.forEach(h => { if (h.awake) { h.actor.nod(2); h.actor.hopOnce(0.03); } });
+  if (!g.visitor.gesture?.('shake')) g.visitor.nod(2);
+  g.hosts.forEach(h => { if (h.awake) h.actor.nod(2); });
   if (!pendingAnswer) { g.attendAll(true); setTimeout(() => { if (!pendingAnswer && gallery === g) g.attendAll(false); }, 3500); }
   speak('visitor', pickLine(t('waveBack')));
 }

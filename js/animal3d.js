@@ -402,11 +402,12 @@ export class Animal3D {
     // the hooves and paws stay planted. A walk that is asked to go much faster gallops.
     const natW = this.stride.walk.len * this._h / this.stride.walk.dur, natR = this.stride.run.len * this._h / this.stride.run.dur;
     if (this.target) {
-      const running = false;                    // they always walk: calm, never a dash
-      this.gaitRun = running;
-      // a normal pace: about two of its own animation strides per second of travel
-      this.effSpeed = Math.min(this.speed, natW * 1.5);
+      this.gaitRun = false;                     // they always walk: calm, never a dash
+      // the pace is the walk's own: ground speed = one stride per cycle × a playback rate kept
+      // between 0.75 and 1.25, so the feet are always planted (never sliding over the ground)
+      this.effSpeed = THREE.MathUtils.clamp(this.speed, natW * 0.75, natW * 1.25);
     }
+    let stepK = 1;
     if (this.target) {
       const d = this.target.clone().sub(p), dist = d.length(), step = this.effSpeed * dt;
       if (dist <= step) {
@@ -417,28 +418,10 @@ export class Animal3D {
         heading = Math.atan2(d.x, d.z); this.lastHeading = heading;
         // like a real animal: turn first, then walk (never shuffle backwards or sideways)
         let off = heading - this.yaw; off = Math.atan2(Math.sin(off), Math.cos(off));
-        const k = Math.abs(off) > 0.6 ? 0 : Math.abs(off) > 0.3 ? 0.4 : 1;
-        p.addScaledVector(d.normalize(), step * k); moving = true;
+        const k = Math.abs(off) > 0.6 ? 0 : Math.abs(off) > 0.3 ? 0.5 : 1;
+        p.addScaledVector(d.normalize(), step * k); moving = true; stepK = k;
       }
     }
-    // only settle into idle after a moment of standing still (no hitch between two walks)
-    this.stillT = moving ? 0 : (this.stillT || 0) + dt;
-    // animation follows what the animal is doing; speed matches the stride
-    if (moving || this.stillT < 0.18) {
-      if (moving) {
-        this.play(this.gaitRun ? 'run' : 'walk', 0.3);
-        this.current.timeScale = THREE.MathUtils.clamp(this.effSpeed / (this.gaitRun ? natR : natW) * 0.78, 0.6, 1.8);
-      }
-    } else {
-      this.idleT -= dt;
-      if (this.idleT < 0 && !this.gazeAt && !this.calm) {   // now and then: graze or look around
-        this.play(Math.random() < 0.5 ? 'eat' : 'idle2', 0.4);
-        setTimeout(() => { if (!this.target) this.play('idle', 0.5); }, 2600);
-        this.idleT = 5 + Math.random() * 6;
-      } else if (this.current === this.actions.walk || this.current === this.actions.run) this.play('idle', 0.3);
-      if (this.current) this.current.timeScale = 1;
-    }
-    this.mixer.update(dt);
     // facing: travel heading while moving, else side-on (dir), plus a turn towards the viewer
     let want = (heading ?? (this.dir > 0 ? Math.PI / 2 : -Math.PI / 2)) + this.lookA * 1.8 * this.dir;
     if (!moving && this.faceYaw !== undefined && this.faceYaw !== null) {
@@ -473,9 +456,35 @@ export class Animal3D {
     if (Math.abs(dy) > 2.9 && Math.abs(this.yawV || 0) > 0.25 && Math.sign(dy) !== Math.sign(this.yawV)) dy += Math.sign(this.yawV) * Math.PI * 2;
     const k = moving ? 9 : 4.5;
     this.yawV = ((this.yawV || 0) + (dy * k * k - 2 * k * (this.yawV || 0)) * dt);
-    this.yawV = THREE.MathUtils.clamp(this.yawV, -4, 4);
+    // a stepping turn: never faster than an animal can turn on its feet
+    this.yawV = THREE.MathUtils.clamp(this.yawV, moving && stepK === 1 ? -3 : -1.6, moving && stepK === 1 ? 3 : 1.6);
+    if (!moving) {
+      if (Math.abs(dy) < 0.1) this.yawV = 0;                         // near enough: it stands still
+      else if (Math.abs(this.yawV) < 0.35) this.yawV = Math.sign(dy) * 0.35;   // otherwise it steps round
+    }
     this.yaw += this.yawV * dt;
     this.inner.rotation.y = this.yaw;
+    // turning round is done by stepping round: the legs walk while the body turns
+    const turning = Math.abs(this.yawV || 0) > 0.01;          // decided above, before the legs are chosen
+    // only settle into idle after a moment of standing still (no hitch between two walks)
+    this.stillT = (moving || turning) ? 0 : (this.stillT || 0) + dt;
+    // animation follows what the animal is doing; the legs keep pace with the ground exactly
+    if (moving || turning || this.stillT < 0.18) {
+      if (moving || turning) {
+        this.play('walk', 0.3);
+        const ground = moving ? this.effSpeed * stepK / natW : 0;     // playback rate that matches the travel
+        this.current.timeScale = Math.max(ground, (turning || stepK < 1) ? 0.55 : 0) || 0.55;
+      }
+    } else {
+      this.idleT -= dt;
+      if (this.idleT < 0 && !this.gazeAt && !this.calm) {   // now and then: graze or look around
+        this.play(Math.random() < 0.5 ? 'eat' : 'idle2', 0.4);
+        setTimeout(() => { if (!this.target) this.play('idle', 0.5); }, 2600);
+        this.idleT = 5 + Math.random() * 6;
+      } else if (this.current === this.actions.walk || this.current === this.actions.run) this.play('idle', 0.3);
+      if (this.current) this.current.timeScale = 1;
+    }
+    this.mixer.update(dt);
     // hop arc
     if (this.hopT >= 0) {
       this.hopT += dt * 2.4; this.hop = Math.sin(Math.min(1, this.hopT) * Math.PI) * this.hopH;

@@ -199,6 +199,8 @@ export const STRINGS = {
       'eden-rabbit': ['I am the little white rabbit near Eve’s feet. Most people never notice me.', 'I keep very still and count the people who walk past. Thousands and thousands.'],
       'eden-dog': ['I am the little white dog. In 1615 dogs like me lived in palaces.', 'I stay by Eve. In a painting you don’t get bored; you just keep being.'],
       'eden-peacock': ['I am the peacock. Every one of my feathers has its own little eye painted on.', 'I show off my tail. It is the same tail every day, but it is still a very good tail.'],
+      'hicks-ox': ['I am the ox. The lion sits right beside me, and the prophecy says he will eat straw just like me.', 'I stand here chewing, very slowly. I have been chewing the same mouthful since 1834.'],
+      'hicks-leopard2': ['I am the leopard standing at the back. A child is holding on to me, and I don’t mind at all.', 'I keep watch over the others. Nobody here needs watching, but I like to be useful.'],
       'hicks-lion': ['I am the lion. The prophecy says I will eat straw like the ox, so here I sit, looking very serious about straw.', 'I sit in the middle and keep my claws to myself. Mr Hicks painted me again and again, more than sixty times.'],
       'hicks-cub': ['I am the bear cub. In the prophecy the cow and the bear feed together, and their young lie down side by side.', 'I sleep curled up next to the calf. Nobody in here has ever been hungry enough to mind.'],
       'hicks-calf': ['I am the calf. A lion sits right above me, and I have never once been afraid.', 'I lie on the warm brown earth and listen to the children. They never stop chattering.'],
@@ -452,7 +454,7 @@ export const STRINGS = {
     },
     hostNames: {
       'eden-lion': 'lion', 'eden-horse': 'white horse', 'eden-deer': 'stag', 'eden-rabbit': 'white rabbit',
-      'eden-dog': 'little dog', 'eden-peacock': 'peacock', 'hicks-lion': 'lion', 'hicks-cub': 'bear cub', 'hicks-calf': 'calf', 'hicks-goat': 'goat', 'hicks-leopard': 'leopard',
+      'eden-dog': 'little dog', 'eden-peacock': 'peacock', 'hicks-ox': 'ox', 'hicks-leopard2': 'leopard', 'hicks-lion': 'lion', 'hicks-cub': 'bear cub', 'hicks-calf': 'calf', 'hicks-goat': 'goat', 'hicks-leopard': 'leopard',
       'marc-deer': 'blue deer', 'marc-boar': 'red boar',
     },
 

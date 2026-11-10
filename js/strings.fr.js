@@ -184,6 +184,8 @@ const fr = {
     'eden-rabbit': ['Je suis le petit lapin blanc aux pieds d’Ève. La plupart des gens ne me remarquent jamais.', 'Je reste très immobile et je compte les gens qui passent. Des milliers et des milliers.'],
     'eden-dog': ['Je suis le petit chien blanc. En 1615, les chiens comme moi vivaient dans des palais.', 'Je reste près d’Ève. Dans un tableau, on ne s’ennuie pas : on continue simplement d’être.'],
     'eden-peacock': ['Je suis le paon. Chacune de mes plumes porte son petit œil peint.', 'Je fais la roue. C’est la même queue tous les jours, mais c’est toujours une très belle queue.'],
+    'hicks-ox': ['Je suis le bœuf. Le lion est assis juste à côté de moi, et la prophétie dit qu’il mangera de la paille comme moi.', 'Je suis debout là, et je rumine, très lentement. Je mâche la même bouchée depuis 1834.'],
+    'hicks-leopard2': ['Je suis le léopard debout, au fond. Un enfant s’accroche à moi, et cela ne me dérange pas du tout.', 'Je veille sur les autres. Personne ici n’a besoin d’être surveillé, mais j’aime me rendre utile.'],
     'hicks-lion': ['Je suis le lion. La prophétie dit que je mangerai de la paille comme le bœuf ; alors je suis assis là, très sérieux au sujet de la paille.', 'Je suis assis au milieu et je garde mes griffes pour moi. M. Hicks m’a peint encore et encore, plus de soixante fois.'],
     'hicks-cub': ['Je suis l’ourson. Dans la prophétie, la vache et l’ourse paissent ensemble, et leurs petits se couchent côte à côte.', 'Je dors roulé en boule à côté du veau. Ici, personne n’a jamais eu assez faim pour s’en soucier.'],
     'hicks-calf': ['Je suis le veau. Un lion est assis juste au-dessus de moi, et je n’ai jamais eu peur, pas une seule fois.', 'Je suis couché sur la terre brune et tiède, et j’écoute les enfants. Ils n’arrêtent jamais de bavarder.'],
@@ -412,7 +414,7 @@ const fr = {
   },
   hostNames: {
     'eden-lion': 'lion', 'eden-horse': 'cheval blanc', 'eden-deer': 'cerf', 'eden-rabbit': 'lapin blanc',
-    'eden-dog': 'petit chien', 'eden-peacock': 'paon', 'hicks-lion': 'lion', 'hicks-cub': 'ourson', 'hicks-calf': 'veau', 'hicks-goat': 'chèvre', 'hicks-leopard': 'léopard',
+    'eden-dog': 'petit chien', 'eden-peacock': 'paon', 'hicks-ox': 'bœuf', 'hicks-leopard2': 'léopard', 'hicks-lion': 'lion', 'hicks-cub': 'ourson', 'hicks-calf': 'veau', 'hicks-goat': 'chèvre', 'hicks-leopard': 'léopard',
     'marc-deer': 'chevreuil bleu', 'marc-boar': 'sanglier rouge',
   },
   collageNames: {

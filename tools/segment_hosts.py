@@ -95,6 +95,11 @@ HOSTS = {
                                (2212, 1228), (2216, 1330), (2205, 1425), (1925, 1425)]},
     "hicks-leopard": {"work": "hicks", "box": [1519, 1450, 1958, 1808], "close": 11,
                       "pos": [[1650, 1650], [1800, 1580], [1880, 1520]], "neg": [[1545, 1640], [1720, 1460]]},
+    # standing animals of the Peaceable Kingdom: they speak from where they stand
+    "hicks-ox":      {"work": "hicks", "box": [790, 610, 1400, 1420], "close": 15, "in_place": True,
+                      "pos": [[1000, 1000], [1150, 900], [950, 1250]], "neg": [[1500, 900]]},
+    "hicks-leopard2": {"work": "hicks", "box": [1786, 530, 2398, 1040], "close": 15, "in_place": True,
+                       "pos": [[1841, 700], [2114, 725], [2250, 800]], "neg": [[1750, 664], [1993, 931]]},
     "marc-deer":     {"work": "marc", "box": [940, 690, 1460, 1720], "close": 15},
     "marc-boar":     {"work": "marc", "box": [60, 1120, 820, 1720], "close": 15},
 }

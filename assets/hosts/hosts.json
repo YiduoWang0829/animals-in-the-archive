@@ -186,5 +186,33 @@
    2002
   ],
   "in_place": false
+ },
+ "hicks-ox": {
+  "work": "hicks",
+  "box": [
+   762,
+   601,
+   1495,
+   1488
+  ],
+  "size": [
+   2400,
+   2002
+  ],
+  "in_place": true
+ },
+ "hicks-leopard2": {
+  "work": "hicks",
+  "box": [
+   1726,
+   501,
+   2400,
+   1052
+  ],
+  "size": [
+   2400,
+   2002
+  ],
+  "in_place": true
  }
 }

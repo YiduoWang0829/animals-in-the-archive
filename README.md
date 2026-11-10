@@ -102,6 +102,14 @@ works. The camera only works on `localhost` or `https://`.
 Privacy: nothing is uploaded or stored. No analytics, cookies or localStorage. The camera
 stops on "Turn camera off", when the tab is hidden, or when the page is closed.
 
+Inside the paintings, the visitor only ever stands, walks, or moves its head: every change
+of place or direction is made with its legs walking (a turn is stepped round; the walk's
+playback rate is tied to the ground speed so the feet never slide), and nothing is moved
+by hand. Only animals painted standing speak; animals painted lying or sitting stay part
+of the picture (a flat painted figure cannot be redrawn standing without inventing it).
+In the Peaceable Kingdom the speakers are the standing ox and the standing leopard, who
+speak from where they stand; the visitor walks over to them.
+
 ## Project structure
 
 ```

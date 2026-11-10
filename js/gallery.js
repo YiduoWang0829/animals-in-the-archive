@@ -625,7 +625,6 @@ export class Gallery {
   async startle() {
     const vp = this.visitor.position;
     for (const h of this.hosts) {
-      h.actor.hopOnce(0.05 * h.actor.height / 0.3);
       h.actor.setDir(Math.sign(vp.x - h.actor.position.x) || 1);
       h.actor.nod(1);
     }
@@ -778,16 +777,18 @@ export class Gallery {
       const still = mover === A ? B : A;
       const wm = this.widthOf(mover), sgn = Math.sign(mover.position.x - still.position.x) || 1;
       const push = (A.target || B.target) ? 0.05 : 0.02;          // someone walking past: make room quickly
-      const dx = sgn * Math.min(ov, push), dz = -push * 0.4;
       const zMin = -this.paintU.uDepth.value * 0.6, cx = x => THREE.MathUtils.clamp(x, -this.pw / 2 + wm / 2, this.pw / 2 - wm / 2);
-      mover.position.x = cx(mover.position.x + dx);
-      mover.position.z = Math.max(zMin, mover.position.z + dz);
-      mover.position.y = this.groundY(mover.position.z);
-      // its destination moves with it, so it never walks straight back into the same spot
-      if (mover.target) { mover.target.x = cx(mover.target.x + dx); mover.target.z = Math.max(zMin, mover.target.z + dz); mover.target.y = this.groundY(mover.target.z); }
+      // it makes room by walking (legs moving), never by sliding: a step aside and a little back
+      const room = (this.widthOf(still) + wm) / 2 + 0.06;
+      const goal = this.spot(cx(still.position.x + sgn * room), Math.max(zMin, mover.position.z - 0.05), mover);
+      if (!mover.target || mover.target.distanceTo(goal) > 0.1) {
+        const h = this.hosts.find(x => x.actor === mover);
+        if (h) h.placed = false;
+        mover.walkTo(goal, 0.3).then(() => { if (h) h.placed = true; });
+      }
     }
     // nobody ever stands outside the picture
-    for (const a of crowd) { const w = this.widthOf(a); a.position.x = THREE.MathUtils.clamp(a.position.x, -this.pw / 2 + w / 2, this.pw / 2 - w / 2); }
+    // (all walk targets are already kept inside the picture by spot(); nobody is moved by hand)
     // draw order follows depth: nearer figures are drawn last (no flicker)
     const all = [v, ...this.hosts.map(h => h.actor)];
     const wp = new THREE.Vector3();
@@ -804,7 +805,15 @@ export class Gallery {
   // before talking, the visitor and a painted animal walk towards each other
   async meet(i) {
     const h = this.hosts[i];
-    if (!h || !h.awake || h.host.inPlace) return;
+    if (!h || !h.awake) return;
+    if (h.host.inPlace) {                        // it stays in the painting: the visitor walks over to it
+      const v = this.visitor, a = h.actor, side = Math.sign(v.position.x - a.position.x) || 1;
+      const x = a.position.x + side * (this.widthOf(a) / 2 + this.widthOf(v) / 2 + 0.04);
+      const goal = this.spot(x, Math.max(a.position.z + 0.06, v.position.z - 0.25), v);
+      if (goal.distanceTo(v.position) > 0.2) await this.arrive([v.walkTo(goal, 0.3)], [v], 9);
+      v.setDir?.(-side);
+      return;
+    }
     const v = this.visitor, a = h.actor, vp = v.position.clone();
     const side = Math.sign(a.position.x - vp.x) || 1, gap = (this.widthOf(v) + this.widthOf(a)) / 2 + 0.1;
     for (let k = 0; h.rising && k < 30; k++) await this.wait(0.1);      // let it finish getting up

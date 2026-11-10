@@ -41,6 +41,8 @@ export const TAGS = {
   'hostLife.eden-rabbit': [['eden-rabbit'], ['eden-rabbit']],
   'hostLife.eden-dog': [['eden-dog'], ['eden-dog']],
   'hostLife.eden-peacock': [['eden-peacock'], ['eden-peacock']],
+  'hostLife.hicks-ox': [['hicks-oxface', 'hicks-lionface'], ['hicks-oxface']],
+  'hostLife.hicks-leopard2': [['hicks-children'], ['hicks-leopards']],
   'hostLife.hicks-lion': [['hicks-lionface'], ['hicks-lionface']],
   'hostLife.hicks-cub': [['hicks-bearcorn'], ['hicks-children']],
   'hostLife.hicks-calf': [['hicks-lionface'], ['hicks-children']],

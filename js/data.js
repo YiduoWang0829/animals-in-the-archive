@@ -9,7 +9,7 @@ export const WORKS = [
     hd: 'assets/paintings/hd/garden-of-eden.jpg',
     depth: 'assets/paintings/depth/garden-of-eden.png',
     size: [2400, 1550], realWidth: 2.3,
-    hosts: ['eden-lion', 'eden-horse', 'eden-deer', 'eden-rabbit', 'eden-dog', 'eden-peacock'],
+    hosts: ['eden-lion', 'eden-horse', 'eden-deer', 'eden-peacock'],   // standing
     kinds: ['lion', 'tiger', 'horse', 'deer', 'dog', 'cat', 'rabbit', 'cattle', 'bird'],   // animal kinds painted in it
     ground: [0.2, 0.22],      // where the painted ground is: height (fraction of the picture) at the front, rise with depth
     wall: 0x2a2622,
@@ -20,7 +20,7 @@ export const WORKS = [
     hd: 'assets/paintings/hd/peaceable-kingdom.jpg',
     depth: 'assets/paintings/depth/peaceable-kingdom.png',
     size: [2400, 2002], realWidth: 2.0,
-    hosts: ['hicks-lion', 'hicks-cub', 'hicks-calf', 'hicks-leopard'],
+    hosts: ['hicks-ox', 'hicks-leopard2'],      // the standing ones (lying and sitting animals don't speak)
     kinds: ['lion', 'wolf', 'cattle', 'bear'],
     ground: [0.1, 0.24],      // the dark earth the animals rest on, rising towards the trees
     wall: 0x26241f,
@@ -31,7 +31,7 @@ export const WORKS = [
     hd: 'assets/paintings/hd/fate-of-the-animals.jpg',
     depth: 'assets/paintings/depth/fate-of-the-animals.png',
     size: [2385, 1783], realWidth: 2.4,
-    hosts: ['marc-deer', 'marc-boar'],
+    hosts: ['marc-deer'],                      // standing (the boars lie curled together)
     kinds: ['deer'],
     ground: [0.06, 0.14],
     wall: 0x22252a,
@@ -49,6 +49,8 @@ export const HOSTS = {
   'eden-rabbit':  { faces: 'left', realH: 0.25 },
   'eden-dog':     { faces: 'left', realH: 0.32 },
   'eden-peacock': { faces: 'right', realH: 1.1 },
+  'hicks-ox':      { faces: 'right', realH: 1.6, inPlace: true },
+  'hicks-leopard2': { faces: 'left', realH: 0.9, inPlace: true },
   'hicks-lion':    { faces: 'left', realH: 1.25, inPlace: true },
   'hicks-cub':     { faces: 'right', realH: 0.45 },
   'hicks-calf':    { faces: 'left', realH: 0.6 },
