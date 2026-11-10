@@ -676,6 +676,11 @@ async function insideStory(g, tok) {
     await speak(leader, t('openHere'));
     await speak('visitor', t('openWow'));
   }
+  else if (alive()) {
+    // every painted animal here stays in its place: the visitor walks over to the one that
+    // spoke first, to see it close
+    await g.meet(0);
+  }
   if (!alive()) return;
   // the opening is over: now the view is yours
   g.locked = false;

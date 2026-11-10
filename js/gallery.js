@@ -422,6 +422,7 @@ export class Gallery {
   // unhurried walk at a time; never while someone is walking up to it
   followYou() {
     const u = this.userGaze, v = this.visitor;
+    this.stroll();
     if (!this.inside || this.locked || !this.follow || !u?.active || u.gesture || v.target) return;
     if (this.hosts.some(h => h.meeting || h.called || h.rising)) return;
     const now = performance.now();
@@ -432,6 +433,21 @@ export class Gallery {
     this.lastFollow = now;
     const x = v.position.x + THREE.MathUtils.clamp(want - v.position.x, -0.32, 0.32);
     v.walkTo(this.spot(x, v.position.z, v), 0.2);
+  }
+  // when nobody is steering it and nobody is talking, it does not just stand there: now and
+  // then it takes a few unhurried steps over the open ground, then stands and looks
+  stroll() {
+    const v = this.visitor, u = this.userGaze;
+    if (!this.inside || !this.follow || v.target || (u?.active && !u.gesture)) return;
+    if (this.hosts.some(h => h.meeting || h.called || h.rising)) return;
+    const now = performance.now();
+    this.nextStroll ??= now + 4000;
+    if (now < this.nextStroll) return;
+    const talk = this.talking();
+    this.nextStroll = now + (talk ? 9000 : 6000) + Math.random() * 4000;
+    const dx = (Math.random() < 0.5 ? -1 : 1) * (talk ? 0.12 + Math.random() * 0.12 : 0.2 + Math.random() * 0.25);
+    const goal = this.spot(v.position.x + dx, v.position.z + (Math.random() - 0.5) * 0.08, v);
+    if (goal.distanceTo(v.position) > 0.1) v.walkTo(goal, 0.25);
   }
   // two animals are talking right now (a line is on screen, or was a moment ago)
   talking() { const c = this.convo; return !!c && performance.now() - c.t < c.dur + 2500; }
@@ -640,16 +656,33 @@ export class Gallery {
   async goTo(points, speed = 0.48) { this.visitor.face?.(null); await this.visitor.walkTo(points, speed); }
   // In the hall it stays where it arrived, well clear of the steps and the walls, and only
   // turns to look: at the label, then at the painting (no walking about, nothing to bump into)
+  // The label hangs just right of the steps. The visitor walks over to stand in front of it,
+  // along a path that keeps its whole body (and every turn it makes: a turn sweeps a circle
+  // as long as the body) clear of the steps: along the front first, then straight in.
+  bodyLen() { const v = this.visitor; return (v.length || v.aspect || 1) * v.height; }
+  labelSpot() {
+    const L = this.bodyLen(), edge = (this.pw + 0.42) / 2;       // the widest step's right edge
+    // facing the label it is end-on to the steps: only half its width, plus the small swing of
+    // its head as it turns a little towards the label, has to clear the step's edge
+    const x = Math.max(this.labelX, edge + 0.3 * L + 0.25 * this.visitor.height + 0.06);
+    return { front: new THREE.Vector3(x, 0, 0.54 + L / 2 + 0.12), at: new THREE.Vector3(x, 0, L / 2 + 0.12) };
+  }
   async toLabel() {
-    const v = this.visitor, p = v.position;
+    const v = this.visitor, s = this.labelSpot();
     v.attend?.(false);
-    v.face?.(Math.atan2(this.labelX - p.x, 0.05 - p.z));
-    await this.wait(0.9);
+    await this.goTo([s.front, s.at], 0.45);
+    v.face?.(Math.atan2(this.labelX - s.at.x, 0.012 - s.at.z)); v.setDir?.(1);
+    await this.wait(0.5);
   }
   async toPainting() {
-    const v = this.visitor, p = v.position;
-    v.face?.(Math.atan2(0 - p.x, 0.05 - p.z));
-    await this.wait(0.9);
+    const v = this.visitor, s = this.labelSpot(), L = this.bodyLen();
+    // it turns away from the steps (to the right, its head sweeping over open floor), out into
+    // the room, then back along the front to the middle
+    const out = new THREE.Vector3(s.at.x + 0.6 * L, 0, s.at.z + 0.6 * L);
+    v.yawV = -Math.abs(v.yawV || 0.4);                    // (the turn sets off clockwise)
+    await this.goTo([out, new THREE.Vector3(0.05, 0, Math.max(1.1, 0.54 + L / 2 + 0.2))], 0.45);
+    v.face?.(Math.PI);
+    await this.wait(0.5);
   }
   talkToYou(on) { this.visitor.face?.(null); this.visitor.attend?.(on); }
 
@@ -749,7 +782,13 @@ export class Gallery {
   // of the picture, standing in front of it would look like walking through it, so the
   // nearest clear place to the side is taken instead.
   spot(x, zWant, a) {
-    const w = this.widthOf(a), h = a.height, lo = -this.pw / 2 + w / 2 + 0.04, hi = this.pw / 2 - w / 2 - 0.04;
+    const w = this.widthOf(a), h = a.height;
+    // the stretch of open ground the painting has (data.js `walk`): never among its figures
+    // (for your animal: the painted ones belong there and keep to the relief check alone, or
+    // several of them would be squeezed into one stretch and keep shuffling)
+    const [u0, u1] = (a === this.visitor && this.o.work.walk) || [0, 1];
+    let lo = Math.max(-this.pw / 2 + w / 2 + 0.04, (u0 - 0.5) * this.pw + w / 2), hi = Math.min(this.pw / 2 - w / 2 - 0.04, (u1 - 0.5) * this.pw - w / 2);
+    if (lo > hi) lo = hi = (lo + hi) / 2;
     const at = x0 => {
       const xx = THREE.MathUtils.clamp(x0, lo, hi);
       let z = zWant;

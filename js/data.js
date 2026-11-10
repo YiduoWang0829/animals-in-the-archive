@@ -11,6 +11,7 @@ export const WORKS = [
     size: [2400, 1550], realWidth: 2.3,
     hosts: ['eden-lion', 'eden-horse', 'eden-deer', 'eden-peacock'],   // standing
     kinds: ['lion', 'tiger', 'horse', 'deer', 'dog', 'cat', 'rabbit', 'cattle', 'bird'],   // animal kinds painted in it
+    walk: [0.41, 0.74],       // the open meadow between Eve (left) and the big cats (right)
     ground: [0.2, 0.22],      // where the painted ground is: height (fraction of the picture) at the front, rise with depth
     wall: 0x2a2622,
   },
@@ -22,6 +23,7 @@ export const WORKS = [
     size: [2400, 2002], realWidth: 2.0,
     hosts: ['hicks-ox', 'hicks-leopard2'],      // the standing ones (lying and sitting animals don't speak)
     kinds: ['lion', 'wolf', 'cattle', 'bear'],
+    walk: [0.05, 0.39],       // the open path on the left; the animals (from the sleeping bear on) crowd the right
     ground: [0.1, 0.24],      // the dark earth the animals rest on, rising towards the trees
     wall: 0x26241f,
   },
@@ -33,6 +35,7 @@ export const WORKS = [
     size: [2385, 1783], realWidth: 2.4,
     hosts: ['marc-deer'],                      // standing (the boars lie curled together)
     kinds: ['deer'],
+    walk: [0.06, 0.94],
     ground: [0.06, 0.14],
     wall: 0x22252a,
   },
