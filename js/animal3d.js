@@ -264,6 +264,14 @@ export class Animal3D {
     const necks = bones.filter(b => /neck/i.test(b.name) && !/(fix|off|correct|end|nub|ik)/i.test(b.name));
     this.neck = byName('Neck2') ? ['Neck2', 'Neck3', 'Neck'].map(byName).filter(Boolean) : necks.slice(-2).reverse();
     this.feet = feet; this.backBone = backB;
+    // the spine from the hips to the head: it bends when the animal turns (the head leads,
+    // the body follows in a curve), on top of whatever the animation is doing
+    this.spine = [];
+    if (headB && backB) {
+      for (let b = headB; b && b !== backB; b = b.parent) if (b.isBone) this.spine.unshift(b);
+      if (!this.spine.length || this.spine[0].parent !== backB) this.spine = [];
+      this.spine = this.spine.filter(b => b !== headB).slice(-6);
+    }
     // a realistic model keeps its own neck: its rest pose is often posed differently from its
     // animations, so bending bones from it would twist the neck. It turns its whole body.
     this.aimChain = this.realistic ? [] : [...this.neck.map(b => ({ b, share: 0.25, limit: 0.16 })), ...(this.head ? [{ b: this.head, share: 1, limit: 0.5 }] : [])];
@@ -441,7 +449,9 @@ export class Animal3D {
         heading = Math.atan2(d.x, d.z); this.lastHeading = heading;
         // like a real animal: turn first, then walk (never shuffle backwards or sideways)
         let off = heading - this.yaw; off = Math.atan2(Math.sin(off), Math.cos(off));
-        const k = Math.abs(off) > 0.6 ? 0 : Math.abs(off) > 0.3 ? 0.5 : 1;
+        // a real animal walks round a bend: it keeps going, slower the sharper the turn
+        // (only a near about-turn is taken almost on the spot)
+        const a = Math.abs(off), k = a > 1.6 ? 0.1 : a > 0.9 ? 0.3 : a > 0.4 ? 0.6 : a > 0.15 ? 0.85 : 1;
         p.addScaledVector(d.normalize(), step * k); moving = true; stepK = k;
       }
     }
@@ -508,6 +518,19 @@ export class Animal3D {
       if (this.current) this.current.timeScale = 1;
     }
     this.mixer.update(dt);
+    // the body curves into the turn: each spine bone takes a share of the bend
+    this.bend = (this.bend || 0) + (THREE.MathUtils.clamp((this.yawV || 0) * 0.32, -0.42, 0.42) - (this.bend || 0)) * Math.min(1, dt * 5);
+    if (this.spine?.length && Math.abs(this.bend) > 0.004) {
+      this.group.updateMatrixWorld(true);
+      const up = new THREE.Vector3(0, 1, 0).transformDirection(this.inner.matrixWorld);
+      const r = new THREE.Quaternion().setFromAxisAngle(up, this.bend / this.spine.length);
+      const q = new THREE.Quaternion(), pq = new THREE.Quaternion();
+      for (const b of this.spine) {
+        b.getWorldQuaternion(q); b.parent.getWorldQuaternion(pq);
+        b.quaternion.copy(pq.invert().multiply(r.clone().multiply(q)));
+        b.updateMatrixWorld(true);
+      }
+    }
     // hop arc
     if (this.hopT >= 0) {
       this.hopT += dt * 2.4; this.hop = Math.sin(Math.min(1, this.hopT) * Math.PI) * this.hopH;

@@ -280,12 +280,25 @@ function say(who, name, text, hold = 4200) {
   let b = bubbles.get(who);
   if (!b) { b = document.createElement('div'); b.className = 'bubble'; $('#bubble-layer').appendChild(b); bubbles.set(who, b); }
   b.classList.remove('show');
-  b.innerHTML = `<span class="who"></span><span class="txt"></span>`;
-  b.querySelector('.who').textContent = name; b.querySelector('.txt').textContent = text;
+  b.innerHTML = `<span class="who"></span><span class="txt"><span class="on"></span><span class="off" style="visibility:hidden"></span></span>`;
+  b.querySelector('.who').textContent = name;
+  // the words come in at a calm reading pace (the bubble already has its full size: the rest
+  // waits invisibly, so nothing jumps)
+  const on = b.querySelector('.on'), off = b.querySelector('.off'), chars = [...text];
+  off.textContent = text; clearInterval(b._type);
+  let n = 0; const step = Math.max(16, Math.round(readMs(text) * 0.45 / Math.max(1, chars.length)));
+  b._type = setInterval(() => { n++; on.textContent = chars.slice(0, n).join(''); off.textContent = chars.slice(n).join(''); if (n >= chars.length) clearInterval(b._type); }, step);
   b.style.visibility = 'visible';
   setTimeout(() => b.classList.add('show'), 20);
   clearTimeout(b._t);
-  if (hold) b._t = setTimeout(() => b.classList.remove('show'), hold + text.length * 35);
+  if (hold) b._t = setTimeout(() => b.classList.remove('show'), hold + readMs(text));
+}
+// how long a line takes to read: Chinese, Japanese and Korean characters each carry a
+// word's worth of meaning, so they get far more time than a Latin letter
+function readMs(text) {
+  let ms = 0;
+  for (const c of String(text)) ms += /[\u3000-\u9fff\uac00-\ud7af\uff00-\uffef]/.test(c) ? 240 : /\s/.test(c) ? 30 : 62;
+  return ms;
 }
 function clearBubbles() { bubbles.forEach(b => b.remove()); bubbles.clear(); }
 function placeBubbles(g) {
@@ -414,7 +427,7 @@ function speak(who, text, { pause = 350, tags = null, q = '' } = {}) {
   const tok = storyToken, g0 = gallery;
   const run = speechLock.then(async () => {
     if (tok !== storyToken || !gallery || switching || g0 !== gallery) return;
-    const g = gallery, dur = 1500 + fill(text).length * 48;
+    const g = gallery, dur = Math.max(2800, 1400 + readMs(fill(text)));
     g.actorOf(who)?.nod?.(1);
     // whoever speaks and whoever listens turn to each other (the visitor looks at the
     // painted animal talking to it, not at you, not at the room)

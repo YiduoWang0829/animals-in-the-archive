@@ -660,27 +660,25 @@ export class Gallery {
   // along a path that keeps its whole body (and every turn it makes: a turn sweeps a circle
   // as long as the body) clear of the steps: along the front first, then straight in.
   bodyLen() { const v = this.visitor; return (v.length || v.aspect || 1) * v.height; }
+  // It stands in front of the label, just beyond the corner of the steps, far enough from
+  // that corner that it can turn any way on the spot (its head and tail sweep a circle half
+  // its length round it) without touching them. Straight there and straight back: no detours.
   labelSpot() {
     const L = this.bodyLen(), edge = (this.pw + 0.42) / 2;       // the widest step's right edge
-    // facing the label it is end-on to the steps: only half its width, plus the small swing of
-    // its head as it turns a little towards the label, has to clear the step's edge
-    const x = Math.max(this.labelX, edge + 0.3 * L + 0.25 * this.visitor.height + 0.06);
-    return { front: new THREE.Vector3(x, 0, 0.54 + L / 2 + 0.12), at: new THREE.Vector3(x, 0, L / 2 + 0.12) };
+    const z = 0.54 + 0.3 * L, r = L / 2 + 0.1;
+    const x = Math.max(this.labelX, edge + Math.sqrt(Math.max(0, r * r - (z - 0.54) ** 2)));
+    return { at: new THREE.Vector3(x, 0, z) };
   }
   async toLabel() {
     const v = this.visitor, s = this.labelSpot();
     v.attend?.(false);
-    await this.goTo([s.front, s.at], 0.45);
+    await this.goTo([s.at], 0.45);
     v.face?.(Math.atan2(this.labelX - s.at.x, 0.012 - s.at.z)); v.setDir?.(1);
     await this.wait(0.5);
   }
   async toPainting() {
-    const v = this.visitor, s = this.labelSpot(), L = this.bodyLen();
-    // it turns away from the steps (to the right, its head sweeping over open floor), out into
-    // the room, then back along the front to the middle
-    const out = new THREE.Vector3(s.at.x + 0.6 * L, 0, s.at.z + 0.6 * L);
-    v.yawV = -Math.abs(v.yawV || 0.4);                    // (the turn sets off clockwise)
-    await this.goTo([out, new THREE.Vector3(0.05, 0, Math.max(1.1, 0.54 + L / 2 + 0.2))], 0.45);
+    const v = this.visitor, L = this.bodyLen();
+    await this.goTo([new THREE.Vector3(0.05, 0, Math.max(1.1, 0.54 + L / 2 + 0.2))], 0.45);
     v.face?.(Math.PI);
     await this.wait(0.5);
   }
