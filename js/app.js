@@ -840,8 +840,8 @@ stage3d.addEventListener('pointerup', e => {
   if (gallery.visitorAt(nx, ny)) return greetBack();       // click your animal: it greets you
   const other = gallery.sideAt(nx, ny);
   if (other) return switchWork(other.id, other.side);
-  // in the room (and while the opening plays inside), a click moves the talk on
-  if (!gallery.inside || gallery.locked) return advanceLine();
+  // in the room, a click moves the talk on
+  if (!gallery.inside) return advanceLine();
   tapInside(nx, ny);
 });
 stage3d.addEventListener('wheel', e => { if (gallery?.inside) { e.preventDefault(); gallery.zoomBy(-e.deltaY * 0.0015); } }, { passive: false });

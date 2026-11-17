@@ -745,11 +745,7 @@ export class Gallery {
     const dist = Math.min(this.ph / 2 / Math.tan(vf), this.pw / 2 / (Math.tan(vf) * this.camera.aspect)) * 0.76;
     this.maxZoom = dist * 0.72; this.viewDist = dist;
     const recede = dist + 0.3;
-    // inside, the picture is shown whole and in its own proportions, face on (as on the wall,
-    // only nearer): you zoom in yourself if you want to (two hands apart, or the wheel)
-    const tanV = Math.tan(vf);
-    const fit = Math.max(this.ph / 2 / tanV, this.pw / 2 / (tanV * this.camera.aspect)) * 1.12;
-    const camTo = new THREE.Vector3(0, this.cy, -recede - 0.03 + fit), lookTo = new THREE.Vector3(0, this.cy, -recede - 1);
+    const camTo = new THREE.Vector3(0, this.cy, dist - recede - 0.03), lookTo = new THREE.Vector3(0, this.cy, -recede);
     // in proportion with the painted animals: each one, with its real-life height, says how big
     // a metre is in this picture; the visitor takes its own real height on that scale
     const h0 = v.height, vr = this.o.visitorRealH || 0.8;
@@ -767,10 +763,6 @@ export class Gallery {
     this.paintU.uDepth.value = keep; v.setHeight(hNow);
     v.walkTo(inside, 0.22);
     this.keyLight.intensity = 0;
-    // (this happens behind the title card) inside there is only the picture: the room, its
-    // steps, frame, label and the other paintings are put away, so the whole picture can be
-    // seen at its own proportions without the gallery showing round it
-    for (const o of this.scene.children) if (o !== this.paintGroup && !o.isLight && o !== this.camera) o.visible = false;
     await this.tween(3.6, e => {
       this.paintU.uDepth.value = depth0 + (depth1 - depth0) * e; this.paintU.uFill.value = e;
       this.camBase.lerpVectors(camFrom, camTo, e);
@@ -781,7 +773,6 @@ export class Gallery {
       for (const h of this.hosts) if (!h.awake) h.actor.position.z = this.paintPoint(h.homeUV[0], h.homeUV[1], 0.004).z;
     });
     v.setPaintAll?.(1);
-    this.view.zoom = this.view.tz = -1;      // the whole picture (see updateCamera: `wide`)
     this.paintU.uWind.value = 0;             // the picture holds still (a ripple reads as flicker)
     this.follow = true;                      // from now on the view keeps the visitor in sight
     this.lastLook = -99;
@@ -804,8 +795,7 @@ export class Gallery {
     // (for your animal: the painted ones belong there and keep to the relief check alone, or
     // several of them would be squeezed into one stretch and keep shuffling)
     const [u0, u1] = (a === this.visitor && this.o.work.walk) || [0, 1];
-    // (a generous margin: an animal standing nearer than the picture looks a little bigger on it)
-    let lo = Math.max(-this.pw / 2 + w / 2 + 0.04, (u0 - 0.5) * this.pw + w * 0.65), hi = Math.min(this.pw / 2 - w / 2 - 0.04, (u1 - 0.5) * this.pw - w * 0.65);
+    let lo = Math.max(-this.pw / 2 + w / 2 + 0.04, (u0 - 0.5) * this.pw + w / 2), hi = Math.min(this.pw / 2 - w / 2 - 0.04, (u1 - 0.5) * this.pw - w / 2);
     if (lo > hi) lo = hi = (lo + hi) / 2;
     const at = x0 => {
       const xx = THREE.MathUtils.clamp(x0, lo, hi);
