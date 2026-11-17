@@ -663,24 +663,26 @@ export class Gallery {
   // It stands in front of the label, just beyond the corner of the steps, far enough from
   // that corner that it can turn any way on the spot (its head and tail sweep a circle half
   // its length round it) without touching them. Straight there and straight back: no detours.
+  // Right in front of the label (not beside the next painting): as near the wall as it can
+  // stand while its whole body, turning any way, keeps clear of the corner of the steps.
   labelSpot() {
     const L = this.bodyLen(), edge = (this.pw + 0.42) / 2;       // the widest step's right edge
-    const z = 0.54 + 0.3 * L, r = L / 2 + 0.1;
-    const x = Math.max(this.labelX, edge + Math.sqrt(Math.max(0, r * r - (z - 0.54) ** 2)));
-    return { at: new THREE.Vector3(x, 0, z) };
+    const r = L / 2 + 0.12, dx = this.labelX - edge;
+    const z = 0.54 + Math.max(0.12, Math.sqrt(Math.max(0, r * r - dx * dx)), 0.25 * L);
+    return { at: new THREE.Vector3(this.labelX, 0, Math.max(z, L / 2 + 0.15)) };
   }
   async toLabel() {
     const v = this.visitor, s = this.labelSpot();
     v.attend?.(false);
     await this.goTo([s.at], 0.45);
-    v.face?.(Math.atan2(this.labelX - s.at.x, 0.012 - s.at.z)); v.setDir?.(1);
+    v.face?.(Math.PI, true); v.setDir?.(1);                 // squarely towards the label
     await this.wait(0.5);
   }
+  // it stays at the label and tells you about the picture from there, only turning its head
+  // and shoulders a little towards it (no walking off, no turning its back)
   async toPainting() {
-    const v = this.visitor, L = this.bodyLen();
-    await this.goTo([new THREE.Vector3(0.05, 0, Math.max(1.1, 0.54 + L / 2 + 0.2))], 0.45);
-    v.face?.(Math.PI);
-    await this.wait(0.5);
+    this.visitor.face?.(Math.PI + 0.45, true);
+    await this.wait(0.4);
   }
   talkToYou(on) { this.visitor.face?.(null); this.visitor.attend?.(on); }
 

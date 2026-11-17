@@ -36,23 +36,27 @@ works. The camera only works on `localhost` or `https://`.
    (MediaPipe, on this device only). Everything also works with mouse or touch.
 4. **Character studio.** A full page. Give your animal a name (or keep the suggested one). Draw your own animal: it becomes a walking
    watercolour character. DoodleNet suggests the nearest 3D animal, with its real score.
-   Or choose one of 11 realistic rigged 3D animals (Sketchfab: fox, wolf, rabbit, deer, elk,
-   donkey, horse, zebra, tiger, lioness, brown bear), shown on a turntable that walks, runs, stands or
-   grazes, in a Natural or Storybook (ink outline) look, or one of 13 storybook animals.
+   Or choose one of 10 realistic rigged 3D animals (Sketchfab: fox, wolf, rabbit, deer, elk,
+   donkey, horse, tiger, lioness, brown bear; the zebra model is kept but not offered: it has
+   no walk cycle), shown on a turntable that walks, in a Natural or Storybook (ink outline)
+   look, or one of 13 storybook animals. They only ever stand, walk and turn (no grazing,
+   lying down or calls), bend their spine into a turn, and never slide sideways.
 5. **Gallery.** Only your animal and you. The chosen painting hangs in the middle of the
    wall, the other two either side under their own lights. Click one of them (or the ‹ ›
    buttons) and your animal walks over to it; the visit carries on at that painting. The animal
    walks in with its own walk cycle; the playback speed matches its stride, so the feet
    stay planted. It turns to you and says hello (wave with the camera on, or click it).
-   It reads the wall label aloud with two facts about the work, looks at the painting,
-   and tells you whether an animal like it is painted there. It asks whether you like the
+   It walks straight to the wall label (on a line clear of the steps), stands facing it and
+   reads it aloud with two facts about the work, then, still standing there, turns a little
+   towards the painting and tells you whether an animal like it is painted there. It asks whether you like the
    painting, then whether to go in. On yes it sets off towards the picture and the light
    closes around the painting like an iris. On the black title card that follows, white
    lines fade in one by one: the painted animals have lived one unchanging moment for
    centuries; the visitor comes from a world of weather, homes and nights; today each will
    show the other how it lives. The walk up the steps and through the frame happens behind
    the card, then the dark lifts onto the inside of the picture. All talk is one line at a
-   time, and questions wait for your nod, shake or click.
+   time, appearing at reading pace; click the bubble (or the room, or press Space, Enter or
+   →) to show the whole line or go on to the next. Questions wait for your nod, shake or click.
 6. **Inside the painting.** The camera passes through the frame, then follows your animal
    from just behind and above. Zoom moves closer to or further from the animal, and
    looking around orbits it, so you never lose it. 3D animals turn their neck and head

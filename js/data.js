@@ -110,7 +110,8 @@ export const ANIMALS3D = [
     real: { title: 'Realistic Animated Donkey 3D Model', author: 'WildMesh 3D', licence: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/realistic-animated-donkey-3d-model-2b4086035df94d9e88fd0f18d34b3872' } },
   { id: 'horse', kind: 'horse', realH: 1.6, height: 0.84, realH: 1.65, doodle: ['horse'],
     real: { title: 'HORSE - Realistic 3D Model (DEMO FREE)', author: 'WildMesh 3D', licence: 'CC BY-NC 4.0', url: 'https://sketchfab.com/3d-models/horse-realistic-3d-model-demo-free-65d6a70a6721495f938c93e80a5998e4' } },
-  { id: 'zebra', kind: 'zebra', height: 0.72, realH: 1.45, doodle: ['zebra'],
+  // (the zebra's file has no walk, only a gallop: animals here only ever walk, so it is not offered)
+  { id: 'zebra', kind: 'zebra', height: 0.72, realH: 1.45, doodle: ['zebra'], hidden: true,
     real: { title: 'Zebra - Rigged', author: 'Noa Seller', licence: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/zebra-rigged-5d6ff2749afc438b9989f91ecb242574' } },
   { id: 'tiger', kind: 'tiger', realH: 1.0, height: 0.52, realH: 1.0, doodle: ['tiger'],
     real: { title: 'Tiger rebuilt', author: 'kenchoo', licence: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/tiger-rebuilt-6b5d14b2de984ffcb00ee00e404ad208' } },

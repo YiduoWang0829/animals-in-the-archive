@@ -199,7 +199,7 @@ async function openStudio(notice = '') {
     <p class="note" style="margin-top:0">${esc(t('drawHint'))}</p>
     <div id="draw-result"></div>
     <div class="result-actions"><button class="btn" data-action="choose-drawing">${esc(t('walkInDrawing'))}</button></div>`;
-  $('#shelf-3d').innerHTML = ANIMALS3D.map(a => `
+  $('#shelf-3d').innerHTML = ANIMALS3D.filter(a => !a.hidden).map(a => `
     <button class="pick" data-action="choose-3d" data-id="${a.id}"><img src="${a.thumb}" alt="" loading="lazy"><span>${esc(t(`animals3d.${a.id}`))}</span></button>`).join('');
   $('#shelf-2d').innerHTML = SPECIES.map(s => `
     <button class="pick" data-action="choose-2d" data-species="${s.id}"><img src="${s.storybook}" alt="" loading="lazy"><span>${esc(t(`species.${s.id}`))}</span></button>`).join('');
@@ -257,7 +257,7 @@ async function recogniseSketch() {
   const pct = p => (p * 100).toFixed(1);
   const top = ranked.slice(0, 4).map(r => `<li><span>${esc(r.label)}</span><span class="bar"><i style="width:${(r.p * 100).toFixed(1)}%"></i></span><span class="pct">${pct(r.p)}%</span></li>`).join('');
   // the closest living 3D animal, if any of its drawing classes scored
-  const best3d = matchSpecies(ranked.slice(), ANIMALS3D.filter(a => a.doodle.length).map(a => ({ ...a, doodle: a.doodle })))[0];
+  const best3d = matchSpecies(ranked.slice(), ANIMALS3D.filter(a => a.doodle.length && !a.hidden).map(a => ({ ...a, doodle: a.doodle })))[0];
   let html = `<div class="result"><h4>${esc(t('drawTop'))}</h4><ul class="bars">${top}</ul>`;
   if (best3d && best3d.score >= 0.05) {
     const a = best3d.species;
@@ -278,7 +278,7 @@ function say(who, name, text, hold = 4200) {
   // a new speaker hides everyone else at once (no fading bubbles left overlapping)
   bubbles.forEach((el, k) => { if (k !== who) { el.classList.remove('show'); el.style.visibility = 'hidden'; } });
   let b = bubbles.get(who);
-  if (!b) { b = document.createElement('div'); b.className = 'bubble'; $('#bubble-layer').appendChild(b); bubbles.set(who, b); }
+  if (!b) { b = document.createElement('div'); b.className = 'bubble'; $('#bubble-layer').appendChild(b); bubbles.set(who, b); b.addEventListener('click', e => { e.stopPropagation(); advanceLine(); }); }
   b.classList.remove('show');
   b.innerHTML = `<span class="who"></span><span class="txt"><span class="on"></span><span class="off" style="visibility:hidden"></span></span>`;
   b.querySelector('.who').textContent = name;
@@ -286,8 +286,9 @@ function say(who, name, text, hold = 4200) {
   // waits invisibly, so nothing jumps)
   const on = b.querySelector('.on'), off = b.querySelector('.off'), chars = [...text];
   off.textContent = text; clearInterval(b._type);
-  let n = 0; const step = Math.max(16, Math.round(readMs(text) * 0.45 / Math.max(1, chars.length)));
-  b._type = setInterval(() => { n++; on.textContent = chars.slice(0, n).join(''); off.textContent = chars.slice(n).join(''); if (n >= chars.length) clearInterval(b._type); }, step);
+  let n = 0; const step = Math.max(14, Math.round(readMs(text) * 0.35 / Math.max(1, chars.length)));
+  b._finish = () => { clearInterval(b._type); n = chars.length; on.textContent = text; off.textContent = ''; b._finish = null; };
+  b._type = setInterval(() => { n++; on.textContent = chars.slice(0, n).join(''); off.textContent = chars.slice(n).join(''); if (n >= chars.length) { clearInterval(b._type); b._finish = null; } }, step);
   b.style.visibility = 'visible';
   setTimeout(() => b.classList.add('show'), 20);
   clearTimeout(b._t);
@@ -297,7 +298,7 @@ function say(who, name, text, hold = 4200) {
 // word's worth of meaning, so they get far more time than a Latin letter
 function readMs(text) {
   let ms = 0;
-  for (const c of String(text)) ms += /[\u3000-\u9fff\uac00-\ud7af\uff00-\uffef]/.test(c) ? 240 : /\s/.test(c) ? 30 : 62;
+  for (const c of String(text)) ms += /[\u3000-\u9fff\uac00-\ud7af\uff00-\uffef]/.test(c) ? 175 : /\s/.test(c) ? 25 : 48;
   return ms;
 }
 function clearBubbles() { bubbles.forEach(b => b.remove()); bubbles.clear(); }
@@ -416,6 +417,18 @@ const hostName = () => t(`hostNames.${state.host.id}`);   // the first painted a
 
 // ---- conversation: one speaker at a time, in order ----------------------------
 let speechLock = Promise.resolve();
+let skipLine = null;                      // resolves the line on screen early (a click, a key)
+// a click on a speech bubble (or the room, or Space / Enter / →): a line still appearing is
+// shown whole at once; a line already whole gives way to the next one
+function advanceLine() {
+  const typing = [...bubbles.values()].find(b => b._finish && b.classList.contains('show'));
+  if (typing) return typing._finish();
+  skipLine?.();
+}
+document.addEventListener('keydown', e => {
+  if (!gallery || /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(e.target.tagName)) return;
+  if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight') { e.preventDefault(); advanceLine(); }
+});
 let storyToken = 0;                       // bumped when the stage closes: stops all scripts
 let pendingAnswer = null, waveWaiter = null;
 const fill = s => localize(String(s).replace(/\{name\}/g, state.name || ''));
@@ -427,7 +440,7 @@ function speak(who, text, { pause = 350, tags = null, q = '' } = {}) {
   const tok = storyToken, g0 = gallery;
   const run = speechLock.then(async () => {
     if (tok !== storyToken || !gallery || switching || g0 !== gallery) return;
-    const g = gallery, dur = Math.max(2800, 1400 + readMs(fill(text)));
+    const g = gallery, dur = Math.max(2200, 1100 + readMs(fill(text)));
     g.actorOf(who)?.nod?.(1);
     // whoever speaks and whoever listens turn to each other (the visitor looks at the
     // painted animal talking to it, not at you, not at the room)
@@ -436,7 +449,8 @@ function speak(who, text, { pause = 350, tags = null, q = '' } = {}) {
     if (who !== 'visitor') g.gazeHost = who; else if (listener !== null) g.gazeHost = listener;
     say(who, speakerName(who), fill(text), 0);
     if (tags) state.talk.push({ who, name: speakerName(who), text: fill(text), side: who === 'visitor' ? 'out' : 'in', tags, q: fill(q) });
-    await sleep(dur);
+    await Promise.race([sleep(dur), new Promise(r => { skipLine = r; })]);   // (or a click moves on)
+    skipLine = null;
     bubbles.get(who)?.classList.remove('show');
     await sleep(pause);
   });
@@ -822,7 +836,9 @@ stage3d.addEventListener('pointerup', e => {
   if (gallery.visitorAt(nx, ny)) return greetBack();       // click your animal: it greets you
   const other = gallery.sideAt(nx, ny);
   if (other) return switchWork(other.id, other.side);
-  if (gallery.inside) tapInside(nx, ny);
+  // in the room (and while the opening plays inside), a click moves the talk on
+  if (!gallery.inside || gallery.locked) return advanceLine();
+  tapInside(nx, ny);
 });
 stage3d.addEventListener('wheel', e => { if (gallery?.inside) { e.preventDefault(); gallery.zoomBy(-e.deltaY * 0.0015); } }, { passive: false });
 

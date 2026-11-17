@@ -337,7 +337,7 @@ export class Animal3D {
     this.play('idle', 0);
 
     this.shadow = blobShadow();
-    this.dir = 1; this.yaw = Math.PI / 2; this.lookA = 0;
+    this.dir = 1; this.yaw = Math.PI / 2; this.lookA = 0; this.inner.rotation.y = this.yaw;
     this.target = null; this.speed = 0.7; this.running = false;
     this.hop = 0; this.hopT = -1; this.idleT = 3 + Math.random() * 4;
     this.setHeight(height);
@@ -410,11 +410,14 @@ export class Animal3D {
     return new Promise(res => { this._arrive = res; });
   }
   // face a fixed direction while standing (yaw: 0 = towards you, PI = towards the wall)
-  face(yaw) { this.faceYaw = yaw; }
+  face(yaw, full = false) { this.faceYaw = yaw; this.faceFull = full; }
   stop() { this.target = null; this._arrive?.(); this._arrive = null; }
   hopOnce(h = 0.1) { this.hopT = 0; this.hopH = h; }
   // a one-off movement from the model's own clips (a head shake, a call), then back to idle
   gesture(name) {
+    // the models' one-off clips (a call, a shake) bend, sit or crouch the body in ways that
+    // look like a glitch in the middle of a conversation: the animal stays as it is
+    if (this.realistic || name) return false;
     const a = this.actions[name];
     if (!a || this.target) return false;
     a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = false;
@@ -440,9 +443,15 @@ export class Animal3D {
     }
     let stepK = 1;
     if (this.target) {
-      const d = this.target.clone().sub(p), dist = d.length(), step = this.effSpeed * dt;
-      if (dist <= step) {
-        p.copy(this.target);
+      // distances along the ground only: the height (a step, the slope of a painted ground)
+      // just follows. Measured in 3D, a goal above or below would never count as reached and
+      // the animal would circle it, turning round and round.
+      const d = this.target.clone().sub(p); d.y = 0;
+      const dist = d.length(), step = this.effSpeed * dt;
+      let off0 = Math.atan2(d.x, d.z) - this.yaw; off0 = Math.abs(Math.atan2(Math.sin(off0), Math.cos(off0)));
+      // there (or a hair's breadth off to the side: it stops where it is, no shuffle onto the spot)
+      if (dist <= step || (dist < 0.05 && off0 > 0.3)) {
+        if (dist <= step) p.copy(this.target); else p.y = this.target.y;
         if (this.path?.length) { this.target = this.path.shift(); moving = true; heading = this.lastHeading; }
         else { this.target = null; this._arrive?.(); this._arrive = null; }
       } else {
@@ -451,22 +460,35 @@ export class Animal3D {
         let off = heading - this.yaw; off = Math.atan2(Math.sin(off), Math.cos(off));
         // a real animal walks round a bend: it keeps going, slower the sharper the turn
         // (only a near about-turn is taken almost on the spot)
-        const a = Math.abs(off), k = a > 1.6 ? 0.1 : a > 0.9 ? 0.3 : a > 0.4 ? 0.6 : a > 0.15 ? 0.85 : 1;
-        p.addScaledVector(d.normalize(), step * k); moving = true; stepK = k;
+        const a = Math.abs(off);
+        let k = a > 1.6 ? 0.1 : a > 0.9 ? 0.3 : a > 0.4 ? 0.6 : a > 0.15 ? 0.85 : 1;
+        // but never round a bend so wide that the goal lies inside it: it would circle the
+        // goal for ever (a spin). Then it turns on the spot first, and walks once it faces it.
+        const radius = this.effSpeed * k / 1.6;
+        if (a > 0.15 && dist < 2.4 * radius + 0.03) k = 0;
+        // it goes where its body points (never sideways): a real curve, the height (steps)
+        // following in proportion
+        const adv = step * k;
+        p.x += Math.sin(this.yaw) * adv; p.z += Math.cos(this.yaw) * adv;
+        p.y += (this.target.y - p.y) * Math.min(1, adv / Math.max(dist, 1e-6));
+        moving = true; stepK = k;
       }
     }
     // facing: travel heading while moving, else side-on (dir), plus a turn towards the viewer
     let want = (heading ?? (this.dir > 0 ? Math.PI / 2 : -Math.PI / 2)) + this.lookA * 1.8 * this.dir;
     if (!moving && this.faceYaw !== undefined && this.faceYaw !== null) {
       want = this.faceYaw;
-      if (!this.aimChain.length) {                 // no neck: look over at it, three-quarter, not fully away
+      if (!this.aimChain.length && !this.faceFull) {   // no neck: look over at it, three-quarter, not fully away
         const sideOn = Math.sin(this.yaw) >= 0 ? Math.PI / 2 : -Math.PI / 2;
         const d0 = THREE.MathUtils.clamp(Math.atan2(Math.sin(this.faceYaw - sideOn), Math.cos(this.faceYaw - sideOn)), -0.8, 0.8);
         want = this.yaw + Math.atan2(Math.sin(sideOn + d0 - this.yaw), Math.cos(sideOn + d0 - this.yaw));
       }
     }
-    if (!moving && this.gazeAt) {
-      const lp = this.group.parent ? this.group.parent.worldToLocal(this.gazeAt.clone()) : this.gazeAt;
+    const gazeLp = this.gazeAt ? (this.group.parent ? this.group.parent.worldToLocal(this.gazeAt.clone()) : this.gazeAt) : null;
+    // something standing right on top of it has no clear direction (it would flip from side to side)
+    const gazeOk = gazeLp && Math.hypot(gazeLp.x - p.x, gazeLp.z - p.z) > this._h * (this.length || 1) * 0.6;
+    if (!moving && gazeOk) {
+      const lp = gazeLp;
       const toward = Math.atan2(lp.x - p.x, lp.z - p.z);
       let off = toward - this.yaw; off = Math.atan2(Math.sin(off), Math.cos(off));
       // like a real animal: the body turns only until the head can reach (≤ ~50°).
@@ -495,6 +517,19 @@ export class Animal3D {
       if (Math.abs(dy) < 0.1) this.yawV = 0;                         // near enough: it stands still
       else if (Math.abs(this.yawV) < 0.35) this.yawV = Math.sign(dy) * 0.35;   // otherwise it steps round
     }
+    // hard limits, whatever asks for a turn: standing, it never turns more than half round in
+    // one go (then it holds still a moment); walking to one goal, it never circles it
+    if (this.turnHold > 0) { this.turnHold -= dt; if (!moving) this.yawV = 0; }
+    if (!moving) {
+      this.standTurn = (this.standTurn || 0) + this.yawV * dt;
+      if (Math.abs(this.standTurn) > Math.PI + 0.25) { this.yawV = 0; this.standTurn = 0; this.turnHold = 1.5; }
+    } else this.standTurn = 0;
+    if (Math.abs(this.yawV) < 1e-3) this.standTurn = 0;
+    if (this.target !== this._turnGoal) { this._turnGoal = this.target; this.goalTurn = 0; }
+    if (this.target) {
+      this.goalTurn += this.yawV * dt;
+      if (Math.abs(this.goalTurn) > Math.PI * 2) { this.goalTurn = 0; this.yawV = 0; this.path = []; this.stop(); }
+    }
     this.yaw += this.yawV * dt;
     this.inner.rotation.y = this.yaw;
     // turning round is done by stepping round: the legs walk while the body turns
@@ -510,14 +545,16 @@ export class Animal3D {
       }
     } else {
       this.idleT -= dt;
-      if (this.idleT < 0 && !this.gazeAt && !this.calm) {   // now and then: graze or look around
-        this.play(Math.random() < 0.5 ? 'eat' : 'idle2', 0.4);
-        setTimeout(() => { if (!this.target) this.play('idle', 0.5); }, 2600);
-        this.idleT = 5 + Math.random() * 6;
-      } else if (this.current === this.actions.walk || this.current === this.actions.run) this.play('idle', 0.3);
+      // (it only ever stands, walks or turns: no grazing, lying down or other surprises)
+      if (this.current === this.actions.walk || this.current === this.actions.run) this.play('idle', 0.3);
       if (this.current) this.current.timeScale = 1;
     }
+    // the bend is never added on top of last frame's bend: every spine bone goes back to its
+    // own pose first (a bone the animation does not move would otherwise keep turning, frame
+    // after frame, all the way round)
+    if (this._spineQ) this.spine.forEach((b, i) => b.quaternion.copy(this._spineQ[i]));
     this.mixer.update(dt);
+    if (this.spine?.length) this._spineQ = this.spine.map(b => b.quaternion.clone());
     // the body curves into the turn: each spine bone takes a share of the bend
     this.bend = (this.bend || 0) + (THREE.MathUtils.clamp((this.yawV || 0) * 0.32, -0.42, 0.42) - (this.bend || 0)) * Math.min(1, dt * 5);
     if (this.spine?.length && Math.abs(this.bend) > 0.004) {
