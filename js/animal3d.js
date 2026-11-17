@@ -410,7 +410,8 @@ export class Animal3D {
     return new Promise(res => { this._arrive = res; });
   }
   // face a fixed direction while standing (yaw: 0 = towards you, PI = towards the wall)
-  face(yaw, full = false) { this.faceYaw = yaw; this.faceFull = full; }
+  // dir: +1 turn to its left (yaw increasing), -1 to its right, 0 the short way
+  face(yaw, full = false, dir = 0) { this.faceYaw = yaw; this.faceFull = full; this.faceDir = dir; }
   stop() { this.target = null; this._arrive?.(); this._arrive = null; }
   hopOnce(h = 0.1) { this.hopT = 0; this.hopH = h; }
   // a one-off movement from the model's own clips (a head shake, a call), then back to idle
@@ -509,6 +510,17 @@ export class Animal3D {
     // a turn under way keeps its direction: with the target right behind, the short way
     // round would flip from side to side (a spin back and forth)
     if (Math.abs(dy) > 2.9 && Math.abs(this.yawV || 0) > 0.25 && Math.sign(dy) !== Math.sign(this.yawV)) dy += Math.sign(this.yawV) * Math.PI * 2;
+    if (!moving) {
+      // a turn asked for in a given direction goes that way round (only while far from done:
+      // a hair past the goal must not send it all the way round again)
+      if (this.faceDir && this.faceYaw != null && !this.gazeAt && Math.abs(dy) > 0.5 && Math.sign(dy) !== this.faceDir) dy += this.faceDir * Math.PI * 2;
+      // and standing, it never swings round through a direction it should not face (in the
+      // hall: towards the next painting); it goes the other way round
+      if (this.avoidYaw != null) {
+        const rel = Math.atan2(Math.sin(this.avoidYaw - this.yaw), Math.cos(this.avoidYaw - this.yaw));
+        if (Math.abs(rel) > 0.35 && Math.sign(rel) === Math.sign(dy) && Math.abs(rel) < Math.abs(dy)) dy -= Math.sign(dy) * Math.PI * 2;
+      }
+    }
     const k = moving ? 9 : 4.5;
     this.yawV = ((this.yawV || 0) + (dy * k * k - 2 * k * (this.yawV || 0)) * dt);
     // a stepping turn: never faster than an animal can turn on its feet
@@ -522,7 +534,7 @@ export class Animal3D {
     if (this.turnHold > 0) { this.turnHold -= dt; if (!moving) this.yawV = 0; }
     if (!moving) {
       this.standTurn = (this.standTurn || 0) + this.yawV * dt;
-      if (Math.abs(this.standTurn) > Math.PI + 0.25) { this.yawV = 0; this.standTurn = 0; this.turnHold = 1.5; }
+      if (Math.abs(this.standTurn) > Math.PI * 1.5) { this.yawV = 0; this.standTurn = 0; this.turnHold = 1.5; }
     } else this.standTurn = 0;
     if (Math.abs(this.yawV) < 1e-3) this.standTurn = 0;
     if (this.target !== this._turnGoal) { this._turnGoal = this.target; this.goalTurn = 0; }

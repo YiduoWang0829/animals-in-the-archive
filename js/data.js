@@ -23,7 +23,7 @@ export const WORKS = [
     size: [2400, 2002], realWidth: 2.0,
     hosts: ['hicks-ox', 'hicks-leopard2'],      // the standing ones (lying and sitting animals don't speak)
     kinds: ['lion', 'wolf', 'cattle', 'bear'],
-    walk: [0.05, 0.39],       // the open path on the left; the animals (from the sleeping bear on) crowd the right
+    walk: [0.04, 0.36],       // the open path on the left; the animals (from the sleeping bear on) crowd the right
     ground: [0.1, 0.24],      // the dark earth the animals rest on, rising towards the trees
     wall: 0x26241f,
   },

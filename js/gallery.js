@@ -631,6 +631,7 @@ export class Gallery {
   // ---- the gallery tour: just the visitor and you ----------------------------
   async walkIn() {
     const f = this.from, v = this.visitor, half = (v.length || v.aspect || 1) * v.height / 2;
+    v.avoidYaw = Math.PI / 2;
     const z = Math.max(1.3, 0.54 + half + 0.25);         // the steps end at z = 0.54
     await v.walkTo([new THREE.Vector3(f * 1.9, 0, z + 0.2), new THREE.Vector3(f * 0.8, 0, z)], 0.55);
   }
@@ -643,7 +644,7 @@ export class Gallery {
   }
   // walk off towards another painting on the wall; the view turns with it
   async leaveToward(side) {
-    const v = this.visitor; v.face?.(null); v.attend?.(false);
+    const v = this.visitor; v.face?.(null); v.attend?.(false); v.avoidYaw = null;   // (it may turn either way to go)
     this.follow = false;
     const from = this.camBase.clone(), look = this.camLook.clone();
     v.walkTo(new THREE.Vector3(side * 3.4, 0, 1.45), 0.75);
@@ -678,11 +679,18 @@ export class Gallery {
     v.face?.(Math.PI, true); v.setDir?.(1);                 // squarely towards the label
     await this.wait(0.5);
   }
-  // it stays at the label and tells you about the picture from there, only turning its head
-  // and shoulders a little towards it (no walking off, no turning its back)
+  // having read the label it turns to you, always by its left (the side of the painting and
+  // of you), never swinging round towards the next picture
+  async lookBack() {
+    this.visitor.face?.(-0.55, true, 1);
+    await this.wait(1.4);
+  }
+  // then it walks over to the middle, in front of the picture, and looks at it
   async toPainting() {
-    this.visitor.face?.(Math.PI + 0.45, true);
-    await this.wait(0.4);
+    const v = this.visitor, L = this.bodyLen();
+    await this.goTo([new THREE.Vector3(0.05, 0, Math.max(1.1, 0.54 + L / 2 + 0.22))], 0.45);
+    v.face?.(Math.PI, true);
+    await this.wait(0.9);
   }
   talkToYou(on) { this.visitor.face?.(null); this.visitor.attend?.(on); }
 
@@ -720,7 +728,7 @@ export class Gallery {
   // ---- step into the picture ------------------------------------------------
   async enter() {
     const v = this.visitor;
-    v.face?.(null); v.attend?.(false);
+    v.face?.(null); v.attend?.(false); v.avoidYaw = null;
     // one continuous walk: to the steps, up them, across the frame
     this.follow = true;
     const x = -0.1;
@@ -737,7 +745,11 @@ export class Gallery {
     const dist = Math.min(this.ph / 2 / Math.tan(vf), this.pw / 2 / (Math.tan(vf) * this.camera.aspect)) * 0.76;
     this.maxZoom = dist * 0.72; this.viewDist = dist;
     const recede = dist + 0.3;
-    const camTo = new THREE.Vector3(0, this.cy, dist - recede - 0.03), lookTo = new THREE.Vector3(0, this.cy, -recede);
+    // inside, the picture is shown whole and in its own proportions, face on (as on the wall,
+    // only nearer): you zoom in yourself if you want to (two hands apart, or the wheel)
+    const tanV = Math.tan(vf);
+    const fit = Math.max(this.ph / 2 / tanV, this.pw / 2 / (tanV * this.camera.aspect)) * 1.12;
+    const camTo = new THREE.Vector3(0, this.cy, -recede - 0.03 + fit), lookTo = new THREE.Vector3(0, this.cy, -recede - 1);
     // in proportion with the painted animals: each one, with its real-life height, says how big
     // a metre is in this picture; the visitor takes its own real height on that scale
     const h0 = v.height, vr = this.o.visitorRealH || 0.8;
@@ -755,6 +767,10 @@ export class Gallery {
     this.paintU.uDepth.value = keep; v.setHeight(hNow);
     v.walkTo(inside, 0.22);
     this.keyLight.intensity = 0;
+    // (this happens behind the title card) inside there is only the picture: the room, its
+    // steps, frame, label and the other paintings are put away, so the whole picture can be
+    // seen at its own proportions without the gallery showing round it
+    for (const o of this.scene.children) if (o !== this.paintGroup && !o.isLight && o !== this.camera) o.visible = false;
     await this.tween(3.6, e => {
       this.paintU.uDepth.value = depth0 + (depth1 - depth0) * e; this.paintU.uFill.value = e;
       this.camBase.lerpVectors(camFrom, camTo, e);
@@ -765,6 +781,7 @@ export class Gallery {
       for (const h of this.hosts) if (!h.awake) h.actor.position.z = this.paintPoint(h.homeUV[0], h.homeUV[1], 0.004).z;
     });
     v.setPaintAll?.(1);
+    this.view.zoom = this.view.tz = -1;      // the whole picture (see updateCamera: `wide`)
     this.paintU.uWind.value = 0;             // the picture holds still (a ripple reads as flicker)
     this.follow = true;                      // from now on the view keeps the visitor in sight
     this.lastLook = -99;
@@ -787,7 +804,8 @@ export class Gallery {
     // (for your animal: the painted ones belong there and keep to the relief check alone, or
     // several of them would be squeezed into one stretch and keep shuffling)
     const [u0, u1] = (a === this.visitor && this.o.work.walk) || [0, 1];
-    let lo = Math.max(-this.pw / 2 + w / 2 + 0.04, (u0 - 0.5) * this.pw + w / 2), hi = Math.min(this.pw / 2 - w / 2 - 0.04, (u1 - 0.5) * this.pw - w / 2);
+    // (a generous margin: an animal standing nearer than the picture looks a little bigger on it)
+    let lo = Math.max(-this.pw / 2 + w / 2 + 0.04, (u0 - 0.5) * this.pw + w * 0.65), hi = Math.min(this.pw / 2 - w / 2 - 0.04, (u1 - 0.5) * this.pw - w * 0.65);
     if (lo > hi) lo = hi = (lo + hi) / 2;
     const at = x0 => {
       const xx = THREE.MathUtils.clamp(x0, lo, hi);

@@ -516,9 +516,13 @@ async function runStory(g) {
   await Promise.all([g.toLabel(), speak('visitor', pickLine(t('tourArrive')))]);
   if (!alive()) return;
   await speak('visitor', t('tourLabel', { title: x.title, artist: x.artist, date: x.date }));
+  if (!alive()) return;
+  await g.lookBack();                                // it turns (by its left) to tell you more
   for (const f of x.facts) { if (!alive()) return; await speak('visitor', f); }
   if (!alive()) return;
-  await Promise.all([g.toPainting(), speak('visitor', t('tourSee', { animals: x.see }))]);
+  await g.toPainting();                              // over to the middle, to look at the picture
+  if (!alive()) return;
+  await speak('visitor', t('tourSee', { animals: x.see }));
   await speak('visitor', kind === 'drawing' ? t('tourDrawing')
     : w.kinds.includes(kind) ? t('tourSame', { kind: t(`kinds.${kind}`) }) : t('tourNotSame', { kind: t(`kinds.${kind}`) }));
   if (!alive()) return;
