@@ -107,7 +107,7 @@ export class Stage {
       const a = await loadAnimal3D(this.o.visitorGlb, { height: 1, look: this.o.visitorLook || 'real' });
       a.setHeight(H * 1.35);
       a.addTo(s);
-      a.group.position.set(-2.5, 0, 1.3);
+      a.group.position.set(-1.9, 0, 1.3);
       a.play?.('idle');
       this.actor = a;
       this.hallFig = a.group;
@@ -326,7 +326,7 @@ export class Stage {
       await a.walkTo([new THREE.Vector3(-1.6, 0, 1.35), new THREE.Vector3(this.spotX, 0, 1.15)], 0.5);
       a.face?.(0, true);                              // turns round to you
       const v = a.group.position;
-      await this.camTo(new THREE.Vector3(v.x + 0.9, Math.max(0.6, h * 0.9), v.z + 2.6), new THREE.Vector3(v.x, h * 0.55, v.z), 1.6);
+      await this.camTo(new THREE.Vector3(v.x + 0.9, Math.max(0.75, h * 1.05 + 0.1), v.z + 2.7), new THREE.Vector3(v.x, h * 0.95, v.z), 1.6);   // looking a little above it: its words have room
       return;
     }
     const v = this.hallFig.position;
@@ -335,27 +335,22 @@ export class Stage {
   talkToYou() {}
   async toLabel() {
     const l = this.label.position;
-    if (this.actor) {
-      this.actor.face?.(null);
-      this.camTo(new THREE.Vector3(l.x - 0.6, l.y * 0.8, 2.4), new THREE.Vector3(l.x - 0.2, l.y * 0.6, 0.6), 3);
-      await this.actor.walkTo(new THREE.Vector3(l.x - 0.15, 0, 0.75), 0.5);
-      this.actor.face?.(Math.PI, true);               // stands facing the label, reading it
-    }
-    await this.camTo(new THREE.Vector3(l.x - 0.2, l.y + 0.05, 1.25), l.clone(), 2.2);
+    const v = this.hallFig.position, h = this.hallHeight();
+    if (this.actor) this.actor.face?.(Math.atan2(l.x - v.x, l.z - v.z), true);   // it stays by the picture and turns to read the label
+    // from the front and to the right: its face and the label, never its back
+    await this.camTo(new THREE.Vector3(l.x + 0.55, Math.max(1.0, l.y + 0.3), 2.4), new THREE.Vector3((v.x + l.x) / 2, (h * 0.9 + l.y) / 2 + 0.1, 0.6), 2.2);
   }
   async lookBack() {
     this.actor?.face?.(-0.6, true, 1);                // turns (by its left) towards you
     const v = this.hallFig.position, h = this.hallHeight();
-    await this.camTo(new THREE.Vector3(v.x + 0.7, h * 0.8 + 0.2, v.z + 1.7), new THREE.Vector3(v.x, h * 0.6, v.z), 1.8);
+    await this.camTo(new THREE.Vector3(v.x + 0.7, h * 0.95 + 0.3, v.z + 1.8), new THREE.Vector3(v.x, h * 0.95, v.z), 1.8);
   }
   async toPainting() {
     const [pw, ph] = this.paintSize, h = this.hallHeight();
-    if (this.actor) {
-      this.actor.face?.(null);
-      await this.actor.walkTo(new THREE.Vector3(this.spotX, 0, 1.15), 0.5);
-      this.actor.face?.(Math.PI * 0.85, true);         // looking up at the picture
-    }
-    await this.camTo(new THREE.Vector3(0.15, 1.3, Math.max(3.2, pw * 1.6 + 1.2)), new THREE.Vector3(0, Math.max(1.1, 0.5 + h * 0.4), 0), 2.4);
+    const v = this.hallFig.position;
+    if (this.actor) this.actor.face?.(Math.PI * 0.82, true);     // turns to the picture, three-quarters (you see its face, not its back)
+    // from the side: the animal in profile at the left, the picture before it
+    await this.camTo(new THREE.Vector3(v.x + 3.4, Math.max(1.35, h + 0.8), v.z + 2.2), new THREE.Vector3(v.x + 0.5, Math.max(1.0, h * 1.2), 0.3), 2.4);
   }
   async leaveToward() {}
   sideAt() { return null; }
@@ -367,7 +362,25 @@ export class Stage {
     const vfov = this.camera.fov, tanY = Math.tan(THREE.MathUtils.degToRad(vfov / 2));
     const dist = Math.max(ph / 2 / tanY, pw / 2 / (tanY * this.camera.aspect)) * 1.0;
     const pc = this.paintGroup.position;
-    if (this.actor) { this.actor.face?.(null); this.actor.walkTo(new THREE.Vector3(0, 0, 0.5), 0.5); }
+    // you watch it from the side: it turns to the picture, walks straight up to it, steps up onto the
+    // painted ground at the foot of the frame and, a little smaller with every step (going into
+    // the depth), passes through the picture plane and is gone into the painting
+    this.walkedIn = Promise.resolve();
+    if (this.actor) {
+      const a = this.actor, g = a.group, foot = Math.max(0, pc.y - ph / 2 + 0.03), s0 = g.scale.x, z0 = 0.95, z1 = pc.z - 0.45;
+      a.face?.(null);
+      this.camTo(new THREE.Vector3(pc.x + 2.1, Math.max(1.0, foot + 0.6), 1.5), new THREE.Vector3(pc.x + 0.1, foot * 0.6 + 0.35, 0.45), 2.2);   // from the side: it crosses into the picture in profile
+      this.walkedIn = (async () => {
+        await Promise.race([a.walkTo(new THREE.Vector3(pc.x, 0, z0), 0.55), sleep(6000)]);
+        let raf = 0;
+        const follow = () => { const z = g.position.z, k = THREE.MathUtils.clamp((z0 - z) / (z0 - pc.z), 0, 1), e = k * k * (3 - 2 * k);
+          g.position.y = foot * e; g.scale.setScalar(s0 * (1 - 0.4 * e)); raf = requestAnimationFrame(follow); };
+        follow();
+        await Promise.race([a.walkTo(new THREE.Vector3(pc.x, foot, z1), 0.5), sleep(6000)]);
+        cancelAnimationFrame(raf); g.scale.setScalar(s0);
+      })();
+      await this.walkedIn;
+    }
     await this.camTo(new THREE.Vector3(pc.x, pc.y, pc.z + dist + 0.02), pc.clone(), 2.6);
     await this.worldReady;
     // behind the title card: the same picture, now as its 3D world seen from the painter's eye

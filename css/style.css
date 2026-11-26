@@ -338,7 +338,8 @@ body.in-stage .footer, body.in-sculpt .footer { display: none; }
 .create-modes button[aria-selected="true"] { background: var(--ink); color: #15130f; }
 .compose-wrap { position: absolute; inset: 72px 16px 110px; display: grid; place-items: center; }
 .compose-wrap canvas { box-shadow: 0 30px 80px rgba(0,0,0,.6); touch-action: none; cursor: grab; }
-#create-status { top: 76px; }
+#create-status { top: 16px; }
+@media (max-width: 1000px) { #create-status { top: 76px; } }
 .hand-cursor.second { border-color: #9fb4d8; }
 .sculpt-tools select { background: rgba(0,0,0,.25); color: var(--ink); border: 1px solid var(--line-2); border-radius: 999px; min-height: 38px; padding: 0 12px; font: 13px var(--sans); }
 
@@ -545,13 +546,13 @@ html[lang="zh"] .crossing .line, html[lang="ko"] .crossing .line { letter-spacin
 .coll-item .look { display: inline-block; margin-top: 4px; font: 400 10px var(--mono); color: var(--accent-2); letter-spacing: .1em; text-transform: uppercase; }
 .coll-more { grid-column: 1 / -1; justify-self: center; margin-top: 8px; }
 /* the visitor's view inside a painting */
-.view-caption { position: absolute; left: 50%; top: 74px; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 10px;
+.view-caption { position: absolute; left: 50%; top: auto; bottom: 104px; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 10px;
   background: rgba(14,12,10,.62); backdrop-filter: blur(10px); border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; font: 400 13px var(--sans); color: var(--ink); white-space: nowrap; }
 .view-caption .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
 .view-caption .sep { color: var(--muted); }
 .view-caption button { font: 400 11px var(--mono); letter-spacing: .06em; color: var(--ink-2); background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px; cursor: pointer; }
 .view-caption button[aria-pressed="true"] { color: #17130d; background: var(--accent); border-color: var(--accent); }
-@media (max-width: 620px) { .view-caption { top: 62px; font-size: 11px; flex-wrap: wrap; justify-content: center; white-space: normal; max-width: calc(100vw - 32px); } }
+@media (max-width: 620px) { .view-caption { bottom: 150px; font-size: 11px; flex-wrap: wrap; justify-content: center; white-space: normal; max-width: calc(100vw - 32px); } }
 /* collage: what the animals do, said in one line */
 .collage-say { position: absolute; left: 50%; bottom: 92px; transform: translateX(-50%) translateY(8px); opacity: 0; transition: opacity .4s, transform .4s; z-index: 7;
   background: rgba(14,12,10,.78); border: 1px solid var(--line); border-radius: 12px; padding: 9px 16px; font: italic 400 17px/1.4 var(--serif); color: var(--ink); max-width: min(640px, calc(100vw - 32px)); text-align: center; pointer-events: none; }
