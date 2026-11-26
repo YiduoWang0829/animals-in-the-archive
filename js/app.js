@@ -369,7 +369,7 @@ function placeBubbles(g) {
   }
   const chip = !$('#cam-chip').hidden ? $('#cam-chip').getBoundingClientRect() : null;
   for (const { el, p } of items) {
-    let x = Math.max(170, Math.min(innerWidth - 170, p.x)), y = Math.min(innerHeight - 120, Math.max(160, p.y));
+    let x = Math.max(170, Math.min(innerWidth - 170, p.x)), y = Math.min(innerHeight - 120, Math.max(130 + (el.offsetHeight || 90), p.y));   // always some air above a bubble
     // keep clear of the camera window
     if (chip && x + 170 > chip.left - 10 && y - el.offsetHeight - 14 < chip.bottom + 10) x = Math.min(x, chip.left - 180);
     // and never over the hint box (the bubble moves down below it)
@@ -614,38 +614,19 @@ const kindOf = () => {
 // ---- part 1: the gallery. Only your animal and you. It reads the label, looks,
 // tells you what it sees, and asks before walking in.
 async function runStory(g) {
+  // short: it reads the label, says one thing about the picture and what it sees in it, and asks
+  // to go in (four lines; a click or Space moves on to the next one)
   const tok = storyToken, alive = () => g === gallery && tok === storyToken;
-  const w = state.work, x = W(w.id), kind = kindOf();
+  const w = state.work, x = W(w.id);
   await g.walkIn();
   if (!alive()) return;
-  if (state.switched) await speak('visitor', pickLine(t('switchArrive')));
-  else {
-    g.talkToYou(true);
-    await speak('visitor', pickLine(t('visitorHello')));
-    if (tracker && alive()) {                       // invite a wave (only with the camera on)
-      status(esc(t('waveHint')));
-      await new Promise(res => { waveWaiter = res; setTimeout(res, 3500); });
-      waveWaiter = null; status('');
-    }
-    g.talkToYou(false);
-  }
-  await Promise.all([g.toLabel(), speak('visitor', pickLine(t('tourArrive')))]);
+  await Promise.all([g.toLabel(), speak('visitor', t('tourLabel', { title: x.title, artist: x.artist, date: x.date }))]);
   if (!alive()) return;
-  await speak('visitor', t('tourLabel', { title: x.title, artist: x.artist, date: x.date }));
+  if (x.facts?.[0]) await Promise.all([g.lookBack(), speak('visitor', x.facts[0])]);
   if (!alive()) return;
-  await g.lookBack();                                // it turns (by its left) to tell you more
-  for (const f of x.facts) { if (!alive()) return; await speak('visitor', f); }
-  if (!alive()) return;
-  await g.toPainting();                              // over to the middle, to look at the picture
-  if (!alive()) return;
-  await speak('visitor', t('tourSee', { animals: x.see }));
-  await speak('visitor', kind === 'drawing' ? t('tourDrawing')
-    : (w.kinds || []).includes(kind) ? t('tourSame', { kind: t(`kinds.${kind}`) }) : t('tourNotSame', { kind: t(`kinds.${kind}`) }));
+  await Promise.all([g.toPainting(), speak('visitor', t('tourSee', { animals: x.see }))]);
   if (!alive()) return;
   g.talkToYou(true);
-  const like = await askUser('visitor', t('tourLikeQ'));
-  if (!like || !alive()) return;
-  await speak('visitor', like === 'yes' ? t('tourLikeYes') : t('tourLikeNo'));
   await askToGoIn(g);
 }
 
@@ -654,7 +635,7 @@ async function askToGoIn(g) {
   const go = await askUser('visitor', t('tourGoQ'));
   if (!go || g !== gallery || tok !== storyToken) return;
   state.answer = go;
-  if (go === 'yes') { await speak('visitor', t('tourGoYes')); stepIn(g); }
+  if (go === 'yes') stepIn(g);
   else {
     await speak('visitor', t('tourGoNo'));
     controls(`<button class="btn" data-action="home">${esc(t('anotherPainting'))}</button>
@@ -672,7 +653,9 @@ async function stepIn(g = gallery) {
   // screen is dark a title card says what is about to happen. The walk through the frame
   // (and the moment the relief opens up) happens behind the card.
   const entering = g.enter();
-  await sleep(650);
+  await sleep(100);
+  await Promise.race([g.walkedIn || sleep(650), sleep(12000)]);     // you see it walk into the picture first
+  await sleep(500);
   if (!alive()) return;
   const x = W(state.work.id);
   await crossing(g, [
@@ -956,8 +939,9 @@ stage3d.addEventListener('pointerup', e => {
   if (gallery.visitorAt(nx, ny)) return greetBack();       // click your animal: it greets you
   const other = gallery.sideAt(nx, ny);
   if (other) return switchWork(other.id, other.side);
-  // in the room, a click moves the talk on
+  // a click moves the talk on: in the room always, inside the painting whenever someone is speaking
   if (!gallery.inside) return advanceLine();
+  if ([...bubbles.values()].some(b => b.classList.contains('show')) && !pendingAnswer) return advanceLine();
   tapInside(nx, ny);
 });
 stage3d.addEventListener('wheel', e => { if (gallery?.inside) { e.preventDefault(); gallery.zoomBy(-e.deltaY * 0.0015); } }, { passive: false });
@@ -1522,5 +1506,6 @@ renderIndex();
 window.__aia = { state, STRINGS, get gallery() { return gallery; },
   // testing only: feed fake camera input (a face, hands, a gesture) without a camera
   works: () => WORKS.map(w => w.id),
+  visit: (id, animal = 'deer') => { state.work = workOf(id); state.role ??= 'visitor'; state.name ??= 'Test'; return enterStage({ kind: 'animal3d', id: animal }); },
   create: (id, animal = 'wolf', mode = 'sculpt') => { teardown(); composer?.dispose?.(); composer = null; state.work = workOf(id); state.visitor = { kind: 'animal3d', id: animal }; state.hosts ??= []; state.role ??= 'visitor'; state.name ??= 'Test'; return enterCreate(mode); },
   sim: { face: f => { face = f; }, hands: h => { hands = h; onHands(h); }, gesture: x => onGesture(x) } };   // console/debug access only
