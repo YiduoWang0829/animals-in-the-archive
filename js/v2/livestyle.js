@@ -67,7 +67,7 @@ const STYLE_FRAG = /* glsl */`
     if (uLook < 1.5) {                                      // oil: glaze, brushwork, chiaroscuro
       float stroke = sNoise(vec3(vObjP.x * 30.0, vObjP.y * 9.0, vObjP.z * 80.0)) * 0.6 + sNoise(vObjP * 220.0) * 0.4;
       float k = diff + (stroke - 0.5) * 0.35;
-      c = mix(alb, palNearest(alb), 0.45) * mix(vec3(0.35, 0.33, 0.4), vec3(1.25, 1.12, 0.92), smoothstep(-0.1, 1.0, k));
+      c = mix(alb, palNearest(alb), 0.8) * mix(vec3(0.35, 0.33, 0.4), vec3(1.25, 1.12, 0.92), smoothstep(-0.1, 1.0, k));
       c = mix(uPal[0] * 0.4, c, 0.3 + 0.7 * smoothstep(-0.1, 0.8, k));
       c += vec3(1.0, 0.85, 0.6) * smoothstep(0.75, 1.0, rim) * 0.08;
     } else if (uLook < 2.5) {                               // gilded: tempera colour, gold edge, craquelure
@@ -133,7 +133,7 @@ function styleMaterial(src, look, uniforms) {
 }
 
 // skinned splats: a SkinnedMesh drawn as points (so its strokes follow the bones)
-function skinnedSplats(mesh, uniforms, { dots, count }) {
+function skinnedSplats(mesh, uniforms, { dots, count, size = null }) {
   const g = mesh.geometry, P = g.attributes.position, N = g.attributes.normal, UV = g.attributes.uv;
   const SI = g.attributes.skinIndex, SW = g.attributes.skinWeight;
   const n = Math.min(count, P.count);
@@ -145,14 +145,16 @@ function skinnedSplats(mesh, uniforms, { dots, count }) {
   geo.setAttribute('position', new THREE.BufferAttribute(take(P, 3), 3));
   if (N) geo.setAttribute('normal', new THREE.BufferAttribute(take(N, 3), 3));
   if (UV) geo.setAttribute('uv', new THREE.BufferAttribute(take(UV, 2), 2));
-  geo.setAttribute('skinIndex', new THREE.BufferAttribute(Float32Array.from(take(SI, 4)), 4));
-  geo.setAttribute('skinWeight', new THREE.BufferAttribute(take(SW, 4), 4));
+  if (SI && SW && mesh.isSkinnedMesh) {
+    geo.setAttribute('skinIndex', new THREE.BufferAttribute(Float32Array.from(take(SI, 4)), 4));
+    geo.setAttribute('skinWeight', new THREE.BufferAttribute(take(SW, 4), 4));
+  }
   const rnd = new Float32Array(n); for (let i = 0; i < n; i++) rnd[i] = Math.random();
   geo.setAttribute('aRnd', new THREE.BufferAttribute(rnd, 1));
   const srcMat = [].concat(mesh.material)[0];
   const mat = new THREE.ShaderMaterial({
     uniforms: { ...uniforms, uMap: { value: srcMat.map || null }, uHasMap: { value: srcMat.map ? 1 : 0 }, uBase: { value: srcMat.color?.clone() || new THREE.Color(1, 1, 1) },
-      uSize: { value: dots ? 0.012 : 0.02 }, uPx: { value: 800 }, uDots: { value: dots ? 1 : 0 } },
+      uSize: { value: size ?? (dots ? 0.012 : 0.02) }, uPx: { value: 800 }, uDots: { value: dots ? 1 : 0 } },
     vertexShader: /* glsl */`
       #include <common>
       #include <skinning_pars_vertex>
@@ -173,9 +175,11 @@ function skinnedSplats(mesh, uniforms, { dots, count }) {
         float diff = max(dot(n, normalize(vec3(-0.45, 0.75, 0.5))), 0.0);
         vec3 alb = uBase;
         if (uHasMap > 0.5) alb *= texture2D(uMap, uv).rgb;
-        vec3 c = mix(alb, palNearest(alb), uDots > 0.5 ? 0.85 : 0.55) * (0.5 + 0.75 * diff);
+        vec3 c = mix(alb, palNearest(alb), uDots > 0.5 ? 0.85 : 0.75) * (0.5 + 0.75 * diff);
         if (uDots > 0.5) c = mix(c, palRamp(sLum(c) + (aRnd - 0.5) * 0.4), 0.45);   // Seurat: neighbouring pure dots
-        else c += (aRnd - 0.5) * 0.05;
+        else c = mix(c, palRamp(sLum(c) * 1.1 + (aRnd - 0.5) * 0.3) * (0.6 + 0.6 * diff), 0.3);   // the painting's own neighbouring tones
+        if (uLook > 5.5 && uLook < 6.5) c = mix(uHue, palAt(aRnd), aRnd < 0.28 ? 0.7 : 0.0) * (0.45 + 0.8 * diff);   // Marc: one pure colour
+        else if (uLook > 2.5 && uLook < 3.5) c = mix(mix(uPal[0], vec3(0.01), 0.7), uPal[7] * 0.95 + 0.03, clamp(diff * 0.9 + 0.2 - (1.0 - smoothstep(0.0, 0.5, sLum(alb))) * 0.5, 0.0, 1.0));   // ink wash
         vC = c;
         vAng = aRnd * 6.2831;
         float s = uSize * (0.7 + aRnd * 0.6);
@@ -195,6 +199,8 @@ function skinnedSplats(mesh, uniforms, { dots, count }) {
         #include <colorspace_fragment>
       }`,
   });
+  // a part with no bones (antlers, horns): plain points that ride on it
+  if (!mesh.isSkinnedMesh) { const pt = new THREE.Points(geo, mat); pt.frustumCulled = false; pt.position.copy(mesh.position); pt.quaternion.copy(mesh.quaternion); pt.scale.copy(mesh.scale); return pt; }
   // a skinned mesh, drawn as points: the renderer still binds its skeleton
   const sp = new THREE.SkinnedMesh(geo, mat);
   sp.isMesh = false; sp.isPoints = true;
@@ -203,7 +209,9 @@ function skinnedSplats(mesh, uniforms, { dots, count }) {
   return sp;
 }
 
-export function styleActor(actor, look, pal, { renderer } = {}) {
+export function styleActor(actor, look, pal, { renderer, coat = null, size = 0.02 } = {}) {
+  // coat: inside a painting (drawn as brush splats or dots) the animal wears the same strokes, in the
+  // painting's own colours, over its re-painted body, so it reads as painted like everything round it
   // the deformation's lattice: about a fifth of the animal's size (from its own meshes)
   let rad = 0; actor.root.traverse(o => { if (o.isMesh && o.geometry) { o.geometry.computeBoundingSphere(); rad = Math.max(rad, o.geometry.boundingSphere.radius); } });
   // the painting's purest strong colour (not too dark, most saturated): the facet look's body colour
@@ -218,10 +226,12 @@ export function styleActor(actor, look, pal, { renderer } = {}) {
     o.userData.ownMaterial ??= o.material;
     o.material = Array.isArray(o.material) ? o.material.map(m => styleMaterial(m, look, uniforms)) : styleMaterial(o.material, look, uniforms);
     o.material.extensions = { derivatives: true };
-    if ((look === 'splat' || look === 'dots') && o.isSkinnedMesh) splats.push(o);
+    if (((look === 'splat' || look === 'dots') && o.isSkinnedMesh) || (coat && o.geometry?.attributes.position)) splats.push(o);
   });
   for (const o of splats) {
-    const sp = skinnedSplats(o, uniforms, { dots: look === 'dots', count: look === 'dots' ? 22000 : 16000 });
+    const dots = look === 'dots' || coat === 'points';
+    const share = o.isSkinnedMesh ? 1 : 0.25;
+    const sp = skinnedSplats(o, uniforms, { dots, count: Math.round((coat ? 30000 : dots ? 22000 : 16000) * share), size: coat ? size * (dots ? 0.6 : 1) * (o.isSkinnedMesh ? 1 : 0.55) : null });
     o.parent.add(sp);
     (actor.splatMeshes ||= []).push(sp);
   }
@@ -234,6 +244,7 @@ export function styleActor(actor, look, pal, { renderer } = {}) {
   }
   if (actor.uniforms?.uOutline && lineLooks[look]) actor.uniforms.uOutline.value = lineLooks[look][1];
   actor.styled = look;
+  actor.setCoat = mode => { for (const s of actor.splatMeshes || []) s.material.uniforms.uDots.value = mode === 'points' ? 1 : 0; };
   actor.updateStyle = r => { for (const s of actor.splatMeshes || []) s.material.uniforms.uPx.value = r.domElement.height; };
   return actor;
 }
