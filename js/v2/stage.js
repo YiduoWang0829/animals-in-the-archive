@@ -324,34 +324,32 @@ export class Stage {
       const a = this.actor, h = this.hallHeight();
       this.camTo(new THREE.Vector3(-0.6, Math.max(0.7, h), 3.6), new THREE.Vector3(-1.2, h * 0.5, 1.2), 3.5);
       await a.walkTo([new THREE.Vector3(-1.6, 0, 1.35), new THREE.Vector3(this.spotX, 0, 1.15)], 0.5);
-      a.face?.(0, true);                              // turns round to you
-      const v = a.group.position;
-      await this.camTo(new THREE.Vector3(v.x + 0.9, Math.max(0.75, h * 1.05 + 0.1), v.z + 2.7), new THREE.Vector3(v.x, h * 0.95, v.z), 1.6);   // looking a little above it: its words have room
+      // it stops and looks straight at the label (no turning round first), and the camera comes round to its face
+      const l = this.label.position, v = a.group.position;
+      a.face?.(Math.atan2(l.x - v.x, l.z - v.z), true);
+      await this.labelView(1.8);
       return;
     }
     const v = this.hallFig.position;
     await this.camTo(new THREE.Vector3(v.x + 0.9, Math.max(0.6, this.hallHeight() * 0.9), v.z + 2.6), new THREE.Vector3(v.x, this.hallHeight() * 0.55, v.z), 2.6);
   }
   talkToYou() {}
-  async toLabel() {
-    const l = this.label.position;
-    const v = this.hallFig.position, h = this.hallHeight();
-    if (this.actor) this.actor.face?.(Math.atan2(l.x - v.x, l.z - v.z), true);   // it stays by the picture and turns to read the label
+  labelView(sec) {
     // from the front and to the right: its face and the label, never its back
-    await this.camTo(new THREE.Vector3(l.x + 0.55, Math.max(1.0, l.y + 0.3), 2.4), new THREE.Vector3((v.x + l.x) / 2, (h * 0.9 + l.y) / 2 + 0.1, 0.6), 2.2);
+    const l = this.label.position, v = this.hallFig.position, h = this.hallHeight();
+    return this.camTo(new THREE.Vector3(l.x + 0.55, Math.max(1.0, l.y + 0.3), 2.4), new THREE.Vector3((v.x + l.x) / 2, (h * 0.9 + l.y) / 2 + 0.1, 0.6), sec);
+  }
+  async toLabel() {
+    // it is already looking at the label: it just reads it out, without turning about
+    if (this.actor) return;
+    await this.labelView(2.2);
   }
   async lookBack() {
-    this.actor?.face?.(-0.6, true, 1);                // turns (by its left) towards you
+    this.actor?.face?.(-0.6, true);                   // done reading, it turns the short way (past you, never its back) and says hello
     const v = this.hallFig.position, h = this.hallHeight();
     await this.camTo(new THREE.Vector3(v.x + 0.7, h * 0.95 + 0.3, v.z + 1.8), new THREE.Vector3(v.x, h * 0.95, v.z), 1.8);
   }
-  async toPainting() {
-    const [pw, ph] = this.paintSize, h = this.hallHeight();
-    const v = this.hallFig.position;
-    if (this.actor) this.actor.face?.(Math.PI * 0.82, true);     // turns to the picture, three-quarters (you see its face, not its back)
-    // from the side: the animal in profile at the left, the picture before it
-    await this.camTo(new THREE.Vector3(v.x + 3.4, Math.max(1.35, h + 0.8), v.z + 2.2), new THREE.Vector3(v.x + 0.5, Math.max(1.0, h * 1.2), 0.3), 2.4);
-  }
+  async toPainting() {}
   async leaveToward() {}
   sideAt() { return null; }
 
@@ -365,21 +363,16 @@ export class Stage {
     // you watch it from the side: it turns to the picture, walks straight up to it, steps up onto the
     // painted ground at the foot of the frame and, a little smaller with every step (going into
     // the depth), passes through the picture plane and is gone into the painting
+    // you stand square in front of the picture; it turns and walks towards it, and while it is
+    // still walking the dark closes in round the picture (it does not climb into the frame)
     this.walkedIn = Promise.resolve();
     if (this.actor) {
-      const a = this.actor, g = a.group, foot = Math.max(0, pc.y - ph / 2 + 0.03), s0 = g.scale.x, z0 = 0.95, z1 = pc.z - 0.45;
+      const a = this.actor;
       a.face?.(null);
-      this.camTo(new THREE.Vector3(pc.x + 2.1, Math.max(1.0, foot + 0.6), 1.5), new THREE.Vector3(pc.x + 0.1, foot * 0.6 + 0.35, 0.45), 2.2);   // from the side: it crosses into the picture in profile
-      this.walkedIn = (async () => {
-        await Promise.race([a.walkTo(new THREE.Vector3(pc.x, 0, z0), 0.55), sleep(6000)]);
-        let raf = 0;
-        const follow = () => { const z = g.position.z, k = THREE.MathUtils.clamp((z0 - z) / (z0 - pc.z), 0, 1), e = k * k * (3 - 2 * k);
-          g.position.y = foot * e; g.scale.setScalar(s0 * (1 - 0.4 * e)); raf = requestAnimationFrame(follow); };
-        follow();
-        await Promise.race([a.walkTo(new THREE.Vector3(pc.x, foot, z1), 0.5), sleep(6000)]);
-        cancelAnimationFrame(raf); g.scale.setScalar(s0);
-      })();
-      await this.walkedIn;
+      this.camTo(new THREE.Vector3(pc.x, Math.max(1.1, pc.y), pc.z + dist * 1.45), pc.clone(), 1.1);
+      this.walkedIn = sleep(1200);                    // the dark starts here, mid-walk
+      const walk = Promise.race([a.walkTo(new THREE.Vector3(pc.x, 0, 0.45), 0.45), sleep(7000)]);
+      await this.walkedIn; await walk;
     }
     await this.camTo(new THREE.Vector3(pc.x, pc.y, pc.z + dist + 0.02), pc.clone(), 2.6);
     await this.worldReady;
