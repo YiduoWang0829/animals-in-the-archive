@@ -10,6 +10,25 @@ import { loadClassifier, createPad, classify, matchSpecies, drawingToCharacter }
 import { makeCard, recordNumber } from './card.js';
 import { paintify, loadImage } from './paint.js';
 import { tagsOf, isPainted, isSolid, motifsOf, FRAGMENTS, drawnPiece, drawnCutout, fragmentPiece, quoteSlip } from './exchange.js';
+import { registerWork, hostsOf } from './v2/texts.js';
+import { KIND, DOODLE_KIND, kindName } from './v2/ecology.js';
+
+// ---- version 2: the three original works + 200 works from open-access museums -------------
+// js/collection.json: each work's record, palette, look, the painted parts found in it
+// (tools/harvest_paintings.py + tools/v2_analyse.py); js/originals.json: the same reading of
+// the three original works.
+const COLLECTION = await fetch('js/collection.json').then(r => r.json()).catch(() => []);
+const ORIG = await fetch('js/originals.json').then(r => r.json()).catch(() => ({}));
+for (const w of WORKS) Object.assign(w, ORIG[w.id] || {}, { featured: true });
+for (const c of COLLECTION) {
+  if (!c.parts) continue;                  // not read yet (tools/v2_analyse.py)
+  const w = { ...c, v2: true, accession: 'AIA.' + (c.year || '0000') + '.' + c.id.replace(/\D/g, '').slice(-4),
+    image: `assets/paintings/v2/thumbs/${c.id}.webp`, hd: `assets/paintings/v2/${c.id}.jpg`, depth: `assets/paintings/v2/depth/${c.id}.png`,
+    plate: `assets/paintings/v2/plate/${c.id}.jpg`, hosts: [] };
+  WORKS.push(w);
+  w.hostList = registerWork(w);
+}
+const workOf = id => WORKS.find(w => w.id === id);
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -63,12 +82,14 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.hid
 
 // ---------------------------------------------------------------- 1 · index
 function renderIndex() {
-  $('#index-count').textContent = t('indexCount', { n: WORKS.length });
-  $('#catalogue').innerHTML = WORKS.map((w, i) => {
+  const FEAT = WORKS.filter(w => w.featured);
+  $('#index-count').textContent = t('indexCount', { n: FEAT.length });
+  renderCollection();
+  $('#catalogue').innerHTML = FEAT.map((w, i) => {
     const x = W(w.id);
     return `<li class="entry" tabindex="0" role="button" data-work="${w.id}" aria-label="${esc(x.title)}">
       <div class="entry-mount"><img src="${w.image}" alt="${esc(x.title)}, ${esc(x.artist)}" loading="${i ? 'lazy' : 'eager'}"></div>
-      <div class="entry-no caption"><span>${esc(w.accession)}</span><span>${String(i + 1).padStart(2, '0')} / ${String(WORKS.length).padStart(2, '0')}</span></div>
+      <div class="entry-no caption"><span>${esc(w.accession)}</span><span>${String(i + 1).padStart(2, '0')} / ${String(FEAT.length).padStart(2, '0')}</span></div>
       <h3 class="entry-title">${esc(x.title)}</h3>
       <dl class="meta">
         <dt>${esc(t('fieldArtist'))}</dt><dd>${esc(x.artist)}</dd>
@@ -81,14 +102,49 @@ function renderIndex() {
   }).join('');
 }
 
+// the collection: 200 works, filtered by style and by animal
+const STYLE_GROUPS = {
+  all: null, old: ['early', 'baroque', 'romantic', 'realist'], impressionism: ['impressionist', 'pointillist', 'postimpressionist'],
+  modern: ['expressionist', 'cubist', 'modern'], folk: ['folk'], asia: ['japan', 'china'], miniature: ['miniature'],
+};
+const STYLE_LABEL = { all: ['All', '全部'], old: ['Old masters', '古典油画'], impressionism: ['Impressionism', '印象派'], modern: ['Modern & abstract', '现代与抽象'],
+  folk: ['Folk', '民间'], asia: ['East Asian ink', '东亚水墨'], miniature: ['Miniatures', '细密画'] };
+const LOOK_LABEL = { oil: ['oil glaze', '油画'], gilded: ['gold ground', '金底'], splat: ['brush splats', '笔触'], dots: ['dots', '点彩'], facet: ['facets', '块面'],
+  ink: ['ink', '水墨'], woodblock: ['woodblock', '木版'], flat: ['flat colour', '平涂'] };
+const L2 = pair => pair[LANG === 'zh' ? 1 : 0];
+const collFilter = { style: 'all', kind: 'all', shown: 48 };
+function renderCollection() {
+  const all = WORKS.filter(w => w.v2);
+  if (!$('#coll-grid')) return;
+  $('#coll-heading').textContent = LANG === 'zh' ? '馆藏 · 动物画作' : 'The collection · paintings with animals';
+  $('#coll-intro').textContent = LANG === 'zh'
+    ? '来自美国国家美术馆、克利夫兰艺术博物馆和大都会艺术博物馆开放馆藏（CC0）的画作。'
+    : 'Works from the open-access collections of the National Gallery of Art, the Cleveland Museum of Art and The Met (CC0).';
+  if (!all.length) { $('#coll-count').textContent = ''; $('#coll-grid').innerHTML = ''; return; }
+  const kinds = Object.entries(all.reduce((m, w) => { for (const k of w.kinds || []) m[k] = (m[k] || 0) + 1; return m; }, {})).sort((a, b) => b[1] - a[1]).slice(0, 14).map(([k]) => k);
+  $('#coll-filters').innerHTML = `<div class="grp"><span class="lbl">${LANG === 'zh' ? '风格' : 'Style'}</span>${Object.keys(STYLE_GROUPS).map(k =>
+    `<button data-action="coll-style" data-v="${k}" aria-pressed="${collFilter.style === k}">${esc(L2(STYLE_LABEL[k]))}</button>`).join('')}</div>
+    <div class="grp"><span class="lbl">${LANG === 'zh' ? '动物' : 'Animal'}</span><button data-action="coll-kind" data-v="all" aria-pressed="${collFilter.kind === 'all'}">${LANG === 'zh' ? '全部' : 'All'}</button>${kinds.map(k =>
+    `<button data-action="coll-kind" data-v="${k}" aria-pressed="${collFilter.kind === k}">${esc(kindName(k, LANG))}</button>`).join('')}</div>`;
+  const list = all.filter(w => (!STYLE_GROUPS[collFilter.style] || STYLE_GROUPS[collFilter.style].includes(w.bucket)) && (collFilter.kind === 'all' || (w.kinds || []).includes(collFilter.kind)));
+  $('#coll-count').textContent = LANG === 'zh' ? `${list.length} / ${all.length} 件作品` : `${list.length} of ${all.length} works`;
+  $('#coll-grid').innerHTML = list.slice(0, collFilter.shown).map(w => {
+    const x = W(w.id);
+    return `<li class="coll-item entry" tabindex="0" role="button" data-work="${w.id}" aria-label="${esc(x.title)}">
+      <div class="mount"><img src="${w.image}" alt="" loading="lazy"></div>
+      <p class="t">${esc(x.title)}</p><p class="a">${esc(x.artist)} · ${esc(x.date)}</p>
+      <span class="look">→ ${esc(L2(LOOK_LABEL[w.look] || LOOK_LABEL.oil))}</span></li>`;
+  }).join('') + (list.length > collFilter.shown ? `<li class="coll-more"><button class="btn" data-action="coll-more">${LANG === 'zh' ? '显示更多' : 'Show more'}</button></li>` : '');
+}
+
 // ---------------------------------------------------------------- 2 · record
 function openRecord(id) {
-  state.work = workById(id);
+  state.work = workOf(id);
   const w = state.work, x = W(id);
   openModal(`
     <p class="kicker">${esc(t('stepOf', { n: 1 }))} · ${esc(w.accession)}</p>
     <div class="record">
-      <img src="${w.image}" alt="${esc(x.title)}">
+      <img src="${w.v2 ? w.hd : w.image}" alt="${esc(x.title)}">
       <div>
         <h2>${esc(x.title)}</h2>
         <p class="blurb">${esc(x.blurb)}</p>
@@ -254,6 +310,7 @@ async function recogniseSketch() {
   const pad = openVisitor.pad, out = $('#draw-result');
   if (pad.isEmpty()) { out.innerHTML = `<p class="status">${esc(t('drawEmpty'))}</p>`; return; }
   const ranked = await classify(pad.canvas);
+  state.drawLabel = ranked[0]?.label;
   const pct = p => (p * 100).toFixed(1);
   const top = ranked.slice(0, 4).map(r => `<li><span>${esc(r.label)}</span><span class="bar"><i style="width:${(r.p * 100).toFixed(1)}%"></i></span><span class="pct">${pct(r.p)}%</span></li>`).join('');
   // the closest living 3D animal, if any of its drawing classes scored
@@ -337,6 +394,7 @@ async function enterStage(visitor) {
   closeModal(); show('stage');
   status(`<span class="loading"></span>${esc(t('loadingRoom'))}`); controls('');
   const w = state.work;
+  if (w.v2 || w.parts) return enterStage2(w);
   // a different set of painted animals wakes up each visit (the first one speaks for them)
   const order = [...w.hosts].sort(() => Math.random() - 0.5);
   const free = order.filter(id => !HOSTS[id].inPlace), fixed = order.filter(id => HOSTS[id].inPlace);
@@ -365,6 +423,64 @@ async function enterStage(visitor) {
   runStory(gallery);
 }
 
+// version 2: the visitor stands still; the camera moves; the painting opens into 3D
+function visitorKindReal() {
+  const v = state.visitor;
+  if (v.kind === 'animal3d') { const a = animal3dById(v.id); return { kind: a.kind, realH: a.realH }; }
+  if (v.kind === 'species') return { kind: v.species.kind, realH: v.species.realH };
+  const k = DOODLE_KIND[state.drawLabel] || 'animal';
+  return { kind: k, realH: (KIND[k] || KIND.animal).h };
+}
+async function visitorGeometry() {
+  const v = state.visitor;
+  const key = v.kind === 'animal3d' ? 'a:' + v.id : v.kind === 'species' ? 's:' + v.species.id : v.canvas;
+  if (state.geoKey === key && state.visitorGeo) return state.visitorGeo;
+  const F = await import('./v2/figure.js');
+  let geo;
+  if (v.kind === 'animal3d') geo = await F.bakeAnimal3D(animal3dById(v.id).glb);
+  else if (v.kind === 'species') geo = F.bakeImage(await loadImage(v.species.storybook), v.species.faces);
+  else geo = F.bakeImage(v.canvas, v.facing);
+  state.geoKey = key; state.visitorGeo = geo;
+  return geo;
+}
+// the painted animals who speak, with where they are in the picture
+function hostsFor(w) {
+  if (w.v2) return (w.hostList || hostsOf(w)).map(h => ({ ...h, partObj: h.part }));
+  // an original work: its hand-cut animals (hosts.json boxes), matched to the analysed parts
+  const order = [...w.hosts].sort(() => Math.random() - 0.5).slice(0, 3);
+  return order.map(id => {
+    const b = hostMeta[id].box, size = w.size;
+    const box = [b[0] / size[0], b[1] / size[1], b[2] / size[0], b[3] / size[1]];
+    const iou = p => { const x0 = Math.max(box[0], p.box[0]), y0 = Math.max(box[1], p.box[1]), x1 = Math.min(box[2], p.box[2]), y1 = Math.min(box[3], p.box[3]);
+      const i = Math.max(0, x1 - x0) * Math.max(0, y1 - y0); return i / ((box[2] - box[0]) * (box[3] - box[1]) + (p.box[2] - p.box[0]) * (p.box[3] - p.box[1]) - i); };
+    const match = (w.parts || []).filter(p => p.type === 'animal').sort((p, q) => iou(q) - iou(p))[0];
+    const kind = { lion: 'lion', horse: 'horse', deer: 'deer', peacock: 'peacock', rabbit: 'rabbit', dog: 'dog', ox: 'cattle', leopard2: 'leopard', leopard: 'leopard', cub: 'bear', calf: 'cattle', goat: 'goat', boar: 'pig' }[id.split('-')[1]] || 'animal';
+    return { ...HOSTS[id], kind, partObj: match && iou(match) > 0.2 ? match : { box, type: 'animal', kind } };
+  });
+}
+async function enterStage2(w) {
+  hostMeta ??= await (await fetch('assets/hosts/hosts.json')).json();
+  const hosts = hostsFor(w);
+  state.hosts = hosts; state.host = hosts[0];
+  const [geo, { Stage }] = await Promise.all([visitorGeometry(), import('./v2/stage.js')]);
+  const vk = visitorKindReal();
+  gallery?.dispose();
+  gallery = new Stage($('#stage3d'), {
+    work: { ...w, hd: w.v2 ? w.hd : w.hd || w.image, depth: w.v2 ? w.depth : (w.depth2 || w.depth) },
+    workText: W(w.id), visitorGeo: geo, visitorKind: vk.kind, visitorRealH: vk.realH,
+    visitorGlb: state.visitor.kind === 'animal3d' ? animal3dById(state.visitor.id).glb : null, visitorLook: state.visitor.look,
+    visitorImage: state.visitor.kind === 'drawing' ? state.visitor.canvas : state.visitor.kind === 'species' ? await loadImage(state.visitor.species.storybook) : null,
+    visitorHeadSide: state.visitor.kind === 'drawing' ? state.visitor.facing : state.visitor.species?.faces, visitorGait: state.visitor.species?.gait,
+    hosts: hosts.map(h => ({ host: h, part: h.partObj })),
+    onFrame: g => { placeBubbles(g); stageFrame(g); },
+  });
+  await gallery.init();
+  window.__aia.stage = gallery;
+  status('');
+  if ($('.veil')) { $('.veil').classList.remove('on'); setTimeout(() => $('.veil')?.remove(), 800); }
+  runStory(gallery);
+}
+
 // ‹ › beside the gallery: walk over to the painting next door
 function workNav(on) {
   let nav = $('#work-nav');
@@ -387,7 +503,7 @@ async function switchWork(id, side) {
   const veil = document.createElement('div'); veil.className = 'veil'; document.body.appendChild(veil);
   requestAnimationFrame(() => veil.classList.add('on'));
   await sleep(650);
-  state.work = workById(id); state.from = -side; state.switched = true;
+  state.work = workOf(id); state.from = -side; state.switched = true;
   switching = false;
   await enterStage(state.visitor);
 }
@@ -524,7 +640,7 @@ async function runStory(g) {
   if (!alive()) return;
   await speak('visitor', t('tourSee', { animals: x.see }));
   await speak('visitor', kind === 'drawing' ? t('tourDrawing')
-    : w.kinds.includes(kind) ? t('tourSame', { kind: t(`kinds.${kind}`) }) : t('tourNotSame', { kind: t(`kinds.${kind}`) }));
+    : (w.kinds || []).includes(kind) ? t('tourSame', { kind: t(`kinds.${kind}`) }) : t('tourNotSame', { kind: t(`kinds.${kind}`) }));
   if (!alive()) return;
   g.talkToYou(true);
   const like = await askUser('visitor', t('tourLikeQ'));
@@ -933,6 +1049,7 @@ async function enterCreate(mode = 'sculpt') {
 }
 
 async function openSculpt() {
+  if (state.work.parts) return openSculpt2();
   $('#compose-wrap').hidden = true; $('#sculpt-canvas').hidden = false;
   if ($('#collage-shelf')) $('#collage-shelf').hidden = true;
   createStatus(t('monumentTalk') + ' ' + t('monumentHint') + (tracker ? ' ' + t('monumentHands') : ''));
@@ -976,8 +1093,146 @@ function createStatus(text, append = false) {
   el.insertAdjacentHTML('beforeend', `<div>${esc(text)}</div>`);
 }
 
+// ---- version 2 create: one organic sculpture, one collage world
+const partUrl = f => 'assets/paintings/v2/parts/' + f;
+const workPainting = w => w.v2 ? w.hd : (w.hd || w.image);
+const workDepth = w => w.v2 ? w.depth : (w.depth2 || w.depth);
+const workPlate = w => w.v2 ? w.plate : (w.plate || w.image);
+async function openSculpt2() {
+  const w = state.work, zh = LANG === 'zh';
+  $('#compose-wrap').hidden = true; $('#sculpt-canvas').hidden = false;
+  if ($('#collage-shelf')) $('#collage-shelf').hidden = true;
+  createStatus(zh
+    ? '你的动物在画里待过之后，被这幅画改成了它的样子，又和画里的动物、画里的东西一起，变成了一座由光点组成的雕塑。拖动转着看，滚轮拉近；每一面都不一样。'
+    : 'After its time in the painting, your animal has been re-formed in the painting’s manner and stands with the painting’s own animals and things, all made of points of light. Drag to walk round it, scroll to come closer: every side is different.');
+  $('#create-tools').innerHTML = `
+    <div class="segmented sculpt-kinds" role="group" id="mat-group">${['dots', 'stars', 'solid'].map(m =>
+      `<button data-action="material" data-mat="${m}" aria-pressed="${m === (sculpt?.material || 'dots')}">${esc(t(`materials.${m}`))}</button>`).join('')}</div>
+    <span class="sep"></span>
+    <button class="btn small ghost" data-action="reshape">${zh ? '重新拼一座' : 'Assemble again'}</button>
+    <button class="btn small ghost" data-action="export-glb">${zh ? '下载点云 .ply' : 'Download .ply'}</button>
+    <button class="btn primary cta" data-action="card">${esc(t('makeCard'))}</button>`;
+  if (sculpt) return sculptLabel();
+  createStatus(zh ? '正在从四面八方给画里的它拍照…' : 'Photographing it from all round, as it is painted…', true);
+  const vk = visitorKindReal(), v = state.visitor;
+  let visitor;
+  if (v.kind === 'animal3d') visitor = { glb: animal3dById(v.id).glb, height: vk.realH };
+  else { const F = await import('./v2/figure.js'); visitor = { img: await F.renderFigureImage(await visitorGeometry(), w.look, w.palette) }; }
+  const parts = (w.parts || []), figures = [], things = [];
+  for (const p of parts.filter(p => p.type === 'animal').slice(0, 6)) { try { figures.push({ img: await loadImage(partUrl(p.file)), kind: p.kind }); } catch {} }
+  for (const p of parts.filter(p => p.type === 'thing' && p.kind !== 'person').slice(0, 6)) { try { things.push({ img: await loadImage(partUrl(p.file)), kind: p.kind }); } catch {} }
+  const { PointSculpture } = await import('./v2/pointsculpture.js');
+  sculpt = new PointSculpture($('#sculpt-canvas'), { work: w, look: w.look, palette: w.palette, painting: workPainting(w), visitor, figures, things });
+  window.__aia.sculpt = sculpt;
+  try { await sculpt.init(step => { if (step === 'build') createStatus(zh ? '正在把它和画里的东西拼在一起…' : 'Putting it together with the painting’s things…', true); }); }
+  catch (e) { console.error('[sculpture]', e); createStatus(zh ? '雕塑没能做出来，请再试一次。' : 'The sculpture could not be made; please try again.', true); return; }
+  sculptLabel();
+}
+// the label beside the sculpture, like a museum label: what it is made of, and what it says
+async function sculptLabel() {
+  const zh = LANG === 'zh', { ZH } = await import('./v2/pointsculpture.js');
+  let el = $('.sculpt-label'); if (!el) { el = document.createElement('aside'); el.className = 'sculpt-label glass'; $('#view-create').appendChild(el); el.addEventListener('click', () => el.classList.toggle('open')); }
+  el.hidden = false;
+  const info = sculpt?.info; if (!info) return;
+  const vk = visitorKindReal(), me = zh ? (ZH[vk.kind] || '它') : vk.kind, wt = W(state.work.id), title = (wt && typeof wt === 'object' && wt.title) || state.work.title;
+  const name = k => zh ? (ZH[k] || k) : k, met = info.met.map(name).join(zh ? '、' : ', '), th = info.things.map(name).join(zh ? '、' : ', ');
+  const how = { oil: zh ? '身体像颜料一样流动、鼓起、往下坠' : 'its body flows, swells and sags like paint', flat: zh ? '扁得像一块画板，圆滚滚的，腿短短的' : 'flat as a painted board, rounder, with stubby legs',
+    facet: zh ? '身体每一块都成了晶体，圆的头变成了尖的' : 'every part of it a crystal; the round head comes out pointed' }[state.work.look] || (zh ? '形状被这幅画的笔法改变了' : 'its shape changed by the painting’s hand');
+  el.innerHTML = zh
+    ? `<h3>《${esc(me)}，走进了${esc(title)}》</h3><p><em>中间</em>${esc(me)}：你带进画里的那只。它被画成了这幅画的样子——${esc(how)}，再也不是原来的模样。</p>`
+      + (met ? `<p><em>围着它</em>${esc(met)}：画里原来的动物，转过身来看这个新来的。</p>` : '')
+      + `<p><em>四周</em>${esc(th || '这幅画本身碎成的色块')}${th ? '：画里的世界' : ''}。金色的线把它们连成一个星座。</p>`
+    : `<h3>${esc(cap(me))}, walked into ${esc(title)}</h3><p><em>Centre</em>your ${esc(me)}, re-formed by the painting: ${esc(how)}.</p>`
+      + (met ? `<p><em>Around it</em>${esc(met)}: the painting’s own animals, turned to look at the newcomer.</p>` : '')
+      + `<p><em>All round</em>${esc(th || 'shards of the painting’s colour')}. Gold lines join them into a constellation.</p>`;
+}
+// ---- the star-map collage: stained glass, cyanotype shadows and constellations, three styles
+async function openStarCollage() {
+  const w = state.work, zh = LANG === 'zh';
+  $('#sculpt-canvas').hidden = true; $('#compose-wrap').hidden = false; $('#compose-wrap').classList.add('star');
+  let shelf = $('#collage-shelf');
+  if (!shelf) { shelf = document.createElement('div'); shelf.id = 'collage-shelf'; $('#view-create').appendChild(shelf); }
+  shelf.className = 'collage-shelf star-shelf glass'; shelf.hidden = false;
+  createStatus(zh
+    ? '把你的动物、画里的动物和撕下来的画摆在一起：每只动物都会变成一个星座。拖动摆放，拖右下角方块缩放，拖上方圆点旋转，双击翻转。松手后会按所选款式重新“烧”一遍。'
+    : 'Lay out your animal, the painting’s animals and torn pieces of paintings: each animal becomes a constellation. Drag to place, the corner square to resize, the dot above to turn, double-click to flip. On release the sheet is fired again in the chosen style.');
+  $('#create-tools').innerHTML = `
+    <button class="btn small ghost" data-action="sc" data-do="shuffle">${zh ? '随机摆一张' : 'Lay out again'}</button>
+    <button class="btn small ghost" data-action="sc" data-do="reglass">${zh ? '重新切玻璃' : 'Recut the glass'}</button>
+    <button class="btn small ghost" data-action="sc" data-do="clear">${zh ? '清空' : 'Clear'}</button>
+    <button class="btn primary cta" data-action="card">${esc(t('makeCard'))}</button>`;
+  if (composer) return;
+  createStatus(zh ? '正在把画拆开…' : 'Taking the painting apart…', true);
+  const { ZH } = await import('./v2/pointsculpture.js');
+  const name = k => zh ? (ZH[k] || k) : k, wt = W(w.id), title = (wt && typeof wt === 'object' && wt.title) || w.title;
+  const ORIGS = { eden: ['assets/paintings/hd/garden-of-eden.jpg', zh ? '伊甸园' : 'Eden'], hicks: ['assets/paintings/hd/peaceable-kingdom.jpg', zh ? '和平王国' : 'the Peaceable Kingdom'], marc: ['assets/paintings/hd/fate-of-the-animals.jpg', zh ? '动物的命运' : 'the Fate of the Animals'] };
+  const short = ORIGS[w.id]?.[1] || (zh ? '画中' : 'the painting');
+  const paintings = [{ key: 'here', name: title, img: await loadImage(workPainting(w)) }];
+  for (const [k, [u, n]] of Object.entries(ORIGS)) if (k !== w.id) { try { paintings.push({ key: k, name: n, img: await loadImage(u) }); } catch {} }
+  const F = await import('./v2/figure.js'), vk = visitorKindReal();
+  const animals = [{ img: await F.renderFigureImage(await visitorGeometry(), w.look, w.palette), label: zh ? `你的${name(vk.kind)}座` : `Your ${vk.kind}`, title: zh ? '你的动物' : 'Your animal' }];
+  const own = (w.parts || []).filter(p => p.type === 'animal').slice(0, 6);
+  for (const p of own) { try { animals.push({ img: await loadImage(partUrl(p.file)), label: zh ? `${short}之${name(p.kind)}座` : `${cap(p.kind)} of ${short}`, title: `${title} · ${name(p.kind)}` }); } catch {} }
+  collage ??= await (await fetch('assets/collage/collage.json')).json();
+  for (const [id, c] of Object.entries(collage)) { if (id.startsWith(w.id + '-')) continue; try {
+    const src = ORIGS[c.work]?.[1] || c.work, nm = zh ? (STRINGS[LANG].collageNames?.[id] || c.name) : c.name;
+    animals.push({ img: await loadImage(`assets/collage/${id}.webp`), label: zh ? `${src}之${nm}座` : `${cap(nm)} of ${src}`, title: `${src} · ${nm}` }); } catch {} }
+  const { StarCollage } = await import('./v2/starcollage.js');
+  composer = await new StarCollage($('#compose-canvas'), shelf, { zh, paintings, animals, mine: own.length }).init();
+  window.__aia.composer = composer;
+}
+let collageSay = null;
+async function openCompose2() {
+  if ($('.sculpt-label')) $('.sculpt-label').hidden = true;
+  const w = state.work;
+  $('#sculpt-canvas').hidden = true; $('#compose-wrap').hidden = false;
+  if ($('#collage-shelf')) $('#collage-shelf').hidden = true;
+  createStatus(LANG === 'zh'
+    ? '这是一整个画中世界：画里的每只动物、每样东西都可以拿起来挪动，越往远处越小。动物会像真的动物一样反应——把猫放到狼旁边试试。双击翻转，滚轮缩放。'
+    : 'One painted world: every animal and thing in it can be picked up and moved, and gets smaller as it goes back. The animals react like animals: try putting the cat next to the wolf. Double-click to flip, scroll to resize.');
+  $('#create-tools').innerHTML = `
+    <label class="check"><input type="checkbox" id="unify-toggle" checked> ${LANG === 'zh' ? '统一成画作的风格' : 'Unify in the painting’s manner'}</label>
+    <label>${esc(t('variant'))}<select id="variant-select">${['original', 'night', 'engraving', 'prism', 'wash'].map(v => `<option value="${v}">${esc(t(`variants.${v}`))}</option>`).join('')}</select></label>
+    <button class="btn small ghost" data-action="shuffle-layout">${LANG === 'zh' ? '让动物们重新站位' : 'Let them rearrange'}</button>
+    <button class="btn small ghost" data-action="add-stranger">${LANG === 'zh' ? '从别的画里请一只动物' : 'Invite an animal from another painting'}</button>
+    <button class="btn small ghost" data-action="remove-sel">${esc(t('removeSel'))}</button>
+    <button class="btn primary cta" data-action="card">${esc(t('makeCard'))}</button>`;
+  if (!composer) {
+    createStatus(LANG === 'zh' ? '正在把画拆开…' : 'Taking the painting apart…', true);
+    const F = await import('./v2/figure.js');
+    const vk = visitorKindReal();
+    const vimg = await F.renderFigureImage(await visitorGeometry(), w.look, w.palette);
+    const parts = [];
+    for (const p of (w.parts || [])) { try { parts.push({ ...p, img: await loadImage(partUrl(p.file)) }); } catch {} }
+    const { Collage } = await import('./v2/collage.js');
+    const say = text => {
+      let el = $('.collage-say'); if (!el) { el = document.createElement('div'); el.className = 'collage-say'; $('#view-create').appendChild(el); }
+      el.textContent = text; el.classList.add('show'); clearTimeout(collageSay); collageSay = setTimeout(() => el.classList.remove('show'), 3800);
+    };
+    composer = new Collage($('#compose-canvas'), { work: w, plate: workPlate(w), depth: workDepth(w), parts, visitor: { img: vimg, kind: vk.kind }, palette: w.palette, look: w.look, onSay: say });
+    await composer.init();
+    window.__aia.composer = composer;
+    addEventListener('resize', () => composer?.resize());
+  }
+  $('#unify-toggle').checked = composer.unify;
+  $('#unify-toggle').addEventListener('change', e => composer.setUnify(e.target.checked));
+  $('#variant-select').value = composer.variant;
+  $('#variant-select').addEventListener('change', e => { composer.variant = e.target.value; });
+}
+async function addStranger() {
+  if (!composer) return;
+  const others = WORKS.filter(o => o !== state.work && o.parts?.some(p => p.type === 'animal'));
+  const o = others[Math.floor(Math.random() * others.length)];
+  const p = o.parts.filter(q => q.type === 'animal')[0];
+  const img = await loadImage(partUrl(p.file));
+  const it = composer.add(img, { kind: p.kind, type: 'animal', x: 0.15 + Math.random() * 0.7, y: 0.75 + Math.random() * 0.2, h: 0.18 });
+  composer.sel = it; composer.react(it);
+}
+
 let collage = null;
 async function openCompose() {
+  if ($('.sculpt-label')) $('.sculpt-label').hidden = true;
+  return openStarCollage();
   $('#sculpt-canvas').hidden = true; $('#compose-wrap').hidden = false;
   createStatus(t('composeTalkHint') + (tracker ? ' ' + t('composeHands') : ''));
   const { Composer, VARIANTS, SEASONS } = await import('./compose.js');
@@ -1085,9 +1340,9 @@ function syncVariant() { if ($('#variant-select') && composer) { $('#variant-sel
 function pressGroup(btn) { btn.parentElement.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b === btn)); }
 
 async function exportGLB() {
-  const blob = await sculpt.exportGLB();
+  const ply = !!sculpt.exportPly, blob = ply ? sculpt.exportPly() : await sculpt.exportGLB();
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = 'animals-in-the-archive-monument.glb';
+  a.href = URL.createObjectURL(blob); a.download = ply ? 'animals-in-the-archive-sculpture.ply' : 'animals-in-the-archive-monument.glb';
   a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 
@@ -1129,8 +1384,9 @@ function teardown() {
   closeLedger(); document.querySelectorAll('.crossing').forEach(e => e.remove());
   storyToken++; giveAnswer(null); speechLock = Promise.resolve();
   gallery?.dispose(); gallery = null;
-  sculpt?.dispose(); sculpt = null;
-  composer = null; clearBubbles(); status(''); controls('');
+  sculpt?.dispose(); sculpt = null; $('.sculpt-label')?.remove();
+  composer?.dispose?.(); composer = null; clearBubbles(); status(''); controls('');
+  $('.collage-say')?.remove(); state.visitorGeo = null; state.geoKey = null;
   if ($('#collage-shelf')) $('#collage-shelf').hidden = true;
   $('#compose-canvas').getContext('2d').clearRect(0, 0, 9999, 9999);
 }
@@ -1160,6 +1416,10 @@ function renderCredits() {
       <tr><th>${L('file')}</th><th>${L('model')}</th><th>${L('source')}</th><th>${L('licence')}</th></tr>
       ${ANIMALS3D.filter(a => a.real).map(a => `<tr><td>${esc(a.glb.split('/').pop())}</td><td>${esc(a.real.title)} · ${esc(a.real.author)}</td><td>${link(a.real.url)}</td><td>${esc(a.real.licence)}</td></tr>`).join('')}
 
+    </table></div>
+    <h2>${LANG === 'zh' ? '馆藏画作（开放获取）' : 'The collection (open access)'}</h2><div class="scroll"><table>
+      <tr><th>${L('work')}</th><th>${L('author')}</th><th>${L('date')}</th><th>${L('collection')}</th><th>${L('source')}</th><th>${L('licence')}</th></tr>
+      ${WORKS.filter(w => w.v2).map(w => `<tr><td><em>${esc(w.title)}</em></td><td>${esc(w.artist)}</td><td>${esc(w.date)}</td><td>${esc(w.museum)}</td><td>${w.url ? link(w.url) : ''}</td><td>${esc(w.licence)}</td></tr>`).join('')}
     </table></div>
     <h2>${L('software')}</h2><div class="scroll"><table>
       <tr><th>${L('item')}</th><th>${L('version')}</th><th>${L('use')}</th><th>${L('licence')}</th></tr>
@@ -1192,13 +1452,14 @@ document.addEventListener('click', e => {
     case 'back-role': show('index'); openRole(); break;
     case 'facing': state.facing = el.dataset.facing; pressGroup(el); break;
     case 'swatch': state.colour = el.dataset.colour; pressGroup(el); break;
-    case 'draw-clear': openVisitor.pad.clear(); $('#draw-pad').classList.remove('revealed'); $('#draw-result').innerHTML = ''; break;
+    case 'draw-clear': state.drawLabel = null; openVisitor.pad.clear(); $('#draw-pad').classList.remove('revealed'); $('#draw-result').innerHTML = ''; break;
     case 'draw-go': recogniseSketch(); break;
     case 'choose-drawing': {
       const pad = openVisitor.pad;
       if (pad.isEmpty()) { $('#draw-result').innerHTML = `<p class="status">${esc(t('drawEmpty'))}</p>`; break; }
       const canvas = drawingToCharacter(pad.canvas, state.colour);
       if (canvas) choose({ kind: 'drawing', canvas, facing: state.facing });
+      if (!state.drawLabel) classify(pad.canvas).then(r => { state.drawLabel = r[0]?.label; }).catch(() => {});
       break;
     }
     case 'choose-3d': choose({ kind: 'animal3d', id: el.dataset.id, look: state.choice.look || 'real' }); break;
@@ -1222,9 +1483,15 @@ document.addEventListener('click', e => {
     case 'form': pressGroup(el); sculpt?.setForm(el.dataset.form); break;
     case 'add-piece': talkPieces().then(tp => { const p = tp.all[+el.dataset.i]; const A = composer.base.width / composer.base.height;
       composer?.addItem(p.img, 0.2 + Math.random() * 0.6, 0.3 + Math.random() * 0.5, (p.kind[0] === 'q' ? 0.25 : p.kind === 'real' ? 0.12 : 0.17) * A / (p.img.width / p.img.height), { flat: true, piece: p.id, r: (Math.random() - 0.5) * 0.2 }); }); break;
-    case 'shuffle-layout': talkPieces().then(layoutTalk); break;
+    case 'shuffle-layout': if (state.work.parts) composer?.shuffle(); else talkPieces().then(layoutTalk); break;
+    case 'add-stranger': addStranger(); break;
+    case 'reshape': sculpt?.reshape(); setTimeout(() => sculpt?.info && sculptLabel(), 400); break;
+    case 'coll-style': collFilter.style = el.dataset.v; collFilter.shown = 48; renderCollection(); break;
+    case 'coll-kind': collFilter.kind = el.dataset.v; collFilter.shown = 48; renderCollection(); break;
+    case 'coll-more': collFilter.shown += 48; renderCollection(); break;
     case 'add-collage': loadImage(`assets/collage/${el.dataset.id}.webp`).then(img => composer?.addItem(img, 0.12 + Math.random() * 0.76, 0.7 + Math.random() * 0.25, 0.14 + Math.random() * 0.1)); break;
     case 'remove-sel': composer?.removeSelected(); break;
+    case 'sc': composer?.act?.(el.dataset.do); break;
     case 'export-glb': exportGLB(); break;
     case 'card': openCard(); break;
     case 'play-again': playAgain(); break;
@@ -1238,4 +1505,5 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && tra
 renderIndex();
 window.__aia = { state, STRINGS, get gallery() { return gallery; },
   // testing only: feed fake camera input (a face, hands, a gesture) without a camera
+  create: (id, animal = 'wolf', mode = 'sculpt') => { state.work = workOf(id); state.visitor = { kind: 'animal3d', id: animal }; state.hosts ??= []; state.role ??= 'visitor'; state.name ??= 'Test'; return enterCreate(mode); },
   sim: { face: f => { face = f; }, hands: h => { hands = h; onHands(h); }, gesture: x => onGesture(x) } };   // console/debug access only

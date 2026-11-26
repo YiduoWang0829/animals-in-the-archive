@@ -391,7 +391,7 @@ export const STRINGS = {
     monumentHint: 'The painting, carved into a plinth, with the animals on top as statues. Drag to walk round it, scroll to come closer, drag a statue to move it, double-click to turn it. Try the five forms and four materials.',
     monumentHands: 'Pinch and move to walk round it, pinch a statue to carry it, two open hands to come closer, swipe to change the form.',
     forms: { stele: 'Stele', cube: 'Cube', drum: 'Drum', chalice: 'Chalice', medallion: 'Medallion' },
-    materials: { marble: 'Marble', bronze: 'Bronze', clay: 'Clay', painted: 'Painted' },
+    materials: { marble: 'Marble', bronze: 'Bronze', clay: 'Clay', painted: 'Painted', stone: 'Stone', splat: 'Gaussian splats', dots: 'Pointillist', stars: 'Starlight', solid: 'Solid' },
     modeCompose: 'New painting · 2D',
     sculptHint: 'Drag on a model to sculpt; drag empty space to turn it.',
     sculptHands: 'Pinch with your right hand to pull, left hand to press. Open hand: turn. Two open hands: zoom.',
@@ -411,7 +411,7 @@ export const STRINGS = {
     exportGLB: 'Download .glb for Blender',
     background: 'Painting',
     variant: 'Picture',
-    variants: { original: 'Original', night: 'Night', engraving: 'Engraving', prism: 'Prism', wash: 'Storybook' },
+    variants: { original: 'Original', night: 'Night', engraving: 'Engraving', prism: 'Prism', wash: 'Storybook', glass: 'starlit glass', cyan: 'sun-printed stars', nebula: 'glass nebula' },
     modelFallback: 'A model file could not be loaded; a relief built in the browser is shown instead.',
     makeCard: 'Make archive card',
 
