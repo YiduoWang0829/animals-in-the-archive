@@ -1,0 +1,622 @@
+{
+ "eden": {
+  "palette": [
+   {
+    "c": "#262723",
+    "w": 0.174
+   },
+   {
+    "c": "#413c2d",
+    "w": 0.218
+   },
+   {
+    "c": "#5a543a",
+    "w": 0.224
+   },
+   {
+    "c": "#7a6f4e",
+    "w": 0.175
+   },
+   {
+    "c": "#a59577",
+    "w": 0.092
+   },
+   {
+    "c": "#8cb3d0",
+    "w": 0.046
+   },
+   {
+    "c": "#d9d2c3",
+    "w": 0.071
+   }
+  ],
+  "stats": {
+   "sat": 0.315,
+   "edges": 0.245,
+   "sky": 0.138,
+   "horizon": 0.0,
+   "light": 0.37
+  },
+  "look": "oil",
+  "parts": [
+   {
+    "kind": "rabbit",
+    "type": "animal",
+    "score": 0.551,
+    "file": "eden-0.webp",
+    "box": [
+     0.2579,
+     0.8639,
+     0.2993,
+     0.9248
+    ],
+    "depth": 0.784,
+    "area": 0.0016
+   },
+   {
+    "kind": "horse",
+    "type": "animal",
+    "score": 0.494,
+    "file": "eden-1.webp",
+    "box": [
+     0.0071,
+     0.3728,
+     0.1329,
+     0.8064
+    ],
+    "depth": 0.553,
+    "area": 0.0305
+   },
+   {
+    "kind": "bird",
+    "type": "animal",
+    "score": 0.421,
+    "file": "eden-3.webp",
+    "box": [
+     0.0714,
+     0.8673,
+     0.1821,
+     0.9967
+    ],
+    "depth": 0.914,
+    "area": 0.0048
+   },
+   {
+    "kind": "rabbit",
+    "type": "animal",
+    "score": 0.413,
+    "file": "eden-4.webp",
+    "box": [
+     0.3,
+     0.802,
+     0.3443,
+     0.8894
+    ],
+    "depth": 0.71,
+    "area": 0.0027
+   },
+   {
+    "kind": "lion",
+    "type": "animal",
+    "score": 0.412,
+    "file": "eden-5.webp",
+    "box": [
+     0.2179,
+     0.8894,
+     0.255,
+     0.9513
+    ],
+    "depth": 0.859,
+    "area": 0.0017
+   },
+   {
+    "kind": "bird",
+    "type": "animal",
+    "score": 0.411,
+    "file": "eden-6.webp",
+    "box": [
+     0.5429,
+     0.2367,
+     0.5671,
+     0.3684
+    ],
+    "depth": 0.271,
+    "area": 0.0016
+   },
+   {
+    "kind": "tree",
+    "type": "thing",
+    "score": 0.515,
+    "file": "eden-7.webp",
+    "box": [
+     0.5243,
+     0.0,
+     0.9936,
+     0.6825
+    ],
+    "depth": 0.302,
+    "area": 0.1371
+   },
+   {
+    "kind": "rock",
+    "type": "thing",
+    "score": 0.278,
+    "file": "eden-8.webp",
+    "box": [
+     0.1586,
+     0.719,
+     0.2543,
+     0.8772
+    ],
+    "depth": 0.616,
+    "area": 0.0073
+   },
+   {
+    "kind": "tree",
+    "type": "thing",
+    "score": 0.263,
+    "file": "eden-9.webp",
+    "box": [
+     0.7286,
+     0.3551,
+     0.8393,
+     0.6139
+    ],
+    "depth": 0.098,
+    "area": 0.0197
+   },
+   {
+    "kind": "tree",
+    "type": "thing",
+    "score": 0.242,
+    "file": "eden-10.webp",
+    "box": [
+     0.0,
+     0.0,
+     0.3171,
+     0.5122
+    ],
+    "depth": 0.408,
+    "area": 0.1239
+   },
+   {
+    "kind": "rock",
+    "type": "thing",
+    "score": 0.221,
+    "file": "eden-11.webp",
+    "box": [
+     0.0786,
+     0.7533,
+     0.165,
+     0.8971
+    ],
+    "depth": 0.616,
+    "area": 0.006
+   },
+   {
+    "kind": "lion",
+    "type": "animal",
+    "score": 1,
+    "file": "eden-lion.webp",
+    "box": [
+     0.7167,
+     0.56,
+     0.8137,
+     0.7277
+    ],
+    "depth": null,
+    "area": 0,
+    "hand": true
+   },
+   {
+    "kind": "horse",
+    "type": "animal",
+    "score": 1,
+    "file": "eden-horse.webp",
+    "box": [
+     0.5363,
+     0.5006,
+     0.6004,
+     0.6303
+    ],
+    "depth": null,
+    "area": 0,
+    "hand": true
+   },
+   {
+    "kind": "deer",
+    "type": "animal",
+    "score": 1,
+    "file": "eden-deer.webp",
+    "box": [
+     0.5663,
+     0.4774,
+     0.65,
+     0.6665
+    ],
+    "depth": null,
+    "area": 0,
+    "hand": true
+   },
+   {
+    "kind": "peacock",
+    "type": "animal",
+    "score": 1,
+    "file": "eden-peacock.webp",
+    "box": [
+     0.3162,
+     0.6619,
+     0.4979,
+     1.0
+    ],
+    "depth": null,
+    "area": 0,
+    "hand": true
+   }
+  ],
+  "bucket": "baroque",
+  "plate": "assets/paintings/v2/plate/eden.jpg",
+  "depth2": "assets/paintings/v2/depth/eden.png"
+ },
+ "hicks": {
+  "palette": [
+   {
+    "c": "#362d26",
+    "w": 0.267
+   },
+   {
+    "c": "#52422f",
+    "w": 0.177
+   },
+   {
+    "c": "#705a34",
+    "w": 0.158
+   },
+   {
+    "c": "#897757",
+    "w": 0.098
+   },
+   {
+    "c": "#a07d2f",
+    "w": 0.063
+   },
+   {
+    "c": "#a99c77",
+    "w": 0.136
+   },
+   {
+    "c": "#d5cbb0",
+    "w": 0.102
+   }
+  ],
+  "stats": {
+   "sat": 0.38,
+   "edges": 0.163,
+   "sky": 0.476,
+   "horizon": 0.5,
+   "light": 0.397
+  },
+  "look": "flat",
+  "parts": [
+   {
+    "kind": "lion",
+    "type": "animal",
+    "score": 0.543,
+    "file": "hicks-0.webp",
+    "box": [
+     0.8057,
+     0.6164,
+     0.9157,
+     0.7235
+    ],
+    "depth": 0.588,
+    "area": 0.0065
+   },
+   {
+    "kind": "lion",
+    "type": "animal",
+    "score": 0.527,
+    "file": "hicks-1.webp",
+    "box": [
+     0.6921,
+     0.7021,
+     0.7543,
+     0.7731
+    ],
+    "depth": 0.541,
+    "area": 0.0024
+   },
+   {
+    "kind": "lion",
+    "type": "animal",
+    "score": 0.477,
+    "file": "hicks-2.webp",
+    "box": [
+     0.5543,
+     0.7055,
+     0.6843,
+     0.8099
+    ],
+    "depth": 0.553,
+    "area": 0.0097
+   },
+   {
+    "kind": "lion",
+    "type": "animal",
+    "score": 0.446,
+    "file": "hicks-3.webp",
+    "box": [
+     0.7821,
+     0.6875,
+     1.0,
+     0.9435
+    ],
+    "depth": 0.835,
+    "area": 0.0474
+   },
+   {
+    "kind": "lion",
+    "type": "animal",
+    "score": 0.42,
+    "file": "hicks-4.webp",
+    "box": [
+     0.7986,
+     0.5762,
+     0.9207,
+     0.6712
+    ],
+    "depth": 0.502,
+    "area": 0.0074
+   },
+   {
+    "kind": "bear",
+    "type": "animal",
+    "score": 0.41,
+    "file": "hicks-5.webp",
+    "box": [
+     0.4071,
+     0.6858,
+     0.515,
+     0.7962
+    ],
+    "depth": 0.475,
+    "area": 0.0098
+   },
+   {
+    "kind": "lion",
+    "type": "animal",
+    "score": 0.397,
+    "file": "hicks-6.webp",
+    "box": [
+     0.5664,
+     0.3416,
+     0.7893,
+     0.625
+    ],
+    "depth": 0.463,
+    "area": 0.0433
+   },
+   {
+    "kind": "tree",
+    "type": "thing",
+    "score": 0.395,
+    "file": "hicks-7.webp",
+    "box": [
+     0.0,
+     0.0051,
+     0.195,
+     0.589
+    ],
+    "depth": 0.137,
+    "area": 0.0546
+   },
+   {
+    "kind": "mountain",
+    "type": "thing",
+    "score": 0.34,
+    "file": "hicks-8.webp",
+    "box": [
+     0.1671,
+     0.2337,
+     0.3893,
+     0.4777
+    ],
+    "depth": 0.047,
+    "area": 0.0267
+   },
+   {
+    "kind": "branch",
+    "type": "thing",
+    "score": 0.332,
+    "file": "hicks-9.webp",
+    "box": [
+     0.6236,
+     0.9101,
+     1.0,
+     1.0
+    ],
+    "depth": 0.816,
+    "area": 0.0142
+   },
+   {
+    "kind": "mountain",
+    "type": "thing",
+    "score": 0.331,
+    "file": "hicks-10.webp",
+    "box": [
+     0.1214,
+     0.3801,
+     0.205,
+     0.4092
+    ],
+    "depth": 0.012,
+    "area": 0.0014
+   },
+   {
+    "kind": "tree",
+    "type": "thing",
+    "score": 0.296,
+    "file": "hicks-11.webp",
+    "box": [
+     0.705,
+     0.1969,
+     1.0,
+     0.6721
+    ],
+    "depth": 0.341,
+    "area": 0.0632
+   },
+   {
+    "kind": "tree",
+    "type": "thing",
+    "score": 0.277,
+    "file": "hicks-12.webp",
+    "box": [
+     0.235,
+     0.0,
+     0.4879,
+     0.2337
+    ],
+    "depth": 0.153,
+    "area": 0.0272
+   },
+   {
+    "kind": "mountain",
+    "type": "thing",
+    "score": 0.266,
+    "file": "hicks-13.webp",
+    "box": [
+     0.0436,
+     0.3176,
+     0.1193,
+     0.4144
+    ],
+    "depth": 0.016,
+    "area": 0.0047
+   },
+   {
+    "kind": "leopard",
+    "type": "animal",
+    "score": 1,
+    "file": "hicks-leopard.webp",
+    "box": [
+     0.6175,
+     0.7198,
+     0.9025,
+     0.9276
+    ],
+    "depth": null,
+    "area": 0,
+    "hand": true
+   },
+   {
+    "kind": "cattle",
+    "type": "animal",
+    "score": 1,
+    "file": "hicks-ox.webp",
+    "box": [
+     0.3175,
+     0.3002,
+     0.6229,
+     0.7433
+    ],
+    "depth": null,
+    "area": 0,
+    "hand": true
+   },
+   {
+    "kind": "leopard",
+    "type": "animal",
+    "score": 1,
+    "file": "hicks-leopard2.webp",
+    "box": [
+     0.7192,
+     0.2502,
+     1.0,
+     0.5255
+    ],
+    "depth": null,
+    "area": 0,
+    "hand": true
+   }
+  ],
+  "bucket": "folk",
+  "plate": "assets/paintings/v2/plate/hicks.jpg",
+  "depth2": "assets/paintings/v2/depth/hicks.png"
+ },
+ "marc": {
+  "palette": [
+   {
+    "c": "#251c2a",
+    "w": 0.196
+   },
+   {
+    "c": "#433123",
+    "w": 0.259
+   },
+   {
+    "c": "#722f16",
+    "w": 0.151
+   },
+   {
+    "c": "#5d573d",
+    "w": 0.158
+   },
+   {
+    "c": "#aa441a",
+    "w": 0.114
+   },
+   {
+    "c": "#aa9565",
+    "w": 0.091
+   },
+   {
+    "c": "#f6f0df",
+    "w": 0.032
+   }
+  ],
+  "stats": {
+   "sat": 0.581,
+   "edges": 0.154,
+   "sky": 0.117,
+   "horizon": 0.5,
+   "light": 0.291
+  },
+  "look": "facet",
+  "parts": [
+   {
+    "kind": "deer",
+    "type": "animal",
+    "score": 1,
+    "file": "marc-deer.webp",
+    "box": [
+     0.3891,
+     0.4655,
+     0.6117,
+     1.0
+    ],
+    "depth": null,
+    "area": 0,
+    "hand": true
+   },
+   {
+    "kind": "pig",
+    "type": "animal",
+    "score": 1,
+    "file": "marc-boar.webp",
+    "box": [
+     0.0298,
+     0.6074,
+     0.3459,
+     0.995
+    ],
+    "depth": null,
+    "area": 0,
+    "hand": true
+   }
+  ],
+  "bucket": "expressionist",
+  "plate": "assets/paintings/v2/plate/marc.jpg",
+  "depth2": "assets/paintings/v2/depth/marc.png"
+ }
+}

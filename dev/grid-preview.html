@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grid preview</title>
+<link rel="stylesheet" href="../css/style.css">
+<style>
+  body { padding: 32px 0 80px; }
+  .opt { max-width: 1500px; margin: 0 auto 64px; padding: 0 var(--gutter); }
+  .opt h2 { font: 400 26px/1.2 var(--serif); color: var(--ink); margin: 0 0 6px; }
+  .opt p.d { color: var(--ink-2); margin: 0 0 22px; max-width: 70ch; }
+  .g { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 28px 18px; }
+  .it { cursor: pointer; display: flex; flex-direction: column; }
+  /* the frame: always the same shape, the picture placed inside it */
+  .fr { position: relative; width: 100%; background: var(--bg-2); border: 1px solid var(--line); transition: border-color .3s; }
+  .it:hover .fr { border-color: var(--accent); }
+  .fr img { position: absolute; display: block; }
+  .t { margin: 10px 0 3px; font: 400 15px/1.3 var(--serif); color: var(--ink); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.6em; }
+  .a { font: 400 10px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .l { margin-top: 5px; font: 400 10px var(--mono); color: var(--accent-2); letter-spacing: .1em; text-transform: uppercase; }
+  /* A: a square mount, the whole painting inside it (nothing cut off) */
+  .A .fr { aspect-ratio: 1 / 1; }
+  .A .fr img { inset: 14px; width: calc(100% - 28px); height: calc(100% - 28px); object-fit: contain; filter: drop-shadow(0 6px 14px rgba(0,0,0,.5)); }
+  /* B: an upright 4:5 frame, filled with the painting (edges cropped) */
+  .B .fr { aspect-ratio: 4 / 5; overflow: hidden; }
+  .B .fr img { inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  /* C: a landscape 4:3 mount, whole painting, on a light card like a museum mat */
+  .C .fr { aspect-ratio: 4 / 3; background: #ebe5d9; border-color: #ebe5d9; }
+  .C .fr img { inset: 16px; width: calc(100% - 32px); height: calc(100% - 32px); object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0,0,0,.35)); }
+</style>
+</head>
+<body>
+  <section class="opt A"><h2>方案 A · 正方形画框，完整显示整幅画</h2>
+    <p class="d">每个画框都是同样大小的正方形，画放在中间，不裁切。竖的卷轴会窄一些、横的会扁一些，但所有卡片高度一致，标题和标签都对齐成一排。</p><ol class="g"></ol></section>
+  <section class="opt B"><h2>方案 B · 竖向 4:5 画框，画铺满（边缘会裁掉一点）</h2>
+    <p class="d">像画册封面一样整齐划一，每张都铺满画框。缺点是长卷轴、宽幅画会被裁掉两边或上下。</p><ol class="g"></ol></section>
+  <section class="opt C"><h2>方案 C · 横向 4:3 浅色卡纸，完整显示</h2>
+    <p class="d">像博物馆里画周围的白色卡纸，完整显示，统一大小，画面更明亮。</p><ol class="g"></ol></section>
+<script type="module">
+  const all = await fetch('../js/collection.json').then(r => r.json());
+  // the same first works you saw, plus a few very tall / very wide ones to test the extremes
+  const pick = all.slice(0, 14);
+  const look = { oil: 'oil glaze', gilded: 'gold ground', splat: 'brush splats', dots: 'dots', facet: 'facets', ink: 'ink', woodblock: 'woodblock', flat: 'flat colour' };
+  const html = pick.map(w => `<li class="it"><div class="fr"><img src="../assets/paintings/v2/thumbs/${w.id}.webp" alt=""></div>
+    <p class="t">${w.title}</p><p class="a">${w.artist} · ${w.date}</p><span class="l">→ ${look[w.look] || ''}</span></li>`).join('');
+  document.querySelectorAll('.g').forEach(g => g.innerHTML = html);
+</script>
+</body>
+</html>

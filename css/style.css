@@ -526,3 +526,82 @@ html[lang="ko"] { --serif: 'Cormorant Garamond', 'AppleMyungjo', 'Nanum Myeongjo
 html[lang="zh"] body, html[lang="ko"] body { word-break: normal; line-break: strict; }
 html[lang="ko"] body { word-break: keep-all; }
 html[lang="zh"] .crossing .line, html[lang="ko"] .crossing .line { letter-spacing: .02em; line-height: 1.7; }
+
+/* ---------- the collection (200 works) ---------- */
+.coll-head { margin-top: clamp(48px, 7vw, 96px); }
+.coll-intro { color: var(--ink-2); max-width: 70ch; margin: 14px 0 18px; font: 400 16px/1.6 var(--sans); }
+.coll-filters { display: flex; flex-wrap: wrap; gap: 6px 8px; margin: 0 0 22px; }
+.coll-filters .grp { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-right: 14px; }
+.coll-filters .lbl { font: 400 10px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
+.coll-filters button { font: 400 12px var(--sans); color: var(--ink-2); background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px; cursor: pointer; }
+.coll-filters button[aria-pressed="true"] { background: var(--accent); color: #17130d; border-color: var(--accent); }
+.coll-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 18px 14px; }
+.coll-item { cursor: pointer; outline: none; }
+.coll-item .mount { aspect-ratio: 1; background: var(--bg-2); border: 1px solid var(--line); display: grid; place-items: center; padding: 10px; transition: border-color .3s var(--ease), background .3s var(--ease); }
+.coll-item img { max-width: 100%; max-height: 100%; object-fit: contain; box-shadow: 0 6px 18px rgba(0,0,0,.45); }
+.coll-item:hover .mount, .coll-item:focus-visible .mount { border-color: var(--accent); background: #1b1916; }
+.coll-item .t { margin: 8px 0 2px; font: 400 15px/1.25 var(--serif); color: var(--ink); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.coll-item .a { font: 400 10px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.coll-item .look { display: inline-block; margin-top: 4px; font: 400 10px var(--mono); color: var(--accent-2); letter-spacing: .1em; text-transform: uppercase; }
+.coll-more { grid-column: 1 / -1; justify-self: center; margin-top: 8px; }
+/* the visitor's view inside a painting */
+.view-caption { position: absolute; left: 50%; top: 74px; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 10px;
+  background: rgba(14,12,10,.62); backdrop-filter: blur(10px); border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; font: 400 13px var(--sans); color: var(--ink); white-space: nowrap; }
+.view-caption .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+.view-caption .sep { color: var(--muted); }
+.view-caption button { font: 400 11px var(--mono); letter-spacing: .06em; color: var(--ink-2); background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px; cursor: pointer; }
+.view-caption button[aria-pressed="true"] { color: #17130d; background: var(--accent); border-color: var(--accent); }
+@media (max-width: 620px) { .view-caption { top: 62px; font-size: 11px; flex-wrap: wrap; justify-content: center; white-space: normal; max-width: calc(100vw - 32px); } }
+/* collage: what the animals do, said in one line */
+.collage-say { position: absolute; left: 50%; bottom: 92px; transform: translateX(-50%) translateY(8px); opacity: 0; transition: opacity .4s, transform .4s; z-index: 7;
+  background: rgba(14,12,10,.78); border: 1px solid var(--line); border-radius: 12px; padding: 9px 16px; font: italic 400 17px/1.4 var(--serif); color: var(--ink); max-width: min(640px, calc(100vw - 32px)); text-align: center; pointer-events: none; }
+.collage-say.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.coll-intro, .coll-filters, .coll-grid { max-width: 1500px; margin-left: auto; margin-right: auto; padding-left: var(--gutter); padding-right: var(--gutter); box-sizing: border-box; }
+.coll-intro { margin-top: 16px; }
+.coll-grid { padding-bottom: 96px; }
+/* collection grid, option A: every frame the same square, the whole painting centred inside it
+   (absolutely placed, so a tall scroll can never stretch its frame), text rows aligned */
+.coll-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 28px 18px; }
+.coll-item { display: flex; flex-direction: column; }
+.coll-item .mount { position: relative; display: block; width: 100%; aspect-ratio: 1 / 1; padding: 0; }
+.coll-item .mount img { position: absolute; inset: 14px; width: calc(100% - 28px); height: calc(100% - 28px); max-width: none; max-height: none;
+  object-fit: contain; box-shadow: none; filter: drop-shadow(0 6px 14px rgba(0,0,0,.5)); }
+.coll-item .t { margin: 10px 0 3px; min-height: 2.6em; }
+.coll-item .a { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.coll-item .look { margin-top: 5px; }
+
+/* ---------- the point sculpture ---------- */
+.sculpt-kinds { padding: 4px; gap: 2px; background: rgba(0, 0, 0, .35); }
+.sculpt-kinds button { min-height: 36px; padding: 0 18px; font: 400 14px var(--serif); letter-spacing: .04em; transition: background .25s, color .25s, box-shadow .25s; }
+.sculpt-kinds button:hover { color: var(--ink); background: rgba(255, 255, 255, .06); }
+.sculpt-kinds button[aria-pressed="true"] { background: linear-gradient(180deg, #f3e6c4, #d9c08a); color: #1b160e; box-shadow: 0 0 0 1px rgba(255, 236, 190, .5), 0 6px 18px rgba(201, 168, 104, .25); }
+.sculpt-label { position: absolute; left: var(--gutter); bottom: 92px; z-index: 5; width: min(330px, calc(100% - 2 * var(--gutter))); padding: 14px 16px 12px; border-radius: 14px; border-left: 2px solid var(--accent, #c9a868); font-size: 13px; line-height: 1.65; color: var(--ink-2); cursor: pointer; }
+.sculpt-label h3 { margin: 0 0 6px; font: 400 18px/1.35 var(--serif); color: var(--ink); }
+.sculpt-label p { margin: 4px 0; }
+.sculpt-label em { font-style: normal; font: 400 10.5px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--accent-2, #c9a868); margin-right: 8px; }
+@media (max-width: 900px) { .sculpt-label { bottom: auto; top: 78px; left: auto; right: var(--gutter); width: min(300px, 60%); } .sculpt-label p { display: none; } .sculpt-label.open p { display: block; } .sculpt-label h3 { margin: 0; font-size: 15px; } }
+#view-create .control-bar .btn, .sculpt-kinds button { white-space: nowrap; }
+
+/* ---------- the star-map collage ---------- */
+.compose-wrap.star { right: 316px; }
+.compose-wrap.star canvas { max-width: 100%; max-height: calc(100vh - 250px); width: auto; height: auto; border-radius: 4px; }
+.star-shelf { width: 284px; padding: 14px 14px 16px; }
+.star-shelf h3 { margin: 14px 0 8px; } .star-shelf h3:first-child { margin-top: 0; }
+.sc-styles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.sc-styles button, .sc-shelf button, .sc-row button { border: 1px solid var(--line); background: rgba(255, 255, 255, .03); color: var(--ink-2); border-radius: 12px; cursor: pointer; transition: border-color .2s, background .2s, transform .2s, color .2s; }
+.sc-styles button { padding: 10px 4px 8px; line-height: 1.25; }
+.sc-styles b { display: block; font: 400 14px var(--serif); color: var(--ink); }
+.sc-styles small { font: 400 10px var(--mono); letter-spacing: .1em; color: var(--muted); }
+.sc-styles button[aria-pressed="true"] { border-color: transparent; background: linear-gradient(180deg, #f3e6c4, #d9c08a); box-shadow: 0 6px 18px rgba(201, 168, 104, .25); }
+.sc-styles button[aria-pressed="true"] b, .sc-styles button[aria-pressed="true"] small { color: #1b160e; }
+.sc-shelf { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; max-height: 190px; overflow: auto; }
+.sc-shelf button { height: 54px; padding: 3px; display: grid; place-items: center; }
+.sc-shelf button:hover, .sc-row button:hover, .sc-styles button:hover { border-color: var(--line-2); background: rgba(255, 255, 255, .07); transform: translateY(-1px); color: var(--ink); }
+.sc-shelf button.mine { border-color: var(--accent, #c9a868); background: rgba(200, 169, 106, .12); }
+.sc-shelf canvas { max-width: 100%; max-height: 100%; }
+.sc-row { display: flex; flex-wrap: wrap; gap: 6px; } .sc-row button { padding: 6px 10px; font: 400 12px var(--sans); }
+.sc-name { width: 100%; box-sizing: border-box; background: rgba(0, 0, 0, .25); border: 1px solid var(--line); border-radius: 10px; color: var(--ink); padding: 8px 10px; font: italic 14px var(--serif); margin-bottom: 8px; }
+.sc-sel[hidden] { display: none; }
+.sc-busy { position: sticky; bottom: -16px; margin-top: 12px; font: 400 11px var(--mono); letter-spacing: .08em; color: #f3d79a; opacity: 0; transition: opacity .2s; }
+.sc-busy.on { opacity: 1; }
+@media (max-width: 900px) { .compose-wrap.star { right: 16px; bottom: 330px; } .star-shelf { top: auto; bottom: 96px; left: 16px; right: 16px; width: auto; height: 220px; } }

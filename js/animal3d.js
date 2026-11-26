@@ -130,7 +130,7 @@ export async function loadAnimal3D(url, opts = {}) {
 // A standing pose made from a walk: every bone at its average over one cycle (rotations
 // averaged on the same hemisphere), held still. Legs swing forward and back about the
 // upright, so the average stands square on all four feet.
-function standClip(walk, N = 24) {
+export function standClip(walk, N = 24) {
   const tracks = [];
   for (const tr of walk.tracks) {
     const it = tr.createInterpolant(), size = tr.getValueSize(), acc = new Float64Array(size);

@@ -114,6 +114,51 @@ of the picture (a flat painted figure cannot be redrawn standing without inventi
 In the Peaceable Kingdom the speakers are the standing ox and the standing leopard, who
 speak from where they stand; the visitor walks over to them.
 
+## Version 2 (branch `v2-upgrade`)
+
+**200 more paintings.** Besides the three original works, the index now holds a collection of
+200 public-domain paintings with animals, from the open-access collections of the National
+Gallery of Art (Washington), the Cleveland Museum of Art and The Met (all CC0), balanced across
+styles: early panels, Baroque, Romantic, Realist, Impressionist, Post-Impressionist, pointillist,
+Expressionist and modern work, American folk painting, Japanese and Chinese painting, and Indian
+and Persian miniatures. Filter them by style or by animal. Their wall texts and the painted
+animals' lines are generated from each work's record (`js/v2/texts.js`, English and Chinese).
+
+**The visitor becomes part of the painting.** Animals no longer walk: the visitor is a still,
+solid 3D figure (a rigged model frozen in its standing pose, or a drawing / storybook animal
+inflated from its silhouette), and inside the painting it is rebuilt in that painting's manner
+and palette (`js/v2/figure.js`): oil glaze, gold ground, impressionist Gaussian brush splats,
+pointillist dots, cubist/expressionist facets, ink wash, woodblock, flat folk colour.
+
+**The painting in 3D.** Each painting is opened into a 3D world from its depth map
+(`js/v2/world.js`): every pixel pushed back along its ray, drawn as Gaussian splats or as a
+point cloud (switch at the top of the view). Seen from the painter's eye it is exactly the
+picture; then it unfolds. The painted animal that speaks glows and comes forward.
+
+**The view is the animal's own** (`js/v2/stage.js`): it depends on the visitor's real size and
+the painted space. A giraffe or an elk looks down on the picture, a cat or a rabbit looks up at
+it from the grass, a bird sees it from the air; the view turns to whoever is speaking.
+
+**Collage** (`js/v2/collage.js`): one picture. The painting with everything movable lifted out
+and the ground repainted (LaMa); every painted animal and thing is a cut-out you can move, and
+it shrinks as it goes back into the picture. Animals react like animals (`js/v2/ecology.js`):
+prey backs away from predators ("the cat won't stand next to the wolf"), small birds hop onto a
+big animal's back, animals of a kind stay together. Invite animals from other paintings; "Unify"
+repaints every piece in the painting's palette and manner.
+
+**Sculpture** (`js/v2/sculpture.js`): one irregular lump of painted earth, no plinth and no
+perfect shapes, with the painting pressed into its front. The visitor (in the painting's manner),
+the painted animals and some painted things grow out of knobs; drag any knob to move it over the
+body. Painted, clay, bronze or stone; export as .glb.
+
+Asset pipeline:
+
+```bash
+SSL_CERT_FILE=$(python -c "import certifi;print(certifi.where())") python tools/harvest_paintings.py 200 --nga <folder with NGA opendata CSVs>
+python tools/v2_analyse.py              # depth, palette, look, OWLv2 + SAM parts, LaMa plate (resumable)
+python tools/v2_analyse.py --originals  # the same reading of the three original works
+```
+
 ## Project structure
 
 ```
