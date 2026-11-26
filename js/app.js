@@ -622,9 +622,10 @@ async function runStory(g) {
   if (!alive()) return;
   await Promise.all([g.toLabel(), speak('visitor', t('tourLabel', { title: x.title, artist: x.artist, date: x.date }))]);
   if (!alive()) return;
-  if (x.facts?.[0]) await Promise.all([g.lookBack(), speak('visitor', x.facts[0])]);
+  // done reading, it turns round to you: one thing about the picture, what it sees, and the question
+  await Promise.all([g.lookBack(), x.facts?.[0] ? speak('visitor', x.facts[0]) : null]);
   if (!alive()) return;
-  await Promise.all([g.toPainting(), speak('visitor', t('tourSee', { animals: x.see }))]);
+  await speak('visitor', t('tourSee', { animals: x.see }));
   if (!alive()) return;
   g.talkToYou(true);
   await askToGoIn(g);
@@ -654,8 +655,7 @@ async function stepIn(g = gallery) {
   // (and the moment the relief opens up) happens behind the card.
   const entering = g.enter();
   await sleep(100);
-  await Promise.race([g.walkedIn || sleep(650), sleep(12000)]);     // you see it walk into the picture first
-  await sleep(500);
+  await Promise.race([g.walkedIn || sleep(650), sleep(12000)]);     // it sets off towards the picture; the dark closes while it walks
   if (!alive()) return;
   const x = W(state.work.id);
   await crossing(g, [
