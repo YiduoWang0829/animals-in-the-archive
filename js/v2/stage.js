@@ -385,7 +385,7 @@ export class Stage {
     if (this.actor) { this.actor.stop?.(); this.actor.group.removeFromParent(); this.actor.shadow?.removeFromParent(); }
     if (this.live3d) {
       const a = this.actor, { styleActor } = await import('./livestyle.js');
-      styleActor(a, this.o.work.look || 'oil', this.o.work.palette);
+      styleActor(a, this.o.work.look || 'oil', this.o.work.palette, { coat: this.world.mode || 'splat', size: this.vh * 0.045 });
       a.setHeight(this.vh);
       a.group.position.copy(this.fig.position);
       a.yaw = this.figYaw; a.inner.rotation.y = a.yaw; a.face?.(null);
@@ -431,6 +431,7 @@ export class Stage {
     el.onclick = e => {
       const b = e.target.closest('[data-v2-mode]'); if (!b) return;
       this.world.setMode(b.dataset.v2Mode);
+      if (this.live3d) this.actor?.setCoat?.(b.dataset.v2Mode);
       el.querySelectorAll('[data-v2-mode]').forEach(x => x.setAttribute('aria-pressed', x === b));
     };
   }
