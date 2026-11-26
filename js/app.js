@@ -1098,6 +1098,22 @@ const partUrl = f => 'assets/paintings/v2/parts/' + f;
 const workPainting = w => w.v2 ? w.hd : (w.hd || w.image);
 const workDepth = w => w.v2 ? w.depth : (w.depth2 || w.depth);
 const workPlate = w => w.v2 ? w.plate : (w.plate || w.image);
+// the big three, hand-checked: which cut-outs, and what each really is (the automatic reading
+// mistakes Eden's white dog for a rabbit and Hicks's cattle for lions)
+const CURATED = {
+  eden: { animals: [['eden-lion', 'lion'], ['eden-peacock', 'peacock'], ['eden-deer', 'deer'], ['eden-horse', 'horse'], ['eden-0', 'rabbit'], ['eden-4', 'dog'], ['eden-6', 'parrot'], ['eden-3', 'paradise']],
+    things: [['eden-s-trunk', 'serpent'], ['eden-s-apple', 'apple'], ['eden-s-tree', 'tree'], ['eden-7', 'tree'], ['eden-9', 'tree']] },
+  hicks: { animals: [['hicks-6', 'lion'], ['hicks-leopard', 'leopard'], ['hicks-ox', 'ox'], ['hicks-5', 'bear'], ['hicks-0', 'cow'], ['hicks-1', 'goat'], ['hicks-4', 'goat'], ['hicks-leopard2', 'leopard']],
+    things: [['hicks-s-tree', 'tree'], ['hicks-7', 'tree'], ['hicks-12', 'branch'], ['hicks-s-bush', 'tree']] },
+  marc: { animals: [['marc-deer', 'deer'], ['marc-boar', 'boar']], things: [] },
+};
+// the pieces a work offers the sculpture and the collage: { animals: [{file, kind}], things: [{file, kind}] }
+function workPieces(w) {
+  const c = CURATED[w.id];
+  if (c) return { animals: c.animals.map(([f, kind]) => ({ file: f + '.webp', kind })), things: c.things.map(([f, kind]) => ({ file: f + '.webp', kind })), curated: true };
+  const parts = w.parts || [];
+  return { animals: parts.filter(p => p.type === 'animal'), things: parts.filter(p => p.type === 'thing' && p.kind !== 'person') };
+}
 async function openSculpt2() {
   const w = state.work, zh = LANG === 'zh';
   $('#compose-wrap').hidden = true; $('#sculpt-canvas').hidden = false;
@@ -1118,9 +1134,9 @@ async function openSculpt2() {
   let visitor;
   if (v.kind === 'animal3d') visitor = { glb: animal3dById(v.id).glb, height: vk.realH };
   else { const F = await import('./v2/figure.js'); visitor = { img: await F.renderFigureImage(await visitorGeometry(), w.look, w.palette) }; }
-  const parts = (w.parts || []), figures = [], things = [];
-  for (const p of parts.filter(p => p.type === 'animal').slice(0, 6)) { try { figures.push({ img: await loadImage(partUrl(p.file)), kind: p.kind }); } catch {} }
-  for (const p of parts.filter(p => p.type === 'thing' && p.kind !== 'person').slice(0, 6)) { try { things.push({ img: await loadImage(partUrl(p.file)), kind: p.kind }); } catch {} }
+  const pcs = workPieces(w), figures = [], things = [];
+  for (const p of pcs.animals.slice(0, 8)) { try { figures.push({ img: await loadImage(partUrl(p.file)), kind: p.kind }); } catch {} }
+  for (const p of pcs.things.slice(0, 6)) { try { things.push({ img: await loadImage(partUrl(p.file)), kind: p.kind }); } catch {} }
   const { PointSculpture } = await import('./v2/pointsculpture.js');
   sculpt = new PointSculpture($('#sculpt-canvas'), { work: w, look: w.look, palette: w.palette, painting: workPainting(w), visitor, figures, things });
   window.__aia.sculpt = sculpt;
@@ -1171,7 +1187,7 @@ async function openStarCollage() {
   for (const [k, [u, n]] of Object.entries(ORIGS)) if (k !== w.id) { try { paintings.push({ key: k, name: n, img: await loadImage(u) }); } catch {} }
   const F = await import('./v2/figure.js'), vk = visitorKindReal();
   const animals = [{ img: await F.renderFigureImage(await visitorGeometry(), w.look, w.palette), label: zh ? `你的${name(vk.kind)}座` : `Your ${vk.kind}`, title: zh ? '你的动物' : 'Your animal' }];
-  const own = (w.parts || []).filter(p => p.type === 'animal').slice(0, 6);
+  const own = workPieces(w).animals.slice(0, 8);
   for (const p of own) { try { animals.push({ img: await loadImage(partUrl(p.file)), label: zh ? `${short}之${name(p.kind)}座` : `${cap(p.kind)} of ${short}`, title: `${title} · ${name(p.kind)}` }); } catch {} }
   collage ??= await (await fetch('assets/collage/collage.json')).json();
   for (const [id, c] of Object.entries(collage)) { if (id.startsWith(w.id + '-')) continue; try {
@@ -1505,5 +1521,6 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && tra
 renderIndex();
 window.__aia = { state, STRINGS, get gallery() { return gallery; },
   // testing only: feed fake camera input (a face, hands, a gesture) without a camera
-  create: (id, animal = 'wolf', mode = 'sculpt') => { state.work = workOf(id); state.visitor = { kind: 'animal3d', id: animal }; state.hosts ??= []; state.role ??= 'visitor'; state.name ??= 'Test'; return enterCreate(mode); },
+  works: () => WORKS.map(w => w.id),
+  create: (id, animal = 'wolf', mode = 'sculpt') => { teardown(); composer?.dispose?.(); composer = null; state.work = workOf(id); state.visitor = { kind: 'animal3d', id: animal }; state.hosts ??= []; state.role ??= 'visitor'; state.name ??= 'Test'; return enterCreate(mode); },
   sim: { face: f => { face = f; }, hands: h => { hands = h; onHands(h); }, gesture: x => onGesture(x) } };   // console/debug access only

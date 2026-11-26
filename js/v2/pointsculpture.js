@@ -21,7 +21,7 @@ export const KINDS = ['dots', 'stars', 'solid'];
 export const ZH = { lion: '狮子', horse: '马', deer: '鹿', peacock: '孔雀', dog: '狗', rabbit: '兔子', calf: '小牛', cub: '小狮子', goat: '山羊', leopard: '豹子',
   ox: '牛', boar: '野猪', pig: '猪', wolf: '狼', fox: '狐狸', bear: '熊', cat: '猫', cow: '牛', sheep: '羊', bird: '鸟', parrot: '鹦鹉', heron: '鹭', ostrich: '鸵鸟',
   duck: '鸭子', swan: '天鹅', chicken: '鸡', monkey: '猴子', elephant: '大象', camel: '骆驼', donkey: '驴', fish: '鱼', squirrel: '松鼠', owl: '猫头鹰', animal: '动物',
-  tree: '树', rock: '石头', mountain: '山', house: '房子', flower: '花', branch: '树枝', boat: '船', moon: '月亮' };
+  tree: '树', serpent: '缠着蛇的树干', apple: '苹果树', paradise: '极乐鸟', cattle: '牛', rock: '石头', mountain: '山', house: '房子', flower: '花', branch: '树枝', boat: '船', moon: '月亮' };
 
 const mulberry = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 const pixels = (im, maxW) => { const w = Math.max(1, Math.min(maxW, im.width || im.naturalWidth)), h = Math.max(1, Math.round(w * (im.height || im.naturalHeight) / (im.width || im.naturalWidth)));
@@ -127,7 +127,7 @@ function shard(P, rnd, Ww, cell) {
   return out;
 }
 function plinth(P, R, n, cell) {      // a lump of the painting's ground, its foot at the origin
-  const out = [], Rb = R * .9, h = R * .28, noise = a => Math.sin(a * 3 + 1.7) * .08 + Math.sin(a * 5 + .4) * .05 + Math.sin(a * 9) * .03;
+  const out = [], Rb = R * .9, h = R * .16, noise = a => Math.sin(a * 3 + 1.7) * .08 + Math.sin(a * 5 + .4) * .05 + Math.sin(a * 9) * .03;
   for (let k = 0; k < n; k++) {
     const a = Math.random() * Math.PI * 2, rr = Rb * (1 + noise(a)), side = Math.random() < .45; let x, y, z, nx, ny, nz, u, v;
     if (!side) { const r = rr * Math.sqrt(Math.random()); x = Math.cos(a) * r; z = Math.sin(a) * r; y = -Math.pow(r / rr, 4) * h * .25; nx = 0; ny = 1; nz = 0; u = .5 + x / (Rb * 2) * .55; v = .8 + z / (Rb * 2) * .3; }
@@ -161,7 +161,7 @@ function reform(pts, look, R, rnd) {
     const { C, g, rad } = parts(P, 9, rnd);
     const N = C.map(() => { const r = new THREE.Quaternion().setFromEuler(new THREE.Euler(rnd() * 6.28, rnd() * 6.28, rnd() * 6.28)); return TET.map(n => n.clone().applyQuaternion(r)); });
     P.forEach((p, i) => { const k = g[i], c = C[k]; d.set(p[0] - c[0], p[1] - c[1], p[2] - c[2]); const r = d.length(); if (r < 1e-6) return; d.divideScalar(r);
-      const s = Math.max(.3, ...N[k].map(n => n.dot(d))), r2 = r * .4 + (rad[k] * 1.1 / s) * .6;
+      const s = Math.max(.3, ...N[k].map(n => n.dot(d))), r2 = r * .55 + (rad[k] * 1.1 / s) * .45;
       p[0] = c[0] + d.x * r2; p[1] = c[1] + d.y * r2; p[2] = c[2] + d.z * r2; });
   } else if (look === 'flat' || look === 'ink') {
     const { C, g, rad } = parts(P, 7, rnd), yLeg = ymin + R * .45;
@@ -183,9 +183,9 @@ function reform(pts, look, R, rnd) {
 
 // ------------------------------------------------------------------ 3 · the arrangement (nothing passes through anything)
 const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Euler(), V = new THREE.Vector3(), Nv = new THREE.Vector3();
-function place(arr, { pos, yaw = 0, pitch = 0, roll = 0, s = 1 }, into) {
+function place(arr, { pos, yaw = 0, pitch = 0, roll = 0, s = 1, role = 2 }, into) {      // role: 0 your animal, 1 a painted animal, 2 a thing
   Q.setFromEuler(E.set(pitch, yaw, roll, 'YXZ')); M.compose(pos, Q, V.set(s, s, s));
-  for (const p of arr) { V.set(p[0], p[1], p[2]).applyMatrix4(M); Nv.set(p[3], p[4], p[5]).applyQuaternion(Q); into.push([V.x, V.y, V.z, Nv.x, Nv.y, Nv.z, p[6], p[7], p[8], p[9] * s]); }
+  for (const p of arr) { V.set(p[0], p[1], p[2]).applyMatrix4(M); Nv.set(p[3], p[4], p[5]).applyQuaternion(Q); into.push([V.x, V.y, V.z, Nv.x, Nv.y, Nv.z, p[6], p[7], p[8], p[9] * s, role]); }
 }
 const extent = arr => { let r = 0, y0 = 1e9; for (const p of arr) { r = Math.max(r, Math.hypot(p[0], p[1], p[2])); y0 = Math.min(y0, p[1]); } return { r, y0 }; };
 
@@ -197,27 +197,35 @@ function arrange({ me, figs, things, painting, look, R, cell, seed, meName }) {
     for (let k = 0; k < 60; k++) { const c = gen(); const gap = Math.min(1e9, ...taken.map(t => c.distanceTo(t.c) - (t.r + r) * .92));
       if (gap > bestGap) { bestGap = gap; best = c; } if (gap > 0) break; }
     taken.push({ c: best, r }); return best; };
-  // your animal, re-formed, near the middle
+  // your animal, re-formed, large, in the middle
   const body = reform(me, look, R, rnd); body.forEach(p => p[9] = cell * 1.3);
-  const meS = .85 + rnd() * .1, ex = extent(body), meP = new THREE.Vector3((rnd() - .5) * R * .2, -ex.y0 * meS + R * .02, (rnd() - .5) * R * .2);
-  place(body, { pos: meP, s: meS, yaw: rnd() * 6.28, roll: tilt(.2) }, out); taken.push({ c: meP.clone(), r: ex.r * meS * .8 }); anchors.push(meP);
-  // the painting's animals, whole, turned towards it
-  const seen = [];
-  for (const f of figs) {
-    const Hw = R * (.45 + rnd() * .35) * Math.min(1.35, Math.sqrt(f.h / f.w) * 1.1), rl = relief(f, Hw, cell), r = extent(rl).r;
-    let a = 0; const p = spot(r, () => { a = rnd() * 6.28; const rr = R * (.65 + rnd() * .5), y = rnd() < .65 ? Hw / 2 : Hw / 2 + rnd() * H * .5; return new THREE.Vector3(Math.cos(a) * rr, y, Math.sin(a) * rr); });
-    a = Math.atan2(p.z, p.x);
-    place(rl, { pos: p, yaw: outward(a) + Math.PI + tilt(2), pitch: tilt(.25), roll: tilt(.3) }, out); anchors.push(p); seen.push(f.kind);
-  }
-  // the painting's world: its things, whole; or crystal shards of it
+  const meS = 1 + rnd() * .1, ex = extent(body), meR = ex.r * meS, meP = new THREE.Vector3((rnd() - .5) * R * .15, -ex.y0 * meS + R * .02, (rnd() - .5) * R * .15);
+  place(body, { pos: meP, s: meS, yaw: rnd() * 6.28, roll: tilt(.15), role: 0 }, out); taken.push({ c: meP.clone(), r: meR * .7 }); anchors.push(meP);
+  // the painting's animals, whole, standing round it on the ground, each turned three-quarters towards it
+  const seen = [], n = Math.max(1, figs.length), a0 = rnd() * 6.28;
+  let floated = false;
+  figs.forEach((f, k) => {
+    const Hw = R * (.6 + rnd() * .3) * Math.min(1.3, Math.sqrt(f.h / f.w) * 1.1), rl = relief(f, Hw, cell, .3), r = extent(rl).r;
+    const fl = !floated && rnd() < .3; floated ||= fl;
+    const p = spot(r, () => { const a = a0 + k * Math.PI * 2 / n + tilt(.7), rr = Math.max(R * .95, meR * .65 + r * .8) + rnd() * R * .3;
+      return new THREE.Vector3(Math.cos(a) * rr, fl ? Hw / 2 + R * (.45 + rnd() * .3) : Hw / 2, Math.sin(a) * rr); });
+    const a = Math.atan2(p.z, p.x), turn = (rnd() < .5 ? 1 : -1) * (.2 + rnd() * .35);
+    place(rl, { pos: p, yaw: outward(a) + turn, roll: tilt(fl ? .4 : .08), role: 1 }, out); anchors.push(p); seen.push(f.kind);
+  });
+  // the painting's world: its things, whole, a grove behind and between the animals; or, for a
+  // painting with no things in it, crystal shards of its colour circling above
   const named = [];
-  const pieces = things.length ? things.map(t => ({ pts: relief(t, R * (.65 + rnd() * .5), cell, .05), name: t.kind }))
-    : Array.from({ length: 5 + Math.floor(rnd() * 3) }, () => ({ pts: shard(painting, rnd, R * (.3 + rnd() * .45), cell * 1.1), name: null }));
-  for (const t of pieces) {
-    const r = extent(t.pts).r;
-    const p = spot(r, () => { const a = rnd() * 6.28, rr = R * (.4 + rnd() * .8); return new THREE.Vector3(Math.cos(a) * rr, r * .8 + rnd() * H * .8, Math.sin(a) * rr); });
+  if (things.length) things.forEach((t, k) => {
+    const Hw = R * (.95 + rnd() * .5), rl = relief(t, Hw, cell, .05), r = extent(rl).r;
+    const p = spot(r, () => { const a = a0 + (k + .5) * Math.PI * 2 / Math.max(n, things.length) + tilt(.6), rr = R * (1.25 + rnd() * .35);
+      return new THREE.Vector3(Math.cos(a) * rr, Hw / 2 - R * .05 + rnd() * R * .25, Math.sin(a) * rr); });
     const a = Math.atan2(p.z, p.x);
-    place(t.pts, { pos: p, yaw: outward(a) + tilt(1.5), pitch: tilt(.5), roll: tilt(things.length ? .7 : 2) }, out); anchors.push(p); if (t.name) named.push(t.name);
+    place(rl, { pos: p, yaw: outward(a) + tilt(.8), pitch: tilt(.25), roll: tilt(.3), role: 2 }, out); anchors.push(p); named.push(t.kind);
+  });
+  else for (let k = 0, m = 6 + Math.floor(rnd() * 3); k < m; k++) {
+    const sh = shard(painting, rnd, R * (.45 + rnd() * .45), cell * 1.1), r = extent(sh).r;
+    const p = spot(r, () => { const a = rnd() * 6.28, rr = R * (.7 + rnd() * .8); return new THREE.Vector3(Math.cos(a) * rr, R * (.35 + rnd() * 1.4), Math.sin(a) * rr); });
+    place(sh, { pos: p, yaw: rnd() * 6.28, pitch: tilt(2), roll: tilt(2), role: 3 }, out); anchors.push(p);
   }
   // star-lines
   const lines = [], stars = [];
@@ -256,13 +264,13 @@ function render(kind, c, base, cell, R, seed) {
   } else if (kind === 'stars') {
     const st = (p, keep, k) => { if (rand() > keep) return; const big = rand() < .03, s = cell * (big ? 1.1 : .3 + rand() * .3), L = v => Math.min(255, v * k + 60);
       out.push(sp(p[0], p[1], p[2], s, s, s, L(p[6]), L(p[7]), L(p[8]), 255, I)); };
-    for (const p of c.pts) st(p, .1, 1.5); for (const p of base) st(p, .06, 1.3);
+    for (const p of c.pts) st(p, p[10] === 2 ? .08 : .15, 1.5); for (const p of base) st(p, .06, 1.3);
   } else {
     // 点彩: dots whose density drifts through space – thick clusters, thin veils, dust lifting off
     const W = Array.from({ length: 5 }, () => [(rand() - .5) * 2, (rand() - .5) * 2, (rand() - .5) * 2, rand() * 6.28, (1.2 + rand() * 2.6) / R]);
     const field = (x, y, z) => { let v = 0; for (const [a, b, c2, ph, f] of W) v += Math.sin((a * x + b * y + c2 * z) * f + ph); return v / W.length * 2.6; };
     const sm = t => t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
-    const dot = (p, scale, k0, k1) => { const n = sm(field(p[0], p[1], p[2]) * .5 + .5);
+    const FLOOR = [.5, .42, 0, .38], dot = (p, scale, k0, k1) => { const n = Math.max(FLOOR[p[10] ?? 2] || 0, sm(field(p[0], p[1], p[2]) * .5 + .5));
       if (rand() > (.05 + .85 * Math.pow(n, 1.3)) * scale) return;
       let x = p[0], y = p[1], z = p[2];
       if (n < .45 && rand() < .35) { const d = R * .25 * (.45 - n) * rand(); x += p[3] * d + (rand() - .5) * d; y += p[4] * d + rand() * d * .6; z += p[5] * d + (rand() - .5) * d; }
@@ -306,7 +314,7 @@ export class PointSculpture {
     this.me = me;
     this.figs = (o.figures || []).map(f => ({ ...pixels(f.img, 360), kind: f.kind }));
     this.things = (o.things || []).map(f => ({ ...pixels(f.img, 360), kind: f.kind }));
-    this.base = plinth(this.painting, R * 1.25, 60000, this.cell);
+    this.base = plinth(this.painting, R * 1.9, 80000, this.cell);
     // the stage
     this.GS = await import(GS_URL);
     this.scene = new THREE.Scene(); this.scene.background = new THREE.Color(0x0b0a09);
@@ -323,9 +331,16 @@ export class PointSculpture {
     return this;
   }
   build() {
-    this.coll = arrange({ me: this.me, figs: [...this.figs].sort(() => Math.random() - .5).slice(0, 4), things: [...this.things].sort(() => Math.random() - .5).slice(0, 4),
+    this.coll = arrange({ me: this.me, figs: [...this.figs].sort(() => Math.random() - .5).slice(0, 4), things: this.things.length ? [this.things[0], ...this.things.slice(1).sort(() => Math.random() - .5)].slice(0, 4) : [],
       painting: this.painting, look: this.o.look, R: this.R, cell: this.cell, seed: this.seed });
-    const R = this.R; this.controls.target.set(0, Math.min(this.coll.top, R * 2.4) * .45, 0);
+    // frame the whole of it: the camera keeps its direction and steps back until everything fits
+    const b = new THREE.Box3(), v = new THREE.Vector3(); for (let i = 0; i < this.coll.pts.length; i += 7) { const p = this.coll.pts[i]; b.expandByPoint(v.set(p[0], p[1], p[2])); }
+    b.expandByPoint(v.set(this.R * 1.2, -this.R * .3, this.R * 1.2)); b.expandByPoint(v.set(-this.R * 1.2, -this.R * .3, -this.R * 1.2));
+    const c = b.getCenter(new THREE.Vector3()), rad = b.getSize(new THREE.Vector3()).length() * .5;
+    const fov = THREE.MathUtils.degToRad(this.camera.fov) / 2, fit = rad / Math.sin(Math.min(fov, Math.atan(Math.tan(fov) * this.camera.aspect))) * .8;
+    const dir = this.camera.position.clone().sub(this.controls.target).normalize();
+    this.controls.target.copy(c); this.camera.position.copy(c).addScaledVector(dir, fit);
+    this.controls.maxDistance = Math.max(this.controls.maxDistance, fit * 1.8);
   }
   async rebuild() { this.build(); await this.show(); }
   async show() {
